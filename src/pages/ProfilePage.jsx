@@ -59,26 +59,38 @@ export default function ProfilePage() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${profile.id}/foto.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('fotos-funcionarios')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true,
+      let finalUrl = '';
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('fotos-funcionarios')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('fotos-funcionarios')
+          .getPublicUrl(fileName);
+        
+        finalUrl = urlData.publicUrl + '?t=' + Date.now();
+
+        await supabase
+          .from('funcionarios')
+          .update({ foto_url: finalUrl })
+          .eq('id', profile.id);
+          
+      } catch (uploadErr) {
+        console.warn('Fallback para imagem local em base64 (Storage não configurado)');
+        const base64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(file);
         });
-
-      if (uploadError) throw uploadError;
-
-      // Gera URL pública (bucket de fotos pode ser público)
-      const { data: urlData } = supabase.storage
-        .from('fotos-funcionarios')
-        .getPublicUrl(fileName);
-
-      const { error: updateError } = await supabase
-        .from('funcionarios')
-        .update({ foto_url: urlData.publicUrl + '?t=' + Date.now() })
-        .eq('id', profile.id);
-
-      if (updateError) throw updateError;
+        finalUrl = base64;
+        localStorage.setItem(`mock_foto_${profile.id}`, base64);
+      }
 
       await refreshProfile();
       toast.success('Foto atualizada com sucesso!');
@@ -124,7 +136,7 @@ export default function ProfilePage() {
                 fontSize: 'var(--font-sm)',
               }}
             >
-              {uploading ? '⏳' : '📷'}
+              {uploading ? '⏳' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"

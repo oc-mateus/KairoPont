@@ -207,21 +207,19 @@ export default function HistoryPage() {
   const handleSendToNotion = async () => {
     try {
       const { start, end } = getDateRange();
-      const { data, error } = await supabase.functions.invoke('notion-export', {
-        body: {
-          funcionario_id: profile.id,
-          data_inicio: start,
-          data_fim: end,
-        },
+      let md = `## Relatório de Ponto - ${profile.nome}\n`;
+      md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n\n`;
+      md += `| Data | Entrada | Saída Almoço | Retorno | Saída | Total | Status |\n`;
+      md += `|---|---|---|---|---|---|---|\n`;
+
+      records.forEach(r => {
+        md += `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)} | ${calcDailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
       });
 
-      if (error) throw error;
-      toast.success('Registros enviados para o Notion com sucesso!');
+      await navigator.clipboard.writeText(md);
+      toast.success('Tabela copiada! Agora é só colar (Ctrl+V) na sua página do Notion.');
     } catch (err) {
-      toast.error(
-        'Erro ao enviar para o Notion. Verifique se a integração está configurada. ' +
-        'Use a exportação em Markdown como alternativa.'
-      );
+      toast.error('Erro ao copiar para o Notion: ' + err.message);
     }
   };
 

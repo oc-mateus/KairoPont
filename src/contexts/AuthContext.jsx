@@ -46,6 +46,15 @@ export function AuthProvider({ children }) {
       if (error && error.code !== 'PGRST116') {
         console.error('Erro ao buscar perfil:', error);
       }
+      
+      // Fallback para exibir foto mesmo sem banco configurado
+      if (data) {
+        const localPhoto = localStorage.getItem(`mock_foto_${userId}`);
+        if (localPhoto) {
+          data.foto_url = localPhoto;
+        }
+      }
+      
       setProfile(data || null);
     } catch (err) {
       console.error('Erro ao buscar perfil:', err);

@@ -16,15 +16,18 @@ export function formatDateTime(isoString) {
 /**
  * Formata apenas a hora de uma data ISO
  */
-export function formatTime(isoString) {
-  if (!isoString) return '—';
-  const date = new Date(isoString);
-  return date.toLocaleTimeString('pt-BR', {
-    timeZone: TIMEZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+export function formatTime(timeString) {
+  if (!timeString) return '—';
+  if (timeString.includes('T')) {
+    const date = new Date(timeString);
+    return date.toLocaleTimeString('pt-BR', {
+      timeZone: TIMEZONE,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  }
+  return timeString; // "08:00:00"
 }
 
 /**
@@ -111,13 +114,15 @@ export function calcDailyTotal(record) {
   if (!record) return '—';
   let totalMs = 0;
   
+  const baseDate = '1970-01-01T';
+
   if (record.entrada && record.saida_almoco) {
-    const diff = new Date(record.saida_almoco) - new Date(record.entrada);
+    const diff = new Date(baseDate + record.saida_almoco) - new Date(baseDate + record.entrada);
     if (diff > 0) totalMs += diff;
   }
   
   if (record.retorno_almoco && record.saida) {
-    const diff = new Date(record.saida) - new Date(record.retorno_almoco);
+    const diff = new Date(baseDate + record.saida) - new Date(baseDate + record.retorno_almoco);
     if (diff > 0) totalMs += diff;
   }
   

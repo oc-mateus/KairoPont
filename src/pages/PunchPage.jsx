@@ -5,11 +5,18 @@ import { supabase } from '../lib/supabase';
 import { formatTime, getTodayInSP, formatDate } from '../lib/utils';
 import { Spinner, Badge } from '../components/ui';
 
+export const PunchInIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>;
+export const LunchOutIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>;
+export const LunchInIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 11 12 16 7"/><line x1="11" y1="12" x2="21" y2="12"/></svg>;
+export const PunchOutIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
+export const CompleteIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+export const BlockIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>;
+
 const PUNCH_STEPS = [
-  { field: 'entrada', label: 'Entrada', icon: '🏢', description: 'Registrar entrada na empresa' },
-  { field: 'saida_almoco', label: 'Saída Almoço', icon: '🍽️', description: 'Registrar saída para almoço' },
-  { field: 'retorno_almoco', label: 'Retorno Almoço', icon: '🔙', description: 'Registrar retorno do almoço' },
-  { field: 'saida', label: 'Saída', icon: '🏠', description: 'Registrar saída da empresa' },
+  { field: 'entrada', label: 'Entrada', icon: PunchInIcon, description: 'Registrar entrada na empresa' },
+  { field: 'saida_almoco', label: 'Saída Almoço', icon: LunchOutIcon, description: 'Registrar saída para almoço' },
+  { field: 'retorno_almoco', label: 'Retorno Almoço', icon: LunchInIcon, description: 'Registrar retorno do almoço' },
+  { field: 'saida', label: 'Saída', icon: PunchOutIcon, description: 'Registrar saída da empresa' },
 ];
 
 export default function PunchPage() {
@@ -149,12 +156,12 @@ export default function PunchPage() {
             <Spinner />
           ) : isComplete ? (
             <>
-              <span className="punch-icon">✅</span>
+              <span className="punch-icon">{CompleteIcon}</span>
               <span className="punch-label">Dia Completo</span>
             </>
           ) : !profile?.ativo ? (
             <>
-              <span className="punch-icon">🚫</span>
+              <span className="punch-icon">{BlockIcon}</span>
               <span className="punch-label">Conta Inativa</span>
             </>
           ) : (

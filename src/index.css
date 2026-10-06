@@ -262,15 +262,17 @@ input, select, textarea {
 }
 
 .sidebar-nav-item.active {
-  background: rgba(46, 125, 50, 0.15);
+  background: linear-gradient(90deg, rgba(46, 125, 50, 0.2) 0%, transparent 100%);
   color: var(--kairo-green-300);
-  border-left: 3px solid var(--kairo-green-400);
+  box-shadow: inset 3px 0 0 var(--kairo-green-400);
 }
 
 .sidebar-nav-item .nav-icon {
-  font-size: var(--font-lg);
   width: 24px;
-  text-align: center;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
@@ -482,16 +484,17 @@ input, select, textarea {
   width: 200px;
   height: 200px;
   border-radius: var(--radius-full);
-  background: var(--gradient-primary);
-  color: white;
+  background: var(--bg-card);
+  border: 3px solid var(--border-default);
+  color: var(--kairo-green-400);
   font-size: var(--font-2xl);
   font-weight: 800;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  box-shadow: var(--shadow-lg), 0 0 60px rgba(46, 125, 50, 0.25);
+  gap: var(--space-3);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5), 0 0 40px rgba(46, 125, 50, 0.1);
   transition: all var(--transition-base);
   position: relative;
 }
@@ -499,20 +502,23 @@ input, select, textarea {
 .btn-punch::before {
   content: '';
   position: absolute;
-  inset: -3px;
+  inset: -6px;
   border-radius: var(--radius-full);
   background: conic-gradient(
+    transparent,
     var(--kairo-green-400),
-    var(--kairo-green-600),
-    var(--kairo-green-400)
+    transparent
   );
   z-index: -1;
   animation: spin-slow 4s linear infinite;
+  opacity: 0.5;
 }
 
 .btn-punch:hover:not(:disabled) {
   transform: scale(1.05);
-  box-shadow: var(--shadow-lg), 0 0 80px rgba(46, 125, 50, 0.35);
+  border-color: var(--kairo-green-400);
+  color: white;
+  box-shadow: inset 0 0 50px rgba(46, 125, 50, 0.4), 0 0 60px rgba(46, 125, 50, 0.3);
 }
 
 .btn-punch:active:not(:disabled) {
@@ -522,16 +528,24 @@ input, select, textarea {
 .btn-punch:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  border-color: var(--border-default);
+}
+
+.btn-punch:disabled::before {
+  display: none;
 }
 
 .btn-punch .punch-icon {
-  font-size: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-punch .punch-label {
-  font-size: var(--font-sm);
-  font-weight: 500;
-  opacity: 0.9;
+  font-size: var(--font-base);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 @keyframes spin-slow {

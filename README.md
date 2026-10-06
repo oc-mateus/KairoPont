@@ -1,15 +1,25 @@
-# KairoPont - Sistema de Controle de Ponto
+# KairoPont — Controle de ponto
 
-Aplicação web completa e responsiva desenvolvida para a **Kairo Automações** para o registro seguro e confiável de ponto dos funcionários.
+Aplicação web da **Kairo Automações** para registrar jornadas, consultar históricos e enviar documentos de funcionários.
+
+**Aplicação:** [oc-mateus.github.io/KairoPont](https://oc-mateus.github.io/KairoPont/) · **Repositório:** [oc-mateus/KairoPont](https://github.com/oc-mateus/KairoPont)
+
+Consulte o [guia do projeto](docs/GUIA_DO_PROJETO.md) para arquitetura, fluxos, segurança, publicação e pendências de entrada em operação.
 
 ## Funcionalidades Principais
 
 *   **Autenticação Dupla:** Login via E-mail ou CPF.
 *   **Registro Seguro:** Ponto registrado sempre com horário gerado diretamente no servidor (Supabase), não confiando no relógio local do dispositivo.
 *   **Prevenção de Erros:** Bloqueio de cliques duplos e sequência obrigatória (Entrada -> Saída Almoço -> Retorno Almoço -> Saída).
-*   **Exportação Múltipla:** Relatórios em PDF, CSV e Markdown (ideal para exportar pro Notion).
+*   **Histórico e exportação:** Consulta de registros e exportação para PDF, CSV e Markdown.
 *   **Envio de Documentos:** Upload privado e seguro de atestados médicos e declarações.
 *   **Painel Administrativo:** Gestão de funcionários, visualização de registros gerais, acesso a documentos e log de auditoria.
+
+## Situação de implantação
+
+O frontend está publicado no GitHub Pages e o workflow do GitHub Actions conclui o build e a publicação. As migrações e os buckets previstos estão configurados no Supabase.
+
+O uso operacional com funcionários ainda depende de concluir itens de autenticação e acesso. No estado verificado em 6 de outubro de 2026, não havia conta/perfil administrativo nem documentos cadastrados. O guia do projeto lista também as limitações verificadas no login por CPF e na validação de arquivos.
 
 ## Pré-requisitos
 

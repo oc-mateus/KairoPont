@@ -1,0 +1,394 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { supabase } from '../lib/supabase';
+import {
+  formatTime, formatDate, calcDailyTotal,
+  getTodayInSP, getCurrentWeekRange, getCurrentMonthRange,
+} from '../lib/utils';
+import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
+
+export default function HistoryPage() {
+  const { profile } = useAuth();
+  const toast = useToast();
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('week');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  const getDateRange = useCallback(() => {
+    switch (filter) {
+      case 'today':
+        const today = getTodayInSP();
+        return { start: today, end: today };
+      case 'week':
+        return getCurrentWeekRange();
+      case 'month':
+        return getCurrentMonthRange();
+      case 'custom':
+        return { start: customStart, end: customEnd };
+      default:
+        return getCurrentWeekRange();
+    }
+  }, [filter, customStart, customEnd]);
+
+  const fetchRecords = useCallback(async () => {
+    if (!profile?.id) return;
+    setLoading(true);
+    try {
+      const { start, end } = getDateRange();
+      if (!start || !end) {
+        setRecords([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('registros_ponto')
+        .select('*')
+        .eq('funcionario_id', profile.id)
+        .gte('data', start)
+        .lte('data', end)
+        .order('data', { ascending: false });
+
+      if (error) throw error;
+      setRecords(data || []);
+    } catch (err) {
+      toast.error('Erro ao carregar histórico: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [profile?.id, getDateRange]);
+
+  useEffect(() => {
+    fetchRecords();
+  }, [fetchRecords]);
+
+  const handleExportPDF = async () => {
+    setExporting(true);
+    try {
+      const [{ jsPDF }, { autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ]);
+
+      const doc = new jsPDF();
+
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(27, 94, 32);
+      doc.text('KairoPont - Kairo Automações', 14, 20);
+
+      doc.setFontSize(12);
+      doc.setTextColor(100);
+      doc.text(`Relatório de Ponto - ${profile.nome}`, 14, 30);
+
+      const { start, end } = getDateRange();
+      doc.setFontSize(10);
+      doc.text(`Período: ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}`, 14, 38);
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`, 14, 44);
+
+      // Table
+      const tableData = records.map(r => [
+        formatDate(r.data + 'T00:00:00'),
+        formatTime(r.entrada),
+        formatTime(r.saida_almoco),
+        formatTime(r.retorno_almoco),
+        formatTime(r.saida),
+        calcDailyTotal(r),
+        r.saida ? 'Completo' : 'Incompleto',
+      ]);
+
+      autoTable(doc, {
+        startY: 52,
+        head: [['Data', 'Entrada', 'Saída Almoço', 'Retorno', 'Saída', 'Total', 'Status']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [27, 94, 32],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+        },
+        bodyStyles: {
+          fontSize: 8,
+        },
+        alternateRowStyles: {
+          fillColor: [232, 245, 233],
+        },
+        styles: {
+          cellPadding: 3,
+        },
+      });
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(
+          `Página ${i} de ${pageCount} - KairoPont © ${new Date().getFullYear()} Kairo Automações`,
+          14,
+          doc.internal.pageSize.height - 10
+        );
+      }
+
+      doc.save(`ponto_${profile.nome.replace(/\s+/g, '_')}_${start}_${end}.pdf`);
+      toast.success('PDF exportado com sucesso!');
+    } catch (err) {
+      toast.error('Erro ao exportar PDF: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      const headers = ['Data', 'Entrada', 'Saída Almoço', 'Retorno Almoço', 'Saída', 'Total Trabalhado', 'Status'];
+      const rows = records.map(r => [
+        formatDate(r.data + 'T00:00:00'),
+        formatTime(r.entrada),
+        formatTime(r.saida_almoco),
+        formatTime(r.retorno_almoco),
+        formatTime(r.saida),
+        calcDailyTotal(r),
+        r.saida ? 'Completo' : 'Incompleto',
+      ]);
+
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${cell}"`).join(','))
+        .join('\n');
+
+      // BOM for UTF-8
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const { start, end } = getDateRange();
+      link.download = `ponto_${profile.nome.replace(/\s+/g, '_')}_${start}_${end}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success('CSV exportado com sucesso!');
+    } catch (err) {
+      toast.error('Erro ao exportar CSV: ' + err.message);
+    }
+  };
+
+  const handleExportMarkdown = () => {
+    try {
+      const { start, end } = getDateRange();
+      let md = `# Relatório de Ponto\n\n`;
+      md += `**Funcionário:** ${profile.nome}\n`;
+      md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n`;
+      md += `**Gerado em:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`;
+      md += `| Data | Entrada | Saída Almoço | Retorno | Saída | Total | Status |\n`;
+      md += `|------|---------|-------------|---------|-------|-------|--------|\n`;
+
+      records.forEach(r => {
+        md += `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)} | ${calcDailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
+      });
+
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ponto_${profile.nome.replace(/\s+/g, '_')}_${start}_${end}.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success('Markdown exportado! Compatível com importação no Notion.');
+    } catch (err) {
+      toast.error('Erro ao exportar Markdown: ' + err.message);
+    }
+  };
+
+  const handleSendToNotion = async () => {
+    try {
+      const { start, end } = getDateRange();
+      const { data, error } = await supabase.functions.invoke('notion-export', {
+        body: {
+          funcionario_id: profile.id,
+          data_inicio: start,
+          data_fim: end,
+        },
+      });
+
+      if (error) throw error;
+      toast.success('Registros enviados para o Notion com sucesso!');
+    } catch (err) {
+      toast.error(
+        'Erro ao enviar para o Notion. Verifique se a integração está configurada. ' +
+        'Use a exportação em Markdown como alternativa.'
+      );
+    }
+  };
+
+  const filterTabs = [
+    { id: 'today', label: 'Hoje' },
+    { id: 'week', label: 'Semana' },
+    { id: 'month', label: 'Mês' },
+    { id: 'custom', label: 'Personalizado' },
+  ];
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h2 className="page-title">Meu Histórico</h2>
+          <p className="page-subtitle">Consulte seus registros de ponto</p>
+        </div>
+        <div className="page-header-actions">
+          <button className="btn btn-secondary btn-sm" onClick={handleExportCSV} disabled={records.length === 0}>
+            📊 CSV
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={handleExportMarkdown} disabled={records.length === 0}>
+            📝 Markdown
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={handleExportPDF} disabled={records.length === 0 || exporting}>
+            {exporting ? <Spinner /> : '📄 PDF'}
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={handleSendToNotion} disabled={records.length === 0}>
+            📓 Notion
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Tabs tabs={filterTabs} active={filter} onChange={setFilter} />
+
+      {filter === 'custom' && (
+        <div className="filters-bar">
+          <div className="filter-group">
+            <label>Data inicial</label>
+            <input
+              type="date"
+              className="form-input"
+              value={customStart}
+              onChange={e => setCustomStart(e.target.value)}
+            />
+          </div>
+          <div className="filter-group">
+            <label>Data final</label>
+            <input
+              type="date"
+              className="form-input"
+              value={customEnd}
+              onChange={e => setCustomEnd(e.target.value)}
+            />
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={fetchRecords}>
+            Filtrar
+          </button>
+        </div>
+      )}
+
+      {/* Records table */}
+      {loading ? (
+        <div className="flex flex-center" style={{ padding: 'var(--space-12)' }}>
+          <Spinner size="lg" />
+        </div>
+      ) : records.length === 0 ? (
+        <EmptyState
+          icon="📋"
+          title="Nenhum registro encontrado"
+          text="Não há registros de ponto para o período selecionado."
+        />
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Entrada</th>
+                  <th>Saída Almoço</th>
+                  <th>Retorno</th>
+                  <th>Saída</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map(r => (
+                  <tr key={r.id}>
+                    <td>{formatDate(r.data + 'T00:00:00')}</td>
+                    <td>{formatTime(r.entrada)}</td>
+                    <td>{formatTime(r.saida_almoco)}</td>
+                    <td>{formatTime(r.retorno_almoco)}</td>
+                    <td>{formatTime(r.saida)}</td>
+                    <td><strong>{calcDailyTotal(r)}</strong></td>
+                    <td>
+                      <Badge variant={r.saida ? 'success' : 'warning'}>
+                        {r.saida ? 'Completo' : 'Incompleto'}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="table-cards">
+            {records.map(r => (
+              <div key={r.id} className="table-card-item">
+                <div className="table-card-row">
+                  <span className="table-card-label">Data</span>
+                  <span className="table-card-value">{formatDate(r.data + 'T00:00:00')}</span>
+                </div>
+                <div className="table-card-row">
+                  <span className="table-card-label">Entrada</span>
+                  <span className="table-card-value">{formatTime(r.entrada)}</span>
+                </div>
+                <div className="table-card-row">
+                  <span className="table-card-label">Saída Almoço</span>
+                  <span className="table-card-value">{formatTime(r.saida_almoco)}</span>
+                </div>
+                <div className="table-card-row">
+                  <span className="table-card-label">Retorno</span>
+                  <span className="table-card-value">{formatTime(r.retorno_almoco)}</span>
+                </div>
+                <div className="table-card-row">
+                  <span className="table-card-label">Saída</span>
+                  <span className="table-card-value">{formatTime(r.saida)}</span>
+                </div>
+                <div className="table-card-row">
+                  <span className="table-card-label">Total</span>
+                  <span className="table-card-value"><strong>{calcDailyTotal(r)}</strong></span>
+                </div>
+                <div className="table-card-row">
+                  <span className="table-card-label">Status</span>
+                  <span className="table-card-value">
+                    <Badge variant={r.saida ? 'success' : 'warning'}>
+                      {r.saida ? 'Completo' : 'Incompleto'}
+                    </Badge>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Summary */}
+          <div className="card mt-6" style={{ maxWidth: '400px' }}>
+            <h4 className="card-title mb-4">Resumo do Período</h4>
+            <div className="table-card-row">
+              <span className="table-card-label">Dias registrados</span>
+              <span className="table-card-value">{records.length}</span>
+            </div>
+            <div className="table-card-row">
+              <span className="table-card-label">Dias completos</span>
+              <span className="table-card-value">{records.filter(r => r.saida).length}</span>
+            </div>
+            <div className="table-card-row">
+              <span className="table-card-label">Dias incompletos</span>
+              <span className="table-card-value">{records.filter(r => !r.saida).length}</span>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

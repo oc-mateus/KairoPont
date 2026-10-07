@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { calcDailyTotal, formatCPF, formatDate, formatDateTime, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
@@ -14,6 +14,13 @@ const FILTERS = [
   { id: 'month', label: 'Mês' },
   { id: 'custom', label: 'Período personalizado' },
 ];
+const WEEKDAYS = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
+
+function defaultHoursForDay(day) {
+  return day === 6 || day === 7
+    ? { entrada: '08:00', saida_almoco: null, retorno_almoco: null, saida: '12:00' }
+    : { entrada: '08:00', saida_almoco: '12:00', retorno_almoco: '13:00', saida: '17:00' };
+}
 
 function getRange(filter, selectedDay, customStart, customEnd, referenceDate) {
   if (filter === 'day') return { start: selectedDay, end: selectedDay };
@@ -73,16 +80,17 @@ function getScheduleComparison(record, schedule) {
   if (!schedule?.dias_semana?.length) return { expected: '—', balance: '—' };
   const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
   if (!schedule.dias_semana.includes(weekday)) return { expected: 'Folga', balance: record.saida ? 'Extra' : '—' };
-  const entry = timeMinutes(schedule.entrada);
-  const lunchOut = timeMinutes(schedule.saida_almoco);
-  const lunchIn = timeMinutes(schedule.retorno_almoco);
-  const exit = timeMinutes(schedule.saida);
-  const expectedMinutes = entry != null && lunchOut != null && lunchIn != null && exit != null ? (lunchOut - entry) + (exit - lunchIn) : null;
+  const daily = schedule.horarios_por_dia?.[String(weekday)] || schedule;
+  const entry = timeMinutes(daily.entrada);
+  const lunchOut = timeMinutes(daily.saida_almoco);
+  const lunchIn = timeMinutes(daily.retorno_almoco);
+  const exit = timeMinutes(daily.saida);
+  const expectedMinutes = entry != null && exit != null ? (lunchOut != null && lunchIn != null ? (lunchOut - entry) + (exit - lunchIn) : exit - entry) : null;
   const actualEntry = timeMinutes(record.entrada);
   const actualLunchOut = timeMinutes(record.saida_almoco);
   const actualLunchIn = timeMinutes(record.retorno_almoco);
   const actualExit = timeMinutes(record.saida);
-  const actualMinutes = actualEntry != null && actualLunchOut != null && actualLunchIn != null && actualExit != null ? (actualLunchOut - actualEntry) + (actualExit - actualLunchIn) : null;
+  const actualMinutes = actualEntry != null && actualExit != null ? (actualLunchOut != null && actualLunchIn != null ? (actualLunchOut - actualEntry) + (actualExit - actualLunchIn) : actualExit - actualEntry) : null;
   const expected = expectedMinutes == null ? '—' : `${Math.floor(expectedMinutes / 60)}h ${String(expectedMinutes % 60).padStart(2, '0')}min`;
   return { expected, balance: durationLabel(actualMinutes == null || expectedMinutes == null ? null : actualMinutes - expectedMinutes) };
 }
@@ -95,6 +103,8 @@ export default function AdminEmployees() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [records, setRecords] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [vacationPeriods, setVacationPeriods] = useState([]);
+  const [vacationRequests, setVacationRequests] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [filter, setFilter] = useState('month');
   const [selectedDay, setSelectedDay] = useState(getTodayInSP());
@@ -109,7 +119,7 @@ export default function AdminEmployees() {
   const [exportingExcel, setExportingExcel] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [savingEmployment, setSavingEmployment] = useState(false);
-  const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), tipo: '5x2', dias_semana: [1, 2, 3, 4, 5], entrada: '08:00', saida_almoco: '12:00', retorno_almoco: '13:00', saida: '17:00' });
+  const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), tipo: '5x2', dias_semana: [1, 2, 3, 4, 5], horarios_por_dia: Object.fromEntries([1, 2, 3, 4, 5].map((day) => [day, defaultHoursForDay(day)])) });
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -152,21 +162,48 @@ export default function AdminEmployees() {
 
   const setFormField = (field, value) => setEmployeeForm((current) => ({ ...current, [field]: value }));
 
+  const toggleWorkDay = (day, checked) => setEmployeeForm((current) => {
+    const days = checked ? [...current.dias_semana, day].sort((a, b) => a - b) : current.dias_semana.filter((item) => item !== day);
+    return { ...current, tipo: 'personalizada', dias_semana: days, horarios_por_dia: checked && !current.horarios_por_dia[String(day)] ? { ...current.horarios_por_dia, [day]: defaultHoursForDay(day) } : current.horarios_por_dia };
+  });
+
+  const setScheduleType = (type) => setEmployeeForm((current) => {
+    const days = type === '5x2' ? [1, 2, 3, 4, 5] : type === '6x1' ? [1, 2, 3, 4, 5, 6] : current.dias_semana;
+    const hours = { ...current.horarios_por_dia };
+    days.forEach((day) => { if (!hours[String(day)]) hours[String(day)] = defaultHoursForDay(day); });
+    return { ...current, tipo: type, dias_semana: days, horarios_por_dia: hours };
+  });
+
+  const setDayTime = (day, field, value) => setEmployeeForm((current) => ({
+    ...current,
+    tipo: 'personalizada',
+    horarios_por_dia: { ...current.horarios_por_dia, [day]: { ...current.horarios_por_dia[String(day)], [field]: value || null } },
+  }));
+
+  const setDayHasLunch = (day, hasLunch) => setEmployeeForm((current) => {
+    const daily = current.horarios_por_dia[String(day)] || defaultHoursForDay(day);
+    const needsLaterExit = (timeMinutes(daily.saida) ?? 0) <= 13 * 60;
+    return { ...current, tipo: 'personalizada', horarios_por_dia: { ...current.horarios_por_dia, [day]: hasLunch ? { ...daily, saida_almoco: '12:00', retorno_almoco: '13:00', saida: needsLaterExit ? '17:00' : daily.saida } : { ...daily, saida_almoco: null, retorno_almoco: null } } };
+  });
+
   const scheduleFromForm = (form) => ({
     tipo: form.tipo,
     dias_semana: form.dias_semana,
-    entrada: form.entrada,
-    saida_almoco: form.saida_almoco,
-    retorno_almoco: form.retorno_almoco,
-    saida: form.saida,
+    horarios_por_dia: Object.fromEntries(form.dias_semana.map((day) => [String(day), form.horarios_por_dia[String(day)]])),
   });
 
   const formFromEmployee = (employee) => {
     const schedule = employee.escala_trabalho || {};
+    const days = schedule.dias_semana || [1, 2, 3, 4, 5];
     return {
       nome: employee.nome || '', email: employee.email || '', cpf: formatCPF(employee.cpf) || '', cargo: employee.cargo || '',
-      data_admissao: employee.data_admissao || '', tipo: schedule.tipo || '5x2', dias_semana: schedule.dias_semana || [1, 2, 3, 4, 5],
-      entrada: schedule.entrada || '08:00', saida_almoco: schedule.saida_almoco || '12:00', retorno_almoco: schedule.retorno_almoco || '13:00', saida: schedule.saida || '17:00',
+      data_admissao: employee.data_admissao || '', tipo: schedule.tipo || 'personalizada', dias_semana: days,
+      horarios_por_dia: Object.fromEntries(days.map((day) => [String(day), schedule.horarios_por_dia?.[String(day)] || {
+        entrada: schedule.entrada || defaultHoursForDay(day).entrada,
+        saida_almoco: schedule.saida_almoco || defaultHoursForDay(day).saida_almoco,
+        retorno_almoco: schedule.retorno_almoco || defaultHoursForDay(day).retorno_almoco,
+        saida: schedule.saida || defaultHoursForDay(day).saida,
+      }])),
     };
   };
 
@@ -180,7 +217,7 @@ export default function AdminEmployees() {
       if (error) throw error;
       toast.success('Convite enviado. O funcionário receberá um e-mail para definir a senha.');
       setShowInviteForm(false);
-      setEmployeeForm({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), tipo: '5x2', dias_semana: [1, 2, 3, 4, 5], entrada: '08:00', saida_almoco: '12:00', retorno_almoco: '13:00', saida: '17:00' });
+      setEmployeeForm({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), tipo: '5x2', dias_semana: [1, 2, 3, 4, 5], horarios_por_dia: Object.fromEntries([1, 2, 3, 4, 5].map((day) => [day, defaultHoursForDay(day)])) });
       await fetchEmployees();
     } catch (error) {
       toast.error(error.message || 'Não foi possível enviar o convite.');
@@ -214,9 +251,22 @@ export default function AdminEmployees() {
     <form className="vacation-form employee-employment-form" onSubmit={onSubmit}>
       {showInviteForm && <div className="form-row"><label className="form-group">Nome completo<input className="form-input" required minLength={3} value={employeeForm.nome} onChange={(event) => setFormField('nome', event.target.value)} /></label><label className="form-group">E-mail corporativo<input className="form-input" required type="email" value={employeeForm.email} onChange={(event) => setFormField('email', event.target.value)} /></label></div>}
       {showInviteForm && <div className="form-row"><label className="form-group">CPF<input className="form-input" required inputMode="numeric" value={employeeForm.cpf} onChange={(event) => setFormField('cpf', maskCPF(event.target.value))} /></label><label className="form-group">Cargo<input className="form-input" required value={employeeForm.cargo} onChange={(event) => setFormField('cargo', event.target.value)} /></label></div>}
-      <div className="form-row"><label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label><label className="form-group">Escala<select className="form-input" value={employeeForm.tipo} onChange={(event) => setFormField('tipo', event.target.value)}><option value="5x2">5x2</option><option value="6x1">6x1</option><option value="personalizada">Personalizada</option></select></label></div>
-      <fieldset className="employee-weekdays"><legend>Dias de trabalho</legend>{['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((day, index) => <label key={day}><input type="checkbox" checked={employeeForm.dias_semana.includes(index + 1)} onChange={(event) => setFormField('dias_semana', event.target.checked ? [...employeeForm.dias_semana, index + 1].sort() : employeeForm.dias_semana.filter((value) => value !== index + 1))} />{day}</label>)}</fieldset>
-      <div className="form-row employee-schedule-times">{[['entrada', 'Entrada'], ['saida_almoco', 'Saída almoço'], ['retorno_almoco', 'Retorno'], ['saida', 'Saída']].map(([field, label]) => <label className="form-group" key={field}>{label}<input className="form-input" type="time" required value={employeeForm[field]} onChange={(event) => setFormField(field, event.target.value)} /></label>)}</div>
+      <div className="form-row"><label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label><label className="form-group">Modelo inicial<select className="form-input" value={employeeForm.tipo} onChange={(event) => setScheduleType(event.target.value)}><option value="5x2">5x2</option><option value="6x1">6x1</option><option value="personalizada">Personalizada</option></select></label></div>
+      <div className="employee-day-schedule-list"><h4>Configure cada dia trabalhado</h4>{WEEKDAYS.map((dayName, index) => {
+        const day = index + 1;
+        const selected = employeeForm.dias_semana.includes(day);
+        const daily = employeeForm.horarios_por_dia[String(day)] || defaultHoursForDay(day);
+        const hasLunch = daily.saida_almoco != null && daily.retorno_almoco != null;
+        return <fieldset className={`employee-day-schedule ${selected ? 'selected' : ''}`} key={day}>
+          <legend><label><input type="checkbox" checked={selected} onChange={(event) => toggleWorkDay(day, event.target.checked)} />{dayName}</label></legend>
+          {selected && <>
+            <div className="form-row employee-day-time-fields"><label className="form-group">Entrada<input className="form-input" type="time" required value={daily.entrada || ''} onChange={(event) => setDayTime(day, 'entrada', event.target.value)} /></label>
+              {hasLunch && <><label className="form-group">Saída para almoço<input className="form-input" type="time" required value={daily.saida_almoco || ''} onChange={(event) => setDayTime(day, 'saida_almoco', event.target.value)} /></label><label className="form-group">Retorno do almoço<input className="form-input" type="time" required value={daily.retorno_almoco || ''} onChange={(event) => setDayTime(day, 'retorno_almoco', event.target.value)} /></label></>}
+              <label className="form-group">Saída final<input className="form-input" type="time" required value={daily.saida || ''} onChange={(event) => setDayTime(day, 'saida', event.target.value)} /></label></div>
+            <label className="employee-lunch-toggle"><input type="checkbox" checked={hasLunch} onChange={(event) => setDayHasLunch(day, event.target.checked)} />Possui intervalo de almoço</label>
+          </>}
+        </fieldset>;
+      })}</div>
       <button className="btn btn-primary" disabled={savingEmployment || employeeForm.dias_semana.length === 0}>{savingEmployment ? 'Salvando…' : submitLabel}</button>
     </form>
   );
@@ -229,20 +279,30 @@ export default function AdminEmployees() {
       if (!selectedEmp) {
         setRecords([]);
         setDocuments([]);
+        setVacationPeriods([]);
+        setVacationRequests([]);
         return;
       }
       const hasValidRange = Boolean(range.start && range.end && range.start <= range.end);
       setRecords([]);
       setDocuments([]);
+      setVacationPeriods([]);
+      setVacationRequests([]);
       setDetailLoading(true);
       try {
-        const [employeeRecords, employeeDocuments] = await Promise.all([
+        const { error: syncError } = await supabase.rpc('sync_current_vacation_periods');
+        if (syncError) throw syncError;
+        const [employeeRecords, employeeDocuments, employeeCycles, employeeVacations] = await Promise.all([
           hasValidRange ? fetchAllRows(() => supabase.from('registros_ponto').select('*').eq('funcionario_id', selectedEmp.id).gte('data', range.start).lte('data', range.end).order('data', { ascending: false })) : Promise.resolve([]),
           fetchAllRows(() => supabase.from('documentos').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
+          fetchAllRows(() => supabase.from('periodos_aquisitivos_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('periodo_inicio', { ascending: false })),
+          fetchAllRows(() => supabase.from('solicitacoes_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
         ]);
         if (!cancelled) {
           setRecords(employeeRecords);
           setDocuments(employeeDocuments);
+          setVacationPeriods(employeeCycles);
+          setVacationRequests(employeeVacations);
         }
       } catch (error) {
         if (!cancelled) toast.error('Erro ao carregar informações do funcionário: ' + error.message);
@@ -378,7 +438,7 @@ export default function AdminEmployees() {
 
       {!selectedEmp ? (
         <>
-          <div className="flex justify-between gap-3 employee-list-toolbar"><p className="page-subtitle">Contas novas só podem ser criadas por um administrador.</p><button className="btn btn-primary" onClick={() => setShowInviteForm((value) => !value)}>{showInviteForm ? 'Cancelar' : 'Novo funcionário'}</button></div>
+          <div className="flex justify-between gap-3 employee-list-toolbar"><button className="btn btn-primary" onClick={() => setShowInviteForm((value) => !value)}>{showInviteForm ? 'Cancelar' : 'Novo funcionário'}</button></div>
           {showInviteForm && <section className="employee-records-section"><h3>Convidar funcionário</h3><p className="page-subtitle">Enviaremos o convite para o e-mail informado, onde a pessoa poderá definir a própria senha.</p>{employmentForm(inviteEmployee, 'Enviar convite')}</section>}
         <div className="employee-select-list">
           {employees.map((emp) => (
@@ -417,6 +477,14 @@ export default function AdminEmployees() {
 
           <section className="employee-records-section"><h3>Admissão e escala semanal</h3><p className="page-subtitle">Usadas para liberar férias e comparar o previsto com as marcações de ponto.</p>{employmentForm(saveEmployment, 'Salvar dados trabalhistas')}</section>
           <WorkScheduleCard schedule={selectedEmp.escala_trabalho} admissionDate={selectedEmp.data_admissao} />
+
+          <section className="employee-records-section employee-vacation-section">
+            <div className="employee-section-heading"><div><h3>Férias deste funcionário</h3><p>{vacationPeriods.length} período(s) aquisitivo(s) · {vacationRequests.length} solicitação(ões)</p></div><Link className="btn btn-secondary btn-sm" to={`/ferias?funcionario=${selectedEmp.id}`}>Abrir gestão de férias</Link></div>
+            {vacationPeriods.length ? <div className="employee-vacation-cycles">{vacationPeriods.map((period) => {
+              const request = vacationRequests.find((item) => item.periodo_id === period.id);
+              return <article className="employee-vacation-cycle" key={period.id}><div><strong>{formatDate(`${period.periodo_inicio}T12:00:00`)} – {formatDate(`${period.periodo_fim}T12:00:00`)}</strong><span>Prazo para concessão: {formatDate(`${period.prazo_concessivo}T12:00:00`)} · Abono: {period.dias_abono}/{period.dias_direito} dias</span></div>{request ? <div className="employee-vacation-request"><Badge variant={request.status === 'aprovada' ? 'success' : request.status === 'recusada' ? 'danger' : 'warning'}>{request.status === 'aprovada' ? 'Aprovada' : request.status === 'recusada' ? 'Recusada' : 'Pendente'}</Badge><span>{formatDate(`${request.data_inicio}T12:00:00`)} – {formatDate(`${request.data_fim}T12:00:00`)}</span>{request.status === 'recusada' && <small>Justificativa: {request.justificativa_recusa}</small>}<small>{request.email_enviado_em ? `E-mail enviado em ${formatDateTime(request.email_enviado_em)}` : request.email_erro ? `Falha no e-mail: ${request.email_erro}` : request.status !== 'pendente' ? 'E-mail da decisão pendente' : ''}</small></div> : <Badge variant="info">Sem solicitação</Badge>}</article>;
+            })}</div> : <p className="employee-no-results">Os períodos de férias serão calculados após informar a data de admissão e abrir a tela de gestão.</p>}
+          </section>
 
           <section className="employee-records-section">
             <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecordsExcel} disabled={detailLoading || !records.length || exportingExcel}>{exportingExcel ? 'Gerando Excel…' : 'Baixar Excel'}</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>

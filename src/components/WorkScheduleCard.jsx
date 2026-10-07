@@ -4,14 +4,18 @@ export function WorkScheduleSummary({ schedule }) {
   if (!schedule) return <p className="work-schedule-empty">Escala ainda não informada pelo administrador.</p>;
   const days = new Set(schedule.dias_semana || []);
   return <>
-    <div className="work-schedule-days" aria-label="Dias de trabalho">
-      {WEEKDAYS.map((day, index) => <span className={days.has(index + 1) ? 'scheduled' : ''} key={day}>{day}</span>)}
-    </div>
-    <div className="work-schedule-times">
-      <div><span>Entrada</span><strong>{schedule.entrada || '—'}</strong></div>
-      <div><span>Saída para almoço</span><strong>{schedule.saida_almoco || '—'}</strong></div>
-      <div><span>Retorno do almoço</span><strong>{schedule.retorno_almoco || '—'}</strong></div>
-      <div><span>Saída final</span><strong>{schedule.saida || '—'}</strong></div>
+    <div className="work-schedule-days" aria-label="Dias de trabalho">{WEEKDAYS.map((day, index) => <span className={days.has(index + 1) ? 'scheduled' : ''} key={day}>{day}</span>)}</div>
+    <div className="work-schedule-table">
+      <div className="work-schedule-row work-schedule-header"><span>Dia</span><span>Entrada</span><span>Intervalo</span><span>Retorno</span><span>Saída</span></div>
+      {WEEKDAYS.map((day, index) => {
+        const weekday = index + 1;
+        const works = days.has(weekday);
+        const hours = schedule.horarios_por_dia?.[String(weekday)] || schedule;
+        const hasLunch = hours.saida_almoco && hours.retorno_almoco;
+        return <div className={`work-schedule-row ${works ? 'scheduled' : 'day-off'}`} key={day}>
+          <strong>{day}</strong><span>{works ? hours.entrada || '—' : 'Folga'}</span><span>{works ? hasLunch ? hours.saida_almoco : 'Sem intervalo' : '—'}</span><span>{works && hasLunch ? hours.retorno_almoco : '—'}</span><span>{works ? hours.saida || '—' : '—'}</span>
+        </div>;
+      })}
     </div>
   </>;
 }

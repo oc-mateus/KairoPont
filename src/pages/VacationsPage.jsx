@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -15,11 +16,14 @@ function statusLabel(status) {
 
 export default function VacationsPage() {
   const { profile, isAdmin } = useAuth();
+  const [searchParams] = useSearchParams();
+  const employeeFilter = searchParams.get('funcionario');
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState([]);
   const [requests, setRequests] = useState([]);
   const [employees, setEmployees] = useState({});
+  const [notifications, setNotifications] = useState([]);
   const [daysByPeriod, setDaysByPeriod] = useState({});
   const [datesByPeriod, setDatesByPeriod] = useState({});
   const [reasons, setReasons] = useState({});
@@ -30,14 +34,23 @@ export default function VacationsPage() {
     try {
       const { error: syncError } = await supabase.rpc('sync_current_vacation_periods');
       if (syncError) throw syncError;
-      const [periodResult, requestResult] = await Promise.all([
-        supabase.from('periodos_aquisitivos_ferias').select('*').order('periodo_inicio', { ascending: false }),
-        supabase.from('solicitacoes_ferias').select('*').order('created_at', { ascending: false }),
+      let periodQuery = supabase.from('periodos_aquisitivos_ferias').select('*').order('periodo_inicio', { ascending: false });
+      let requestQuery = supabase.from('solicitacoes_ferias').select('*').order('created_at', { ascending: false });
+      if (isAdmin && employeeFilter) {
+        periodQuery = periodQuery.eq('funcionario_id', employeeFilter);
+        requestQuery = requestQuery.eq('funcionario_id', employeeFilter);
+      }
+      const [periodResult, requestResult, notificationResult] = await Promise.all([
+        periodQuery,
+        requestQuery,
+        isAdmin || !profile?.id ? Promise.resolve({ data: [], error: null }) : supabase.from('notificacoes').select('*').eq('funcionario_id', profile.id).order('created_at', { ascending: false }),
       ]);
       if (periodResult.error) throw periodResult.error;
       if (requestResult.error) throw requestResult.error;
+      if (notificationResult.error) throw notificationResult.error;
       setPeriods(periodResult.data || []);
       setRequests(requestResult.data || []);
+      setNotifications(notificationResult.data || []);
       if (isAdmin) {
         const { data, error } = await supabase.from('funcionarios').select('id,nome,email,cargo').order('nome');
         if (error) throw error;
@@ -48,7 +61,7 @@ export default function VacationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, toast]);
+  }, [employeeFilter, isAdmin, profile?.id, toast]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -96,6 +109,12 @@ export default function VacationsPage() {
     } finally { setBusyId(''); }
   };
 
+  const markNotificationRead = async (notification) => {
+    const { error } = await supabase.from('notificacoes').update({ lida_em: new Date().toISOString() }).eq('id', notification.id);
+    if (error) return toast.error('Não foi possível marcar o aviso como lido.');
+    setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, lida_em: new Date().toISOString() } : item));
+  };
+
   const decide = async (request, approved) => {
     const reason = (reasons[request.id] || '').trim();
     if (!approved && reason.length < 5) return toast.warning('Informe uma justificativa de pelo menos 5 caracteres.');
@@ -120,6 +139,8 @@ export default function VacationsPage() {
     <div className="page-header"><div><h2 className="page-title">{isAdmin ? 'Férias dos funcionários' : 'Minhas férias'}</h2><p className="page-subtitle">Períodos aquisitivos, solicitação de gozo e acompanhamento de prazos.</p></div><button className="btn btn-secondary btn-sm" onClick={loadData}>Atualizar</button></div>
 
     {!isAdmin && !profile?.data_admissao && <div className="alert alert-warning">Sua data de admissão ainda não foi informada. Peça ao administrador para completar seu cadastro trabalhista.</div>}
+
+    {!isAdmin && notifications.filter((notification) => !notification.lida_em).map((notification) => <div className={`alert ${notification.tipo === 'ferias_vencidas' ? 'alert-danger' : 'alert-warning'}`} key={notification.id}><strong>{notification.titulo}</strong><p>{notification.mensagem}</p><button className="btn btn-ghost btn-sm" onClick={() => markNotificationRead(notification)}>Marcar como lido</button></div>)}
 
     {!isAdmin && periods.map((period) => {
       const existing = requestsByPeriod[period.id] || [];

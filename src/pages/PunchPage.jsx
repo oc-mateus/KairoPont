@@ -19,6 +19,18 @@ const PUNCH_STEPS = [
   { field: 'saida', label: 'Saída', icon: PunchOutIcon, description: 'Registrar saída da empresa' },
 ];
 
+function getDailyPunchSteps(schedule) {
+  if (!schedule) return PUNCH_STEPS;
+  const today = getTodayInSP();
+  const day = new Date(`${today}T12:00:00`).getDay() || 7;
+  if (!schedule.dias_semana?.includes(day)) return PUNCH_STEPS;
+  const daily = schedule.horarios_por_dia?.[String(day)] || schedule;
+  if (!daily.entrada || !daily.saida) return PUNCH_STEPS;
+  return daily.saida_almoco && daily.retorno_almoco
+    ? PUNCH_STEPS
+    : PUNCH_STEPS.filter((step) => !['saida_almoco', 'retorno_almoco'].includes(step.field));
+}
+
 export default function PunchPage() {
   const { profile } = useAuth();
   const toast = useToast();
@@ -61,10 +73,11 @@ export default function PunchPage() {
   }, [fetchTodayRecord]);
 
   // Determina o próximo passo
+  const punchSteps = getDailyPunchSteps(profile?.escala_trabalho);
   const getNextStep = () => {
     if (!todayRecord) return 0; // entrada
-    for (let i = 0; i < PUNCH_STEPS.length; i++) {
-      if (!todayRecord[PUNCH_STEPS[i].field]) return i;
+    for (let i = 0; i < punchSteps.length; i++) {
+      if (!todayRecord[punchSteps[i].field]) return i;
     }
     return -1; // ciclo completo
   };
@@ -82,7 +95,7 @@ export default function PunchPage() {
 
     setPunching(true);
     try {
-      const step = PUNCH_STEPS[nextStepIndex];
+      const step = punchSteps[nextStepIndex];
       const { data, error } = await supabase.rpc('registrar_ponto', {
         p_funcionario_id: profile.id,
         p_tipo: step.field,
@@ -166,15 +179,15 @@ export default function PunchPage() {
             </>
           ) : (
             <>
-              <span className="punch-icon">{PUNCH_STEPS[nextStepIndex].icon}</span>
-              <span className="punch-label">{PUNCH_STEPS[nextStepIndex].label}</span>
+              <span className="punch-icon">{punchSteps[nextStepIndex].icon}</span>
+              <span className="punch-label">{punchSteps[nextStepIndex].label}</span>
             </>
           )}
         </button>
 
         {!isComplete && profile?.ativo && (
           <p className="text-muted" style={{ fontSize: 'var(--font-sm)' }}>
-            Próximo: <strong>{PUNCH_STEPS[nextStepIndex].description}</strong>
+            Próximo: <strong>{punchSteps[nextStepIndex].description}</strong>
           </p>
         )}
 
@@ -195,7 +208,7 @@ export default function PunchPage() {
         </div>
 
         <div className="punch-timeline">
-          {PUNCH_STEPS.map((step, index) => {
+          {punchSteps.map((step, index) => {
             const value = todayRecord?.[step.field];
             const isCompleted = !!value;
             const isCurrent = index === nextStepIndex;

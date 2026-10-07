@@ -1537,6 +1537,12 @@ select.form-input {
 .employee-date-filter .form-input { min-width: 0; }
 .employee-custom-range { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .employee-no-results { padding: var(--space-6); color: var(--text-muted); text-align: center; background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.employee-vacation-cycles { display: grid; gap: var(--space-2); }
+.employee-vacation-cycle { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.employee-vacation-cycle > div { display: grid; gap: var(--space-1); }
+.employee-vacation-cycle strong { color: var(--text-primary); font-size: var(--font-sm); }
+.employee-vacation-cycle span, .employee-vacation-cycle small { color: var(--text-muted); font-size: var(--font-xs); }
+.employee-vacation-request { justify-items: end; }
 .employee-document-list { display: grid; gap: var(--space-2); }
 .employee-document-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
 .employee-document-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }
@@ -1549,6 +1555,13 @@ select.form-input {
 .employee-weekdays legend { padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--font-xs); }
 .employee-weekdays label { display: flex; align-items: center; gap: var(--space-1); }
 .employee-schedule-times .form-group { min-width: 110px; }
+.employee-day-schedule-list { display: grid; gap: var(--space-2); }
+.employee-day-schedule-list > h4 { color: var(--text-primary); font-size: var(--font-base); }
+.employee-day-schedule { min-width: 0; padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.employee-day-schedule.selected { border-color: rgba(74, 222, 128, .35); background: rgba(22, 101, 52, .08); }
+.employee-day-schedule legend label { display: flex; align-items: center; gap: var(--space-2); color: var(--text-primary); font-weight: 600; }
+.employee-day-time-fields { display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: var(--space-3); }
+.employee-lunch-toggle { display: flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); font-size: var(--font-xs); }
 .work-schedule-card { margin-bottom: var(--space-6); padding: var(--space-5); background: var(--gradient-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
 .work-schedule-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
 .work-schedule-heading h3 { color: var(--text-primary); font-size: var(--font-lg); }
@@ -1560,6 +1573,13 @@ select.form-input {
 .work-schedule-times > div { display: grid; gap: 3px; min-width: 0; padding: var(--space-3); background: var(--bg-card); border-radius: var(--radius-md); }
 .work-schedule-times span { color: var(--text-muted); font-size: var(--font-xs); }
 .work-schedule-times strong { color: var(--text-primary); font-size: var(--font-base); }
+.work-schedule-table { display: grid; gap: 2px; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.work-schedule-row { display: grid; grid-template-columns: minmax(125px, 1.4fr) repeat(4, minmax(90px, 1fr)); align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--text-secondary); background: var(--bg-card); font-size: var(--font-xs); }
+.work-schedule-row > * { min-width: 0; }
+.work-schedule-row > strong { color: var(--text-primary); }
+.work-schedule-row.scheduled { background: rgba(22, 101, 52, .12); }
+.work-schedule-row.day-off { color: var(--text-muted); }
+.work-schedule-header { color: var(--text-muted); background: var(--bg-card); font-weight: 700; }
 .work-schedule-empty { color: var(--text-muted); font-size: var(--font-sm); }
 .work-schedule-card.compact { padding: var(--space-4); }
 
@@ -1585,6 +1605,8 @@ select.form-input {
 .vacation-history-title { margin-top: var(--space-4); }
 .alert { padding: var(--space-4); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-secondary); background: var(--bg-card); }
 .alert-warning { border-color: rgba(245, 158, 11, .45); }
+.alert-danger { border-color: rgba(239, 68, 68, .5); }
+.alert p { margin: var(--space-1) 0 var(--space-2); }
 .alert-info { border-color: rgba(59, 130, 246, .4); }
 
 /* =========================================
@@ -1795,9 +1817,15 @@ select.form-input {
   .employee-document-item { align-items: flex-start; flex-wrap: wrap; }
   .employee-document-copy { flex-basis: calc(100% - 80px); }
   .employee-document-item .btn { margin-left: auto; }
+  .employee-vacation-cycle { flex-direction: column; }
+  .employee-vacation-request { justify-items: start; }
   .employee-list-toolbar { align-items: stretch; flex-direction: column; }
   .employee-schedule-times { display: grid; grid-template-columns: 1fr 1fr; }
+  .employee-day-time-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .work-schedule-times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .work-schedule-header { display: none; }
+  .work-schedule-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1) var(--space-2); padding: var(--space-3); }
+  .work-schedule-row > strong { grid-column: 1 / -1; }
   .work-schedule-heading { flex-direction: column; }
   .vacation-cycle-card, .vacation-admin-queue { padding: var(--space-3); }
   .vacation-cycle-heading, .vacation-request-row { align-items: flex-start; }

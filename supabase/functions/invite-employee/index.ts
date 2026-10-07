@@ -39,17 +39,25 @@ function isSchedule(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const schedule = value as Record<string, unknown>;
   const days = schedule.dias_semana;
+  const hoursByDay = schedule.horarios_por_dia;
   return ["5x2", "6x1", "personalizada"].includes(String(schedule.tipo))
     && Array.isArray(days) && days.length >= 1 && days.length <= 7
     && days.every((day) => Number.isInteger(day) && Number(day) >= 1 && Number(day) <= 7)
     && new Set(days).size === days.length
-    && isTime(schedule.entrada)
-    && isTime(schedule.saida_almoco)
-    && isTime(schedule.retorno_almoco)
-    && isTime(schedule.saida)
-    && timeToMinutes(schedule.entrada) < timeToMinutes(schedule.saida_almoco)
-    && timeToMinutes(schedule.saida_almoco) < timeToMinutes(schedule.retorno_almoco)
-    && timeToMinutes(schedule.retorno_almoco) < timeToMinutes(schedule.saida);
+    && Boolean(hoursByDay) && typeof hoursByDay === "object" && !Array.isArray(hoursByDay)
+    && days.every((day) => {
+      const hours = (hoursByDay as Record<string, unknown>)[String(day)];
+      if (!hours || typeof hours !== "object" || Array.isArray(hours)) return false;
+      const daily = hours as Record<string, unknown>;
+      if (!isTime(daily.entrada) || !isTime(daily.saida)) return false;
+      if (daily.saida_almoco == null && daily.retorno_almoco == null) {
+        return timeToMinutes(daily.entrada) < timeToMinutes(daily.saida);
+      }
+      return isTime(daily.saida_almoco) && isTime(daily.retorno_almoco)
+        && timeToMinutes(daily.entrada) < timeToMinutes(daily.saida_almoco)
+        && timeToMinutes(daily.saida_almoco) < timeToMinutes(daily.retorno_almoco)
+        && timeToMinutes(daily.retorno_almoco) < timeToMinutes(daily.saida);
+    });
 }
 
 Deno.serve(async (req) => {

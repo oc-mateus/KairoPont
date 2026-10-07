@@ -38,7 +38,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
 - Criar funcionário por convite, informando admissão, cargo e escala semanal; editar admissão/escala dos perfis existentes.
-- Configurar a escala por dias específicos da semana e horários de entrada, saída para almoço, retorno e saída final. A escala completa fica visível na ficha administrativa e em Meu Perfil.
+- Configurar cada dia separadamente: dias trabalhados, entrada, saída/retorno do almoço e saída final; um dia pode ser jornada contínua sem intervalo (por exemplo, sábado 08h–12h). A escala completa fica visível na ficha administrativa e em Meu Perfil, e a jornada contínua tem só marcações de entrada e saída.
 - Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
 - Comparar nas tabelas de ponto as horas registradas, a jornada planejada para cada dia e o saldo diário.
 
@@ -81,7 +81,7 @@ Cada funcionário pode ter um registro por dia. As colunas guardam entrada, saí
 
 ## Dados e estrutura
 
-As migrações criam quatro tabelas no esquema public:
+As migrações criam as tabelas principais no esquema public:
 
 | Tabela | Dados armazenados | Proteção aplicada |
 | --- | --- | --- |
@@ -145,12 +145,15 @@ As migrações devem ser aplicadas nesta ordem:
 2. supabase/migrations/20261006001000_security_hardening.sql
 3. supabase/migrations/20261006002000_restrict_internal_trigger.sql
 4. supabase/migrations/20261007162427_vacation_requests_employee_schedule.sql
+5. supabase/migrations/20261007164037_custom_daily_work_schedules.sql
 
 O projeto KairoPont já registrava as três migrações, com os buckets documentos (privado) e fotos-funcionarios (público). Não reaplique nem resete o banco de produção para seguir este guia.
 
 A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` (endereço verificado no Resend). Sem eles, a decisão é gravada, mas o envio falha e pode ser tentado novamente na fila administrativa. O envio do convite depende do SMTP configurado no Supabase Auth e da URL permitida `https://oc-mateus.github.io/KairoPont/definir-senha`, onde o funcionário define sua senha.
 
 Para perfis existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível.
+
+Na escala personalizada, cada dia guarda seus próprios horários; o intervalo de almoço pode ser desativado em um dia específico. A sequência de ponto desse dia passa a ser entrada e saída, e a folha calcula a jornada sem subtrair almoço.
 
 ### GitHub Pages
 

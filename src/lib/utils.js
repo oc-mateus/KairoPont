@@ -116,7 +116,12 @@ export function calcDailyTotal(record) {
   
   const baseDate = '1970-01-01T';
 
-  if (record.entrada && record.saida_almoco) {
+  if (record.entrada && record.saida && !record.saida_almoco && !record.retorno_almoco) {
+    const continuousDay = new Date(baseDate + record.saida) - new Date(baseDate + record.entrada);
+    if (continuousDay > 0) totalMs = continuousDay;
+  }
+
+  if (!totalMs && record.entrada && record.saida_almoco) {
     const diff = new Date(baseDate + record.saida_almoco) - new Date(baseDate + record.entrada);
     if (diff > 0) totalMs += diff;
   }

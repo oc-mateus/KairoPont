@@ -24,6 +24,13 @@ function formatDate(value: string) {
   return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
+function addIsoDays(value: string, days: number) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return reply({ error: "Método não permitido." }, 405);
@@ -41,7 +48,7 @@ Deno.serve(async (req) => {
     const requestId = String(input.solicitacao_id || "");
     const { data: request, error: requestError } = await ctx.supabaseAdmin
       .from("solicitacoes_ferias")
-      .select("id, funcionario_id, periodo_id, data_inicio, data_fim, status, justificativa_recusa, decidida_em, email_enviado_em")
+      .select("id, funcionario_id, periodo_id, data_inicio, data_fim, data_retorno, status, justificativa_recusa, decidida_em, email_enviado_em")
       .eq("id", requestId).maybeSingle();
     if (requestError) throw requestError;
     if (!request || !["aprovada", "recusada"].includes(request.status)) {
@@ -64,7 +71,8 @@ Deno.serve(async (req) => {
 
     const approved = request.status === "aprovada";
     const subject = `Férias ${approved ? "aprovadas" : "recusadas"} - KairoPont`;
-    const periodText = `${formatDate(request.data_inicio)} a ${formatDate(request.data_fim)}`;
+    const returnDate = request.data_retorno || addIsoDays(request.data_fim, 1);
+    const periodText = `saída em ${formatDate(request.data_inicio)} e retorno ao trabalho em ${formatDate(returnDate)}`;
     const reasonText = approved ? "" : String(request.justificativa_recusa || "");
     const html = `<div style="font-family:Arial,sans-serif;color:#173126;max-width:600px;margin:auto;padding:24px"><h1 style="color:${approved ? "#16803c" : "#b42318"}">Solicitação de férias ${approved ? "aprovada" : "recusada"}</h1><p>Olá, ${escapeHtml(employee.nome)}.</p><p>Sua solicitação para <strong>${escapeHtml(periodText)}</strong> foi <strong>${approved ? "aprovada" : "recusada"}</strong>.</p>${approved ? "" : `<p><strong>Justificativa:</strong><br>${escapeHtml(reasonText).replace(/\n/g, "<br>")}</p>`}<p>Dias convertidos em abono: ${Number(cycle?.dias_abono || 0)}.</p><p>Esta mensagem foi enviada pelo KairoPont.</p></div>`;
     const plainText = `Olá, ${employee.nome}.\n\nSua solicitação de férias para ${periodText} foi ${approved ? "aprovada" : "recusada"}.${approved ? "" : `\n\nJustificativa: ${reasonText}`}\n\nDias convertidos em abono: ${Number(cycle?.dias_abono || 0)}.\n\nKairoPont`;

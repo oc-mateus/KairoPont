@@ -25,8 +25,9 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
 - Enviar atestado médico ou declaração de horas e baixar documentos autorizados.
 - Atualizar dados básicos do perfil e a foto.
-- Consultar períodos aquisitivos; a solicitação de gozo só é liberada após completar um ano de empresa. Antes disso, a tela informa que o funcionário ainda não está elegível e mostra a data de liberação.
-- Registrar intenção de conversão de até 10 dias em abono dentro do prazo; acompanhar prazos e avisos na tela de férias.
+- Consultar períodos aquisitivos; a tela mostra a data de admissão e separa a data de liberação para solicitar da primeira data possível de saída. Antes de completar um ano, informa claramente a inelegibilidade.
+- Registrar se pretende vender férias e quantos dias (até 10) dentro do prazo; no pedido de gozo, informar data de saída e data de retorno ao trabalho.
+- Enviar a solicitação de gozo para a fila administrativa e acompanhar o envio do pedido; o resultado é comunicado exclusivamente por e-mail.
 - Receber exclusivamente por e-mail a decisão de aprovação ou recusa; recusas incluem a justificativa. A tela não revela o resultado da decisão.
 
 ### Para administradores
@@ -40,6 +41,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Criar funcionário por convite, informando admissão, cargo e escala semanal; editar admissão/escala dos perfis existentes.
 - Configurar cada dia separadamente: dias trabalhados, entrada, saída/retorno do almoço e saída final; um dia pode ser jornada contínua sem intervalo (por exemplo, sábado 08h–12h). A escala completa fica visível na ficha administrativa e em Meu Perfil, e a jornada contínua tem só marcações de entrada e saída.
 - Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
+- Na ficha do funcionário, consultar a data de admissão, quando o pedido será liberado e a primeira data possível de saída; na fila, revisar saída e retorno solicitados.
 - Comparar nas tabelas de ponto as horas registradas, a jornada planejada para cada dia e o saldo diário.
 
 Os relatórios PDF de ponto do funcionário e do administrador exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. Na ficha administrativa, PDF, Excel e tabela diária também comparam a jornada prevista com o total marcado. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
@@ -146,8 +148,11 @@ As migrações devem ser aplicadas nesta ordem:
 3. supabase/migrations/20261006002000_restrict_internal_trigger.sql
 4. supabase/migrations/20261007162427_vacation_requests_employee_schedule.sql
 5. supabase/migrations/20261007164037_custom_daily_work_schedules.sql
+6. supabase/migrations/20261007171841_vacation_request_return_date.sql
 
-O projeto KairoPont já registrava as três migrações, com os buckets documentos (privado) e fotos-funcionarios (público). Não reaplique nem resete o banco de produção para seguir este guia.
+O projeto KairoPont registra as migrações listadas, com os buckets documentos (privado) e fotos-funcionarios (público). Não reaplique nem resete o banco de produção para seguir este guia.
+
+As solicitações guardam separadamente o último dia de férias e a data de retorno ao trabalho. Os registros anteriores foram preservados convertendo o antigo último dia em retorno no dia seguinte; pedidos novos usam saída e retorno explícitos.
 
 A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` (endereço verificado no Resend). Sem eles, a decisão é gravada, mas o envio falha e pode ser tentado novamente na fila administrativa. O envio do convite depende do SMTP configurado no Supabase Auth e da URL permitida `https://oc-mateus.github.io/KairoPont/definir-senha`, onde o funcionário define sua senha.
 

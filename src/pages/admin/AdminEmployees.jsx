@@ -22,6 +22,14 @@ function defaultHoursForDay(day) {
     : { entrada: '08:00', saida_almoco: '12:00', retorno_almoco: '13:00', saida: '17:00' };
 }
 
+function addIsoDays(value, days) {
+  if (!value) return '';
+  const [year, month, day] = value.split('-').map(Number);
+  const result = new Date(Date.UTC(year, month - 1, day));
+  result.setUTCDate(result.getUTCDate() + days);
+  return result.toISOString().slice(0, 10);
+}
+
 function getRange(filter, selectedDay, customStart, customEnd, referenceDate) {
   if (filter === 'day') return { start: selectedDay, end: selectedDay };
   if (filter === 'week') {
@@ -480,10 +488,21 @@ export default function AdminEmployees() {
 
           <section className="employee-records-section employee-vacation-section">
             <div className="employee-section-heading"><div><h3>Férias deste funcionário</h3><p>{vacationPeriods.length} período(s) aquisitivo(s) · {vacationRequests.length} solicitação(ões)</p></div><Link className="btn btn-secondary btn-sm" to={`/ferias?funcionario=${selectedEmp.id}`}>Abrir gestão de férias</Link></div>
+            {(() => {
+              const today = getTodayInSP();
+              const availablePeriod = vacationPeriods.find((period) => today > period.periodo_fim && today <= period.prazo_concessivo);
+              const upcomingPeriod = vacationPeriods.find((period) => today <= period.periodo_fim);
+              const firstRequestDate = upcomingPeriod ? addIsoDays(upcomingPeriod.periodo_fim, 1) : null;
+              const earliestLeaveDate = availablePeriod ? addIsoDays(today, 30) : upcomingPeriod ? addIsoDays(upcomingPeriod.periodo_fim, 31) : null;
+              return <div className="vacation-eligibility-overview"><div><span>Data de admissão</span><strong>{selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</strong></div><div><span>Direito atual</span><strong>{availablePeriod ? `Pode solicitar desde ${formatDate(`${addIsoDays(availablePeriod.periodo_fim, 1)}T12:00:00`)}` : firstRequestDate ? `Solicitações a partir de ${formatDate(`${firstRequestDate}T12:00:00`)}` : 'Sem período disponível'}</strong></div><div><span>Primeiro início de gozo possível</span><strong>{earliestLeaveDate ? formatDate(`${earliestLeaveDate}T12:00:00`) : 'A definir pelo período aquisitivo'}</strong><small>Considerando o prazo mínimo de 30 dias entre o pedido e a saída.</small></div></div>;
+            })()}
             {vacationPeriods.length ? <div className="employee-vacation-cycles">{vacationPeriods.map((period) => {
               const request = vacationRequests.find((item) => item.periodo_id === period.id);
-              const eligibleForLeave = getTodayInSP() > period.periodo_fim && getTodayInSP() <= period.prazo_concessivo;
-              return <article className="employee-vacation-cycle" key={period.id}><div><strong>{formatDate(`${period.periodo_inicio}T12:00:00`)} – {formatDate(`${period.periodo_fim}T12:00:00`)}</strong><span>Prazo para concessão: {formatDate(`${period.prazo_concessivo}T12:00:00`)} · Abono: {period.dias_abono}/{period.dias_direito} dias</span>{!eligibleForLeave && getTodayInSP() <= period.periodo_fim && <small className="vacation-ineligible-message">Funcionário ainda não elegível para gozo de férias.</small>}</div>{request ? <div className="employee-vacation-request"><Badge variant={request.status === 'aprovada' ? 'success' : request.status === 'recusada' ? 'danger' : 'warning'}>{request.status === 'aprovada' ? 'Aprovada' : request.status === 'recusada' ? 'Recusada' : 'Pendente'}</Badge><span>{formatDate(`${request.data_inicio}T12:00:00`)} – {formatDate(`${request.data_fim}T12:00:00`)}</span>{request.status === 'recusada' && <small>Justificativa: {request.justificativa_recusa}</small>}<small>{request.email_enviado_em ? `E-mail enviado em ${formatDateTime(request.email_enviado_em)}` : request.email_erro ? `Falha no e-mail: ${request.email_erro}` : request.status !== 'pendente' ? 'E-mail da decisão pendente' : ''}</small></div> : <Badge variant={eligibleForLeave ? 'info' : 'warning'}>{eligibleForLeave ? 'Sem solicitação' : 'Ainda não elegível para gozo'}</Badge>}</article>;
+              const today = getTodayInSP();
+              const eligibleForLeave = today > period.periodo_fim && today <= period.prazo_concessivo;
+              const firstRequestDate = addIsoDays(period.periodo_fim, 1);
+              const earliestLeaveDate = addIsoDays(period.periodo_fim, 31);
+              return <article className="employee-vacation-cycle" key={period.id}><div><strong>Período aquisitivo: {formatDate(`${period.periodo_inicio}T12:00:00`)} – {formatDate(`${period.periodo_fim}T12:00:00`)}</strong><span>Admissão: {selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</span><span>Elegível para solicitar a partir de: {formatDate(`${firstRequestDate}T12:00:00`)}</span><span>Prazo final para gozo: {formatDate(`${period.prazo_concessivo}T12:00:00`)}</span><span>Abono escolhido: {period.dias_abono ? `${period.dias_abono} dia(s) vendido(s)` : 'Não'}</span>{!eligibleForLeave && today <= period.periodo_fim && <small className="vacation-ineligible-message">Ainda não elegível. Se o pedido for enviado na primeira data disponível, a saída mais cedo será {formatDate(`${earliestLeaveDate}T12:00:00`)}, respeitando a antecedência mínima de 30 dias.</small>}</div>{request ? <div className="employee-vacation-request"><Badge variant={request.status === 'aprovada' ? 'success' : request.status === 'recusada' ? 'danger' : 'warning'}>{request.status === 'aprovada' ? 'Aprovada' : request.status === 'recusada' ? 'Recusada' : 'Pendente'}</Badge><span>Saída: {formatDate(`${request.data_inicio}T12:00:00`)}</span><span>Retorno ao trabalho: {formatDate(`${(request.data_retorno || addIsoDays(request.data_fim, 1))}T12:00:00`)}</span>{request.status === 'recusada' && <small>Justificativa: {request.justificativa_recusa}</small>}<small>{request.email_enviado_em ? `E-mail enviado em ${formatDateTime(request.email_enviado_em)}` : request.email_erro ? `Falha no e-mail: ${request.email_erro}` : request.status !== 'pendente' ? 'E-mail da decisão pendente' : ''}</small></div> : <Badge variant={eligibleForLeave ? 'info' : 'warning'}>{eligibleForLeave ? 'Sem solicitação' : 'Ainda não elegível para gozo'}</Badge>}</article>;
             })}</div> : <p className="employee-no-results">Os períodos de férias serão calculados após informar a data de admissão e abrir a tela de gestão.</p>}
           </section>
 

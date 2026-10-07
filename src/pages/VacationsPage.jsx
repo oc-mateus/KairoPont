@@ -21,6 +21,15 @@ function addIsoDays(dateValue, days) {
   return date.toISOString().slice(0, 10);
 }
 
+function SaleChoiceFields({ choice, onChoiceChange, days, onDaysChange, disabled = false }) {
+  return <fieldset className="vacation-choice-group" disabled={disabled}>
+    <legend>Venda de até 10 dias (abono)</legend>
+    <label className="vacation-choice-option"><input type="checkbox" checked={choice === 'yes'} onChange={() => onChoiceChange('yes')} />Sim, pretendo vender parte das férias</label>
+    <label className="vacation-choice-option"><input type="checkbox" checked={choice === 'no'} onChange={() => onChoiceChange('no')} />Não pretendo vender férias</label>
+    {choice === 'yes' && <label className="form-group">Quantidade de dias para venda<select className="form-input" value={days} onChange={(event) => onDaysChange(event.target.value)}>{Array.from({ length: 10 }, (_, index) => index + 1).map((day) => <option key={day} value={day}>{day} {day === 1 ? 'dia' : 'dias'}</option>)}</select></label>}
+  </fieldset>;
+}
+
 export default function VacationsPage() {
   const { profile, isAdmin } = useAuth();
   const [searchParams] = useSearchParams();
@@ -32,6 +41,7 @@ export default function VacationsPage() {
   const [employees, setEmployees] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [daysByPeriod, setDaysByPeriod] = useState({});
+  const [saleChoiceByPeriod, setSaleChoiceByPeriod] = useState({});
   const [datesByPeriod, setDatesByPeriod] = useState({});
   const [reasons, setReasons] = useState({});
   const [busyId, setBusyId] = useState('');
@@ -77,7 +87,8 @@ export default function VacationsPage() {
   const setPeriodValue = (setter, id, key, value) => setter((current) => ({ ...current, [id]: { ...current[id], [key]: value } }));
 
   const submitSaleIntention = async (period) => {
-    const days = Number(daysByPeriod[period.id] ?? period.dias_abono ?? 0);
+    const choice = saleChoiceByPeriod[period.id] || (Number(period.dias_abono) > 0 ? 'yes' : 'no');
+    const days = choice === 'yes' ? Number(daysByPeriod[period.id] ?? period.dias_abono ?? 1) : 0;
     setBusyId(period.id);
     try {
       const { error } = await supabase.rpc('set_vacation_sale_intention', { p_periodo_id: period.id, p_dias_abono: days });
@@ -91,12 +102,13 @@ export default function VacationsPage() {
 
   const submitRequest = async (period) => {
     const dates = datesByPeriod[period.id] || {};
-    if (!dates.start || !dates.end) return toast.warning('Informe as datas desejadas para as férias.');
+    if (!dates.departure || !dates.returnDate) return toast.warning('Informe a data de saída e a data de retorno ao trabalho.');
+    if (dates.returnDate <= dates.departure) return toast.warning('A data de retorno deve ser posterior à data de saída.');
     setBusyId(period.id);
     try {
-      const { error } = await supabase.rpc('submit_vacation_request', { p_periodo_id: period.id, p_data_inicio: dates.start, p_data_fim: dates.end });
+      const { error } = await supabase.rpc('submit_vacation_request_with_return', { p_periodo_id: period.id, p_data_saida: dates.departure, p_data_retorno: dates.returnDate });
       if (error) throw error;
-      toast.success('Solicitação enviada ao administrador. O resultado será enviado somente por e-mail.');
+      toast.success('Solicitação enviada à equipe administrativa. A decisão será enviada somente por e-mail.');
       await loadData();
     } catch (error) {
       toast.error(error.message || 'Não foi possível solicitar as férias.');
@@ -154,24 +166,29 @@ export default function VacationsPage() {
       const requested = existing.find((request) => ['pendente', 'aprovada'].includes(request.status));
       const pending = existing.filter((request) => request.status === 'pendente');
       const today = getTodayInSP();
-      const saleOpen = today <= new Date(new Date(`${period.periodo_fim}T12:00:00`).getTime() - 15 * 86400000).toISOString().slice(0, 10);
+      const saleOpen = today <= addIsoDays(period.periodo_fim, -15);
       const eligible = today > period.periodo_fim && today <= period.prazo_concessivo;
       const requestDates = datesByPeriod[period.id] || {};
+      const savedSaleChoice = Number(period.dias_abono) > 0 ? 'yes' : 'no';
+      const editableSaleChoice = saleChoiceByPeriod[period.id] || savedSaleChoice;
+      const requestSaleDays = Number(period.dias_abono) || 0;
+      const earliestRequestDate = addIsoDays(period.periodo_fim, 1);
+      const earliestLeaveDate = addIsoDays(earliestRequestDate, 30);
       return <section className="vacation-cycle-card" key={period.id}>
         <div className="vacation-cycle-heading"><div><h3>Período aquisitivo {dateLabel(period.periodo_inicio)} – {dateLabel(period.periodo_fim)}</h3><p>Prazo para concessão até {dateLabel(period.prazo_concessivo)}</p></div><Badge variant={period.prazo_concessivo < today ? 'danger' : eligible ? 'success' : 'info'}>{period.prazo_concessivo < today ? 'Prazo vencido' : eligible ? 'Direito adquirido' : 'Em aquisição'}</Badge></div>
-        <p className="vacation-cycle-summary">Direito: {period.dias_direito} dias · Abono registrado: {period.dias_abono} dia(s)</p>
-        {!eligible && today <= period.periodo_fim && <p className="vacation-ineligible-message">Funcionário ainda não elegível para gozo de férias. A solicitação estará disponível a partir de {dateLabel(addIsoDays(period.periodo_fim, 1))}, após completar um ano de empresa.</p>}
-        {saleOpen && <div className="vacation-inline-form"><label className="form-group">Pretende converter dias em abono? (0 a 10)<select className="form-input" value={daysByPeriod[period.id] ?? period.dias_abono} onChange={(event) => setDaysByPeriod((current) => ({ ...current, [period.id]: event.target.value }))}>{Array.from({ length: 11 }, (_, day) => <option key={day} value={day}>{day} {day === 1 ? 'dia' : 'dias'}</option>)}</select></label><button className="btn btn-secondary" disabled={busyId === period.id} onClick={() => submitSaleIntention(period)}>Registrar intenção de abono</button><small>Disponível até 15 dias antes do fim do período aquisitivo. O pedido de gozo só abre após completar 1 ano.</small></div>}
-        {eligible && !requested && <div className="vacation-inline-form"><p>Informe o período desejado. A duração deve corresponder aos dias de direito, descontado eventual abono.</p><div className="form-row"><label className="form-group">Início<input className="form-input" type="date" min={today} value={requestDates.start || ''} onChange={(event) => setPeriodValue(setDatesByPeriod, period.id, 'start', event.target.value)} /></label><label className="form-group">Fim<input className="form-input" type="date" min={requestDates.start || today} value={requestDates.end || ''} onChange={(event) => setPeriodValue(setDatesByPeriod, period.id, 'end', event.target.value)} /></label></div><button className="btn btn-primary" disabled={busyId === period.id} onClick={() => submitRequest(period)}>Solicitar férias</button></div>}
-        {pending.length > 0 && <div className="vacation-request-history">{pending.map((request) => <article className="vacation-request-row" key={request.id}><div><strong>{dateLabel(request.data_inicio)} – {dateLabel(request.data_fim)}</strong><small>Solicitado em {dateLabel(request.created_at?.slice(0, 10))}</small></div><Badge variant="warning">Aguardando decisão</Badge></article>)}</div>}
+        <div className="vacation-cycle-summary vacation-eligibility-details"><span>Data de admissão: <strong>{dateLabel(profile?.data_admissao)}</strong></span><span>Direito adquirido: <strong>{period.dias_direito} dias</strong></span><span>Abono de férias: <strong>{requestSaleDays ? `${requestSaleDays} dia(s) vendido(s)` : 'Não solicitado'}</strong></span><span>Prazo para gozo até: <strong>{dateLabel(period.prazo_concessivo)}</strong></span></div>
+        {!eligible && today <= period.periodo_fim && <div className="vacation-ineligible-message"><strong>Funcionário ainda não elegível para gozo de férias.</strong><span>Você poderá solicitar a partir de {dateLabel(earliestRequestDate)}, após completar um ano de empresa. Se o pedido for enviado nessa data, a saída mais cedo permitida será {dateLabel(earliestLeaveDate)} (antecedência mínima de 30 dias).</span></div>}
+        {saleOpen && <div className="vacation-inline-form"><SaleChoiceFields choice={editableSaleChoice} onChoiceChange={(choice) => setSaleChoiceByPeriod((current) => ({ ...current, [period.id]: choice }))} days={daysByPeriod[period.id] ?? (Number(period.dias_abono) || 1)} onDaysChange={(days) => setDaysByPeriod((current) => ({ ...current, [period.id]: days }))} /><button className="btn btn-secondary" disabled={busyId === period.id} onClick={() => submitSaleIntention(period)}>Salvar opção de venda</button><small>Defina se pretende vender até 10 dias e a quantidade até {dateLabel(addIsoDays(period.periodo_fim, -15))}. Essa opção precisa ser registrada antes do prazo; o pedido de gozo abre após completar um ano.</small></div>}
+        {eligible && !requested && <div className="vacation-inline-form"><p>Informe o dia em que sairá e o dia em que voltará ao trabalho. A duração do afastamento deve corresponder a {period.dias_direito - requestSaleDays} dia(s), considerando a opção de abono registrada no prazo.</p><div className="form-row"><label className="form-group">Data de saída<input className="form-input" type="date" min={addIsoDays(today, 30)} max={period.prazo_concessivo} value={requestDates.departure || ''} onChange={(event) => setPeriodValue(setDatesByPeriod, period.id, 'departure', event.target.value)} /></label><label className="form-group">Data de retorno ao trabalho<input className="form-input" type="date" min={requestDates.departure ? addIsoDays(requestDates.departure, 1) : addIsoDays(today, 31)} max={addIsoDays(period.prazo_concessivo, 1)} value={requestDates.returnDate || ''} onChange={(event) => setPeriodValue(setDatesByPeriod, period.id, 'returnDate', event.target.value)} /></label></div><SaleChoiceFields choice={savedSaleChoice} onChoiceChange={() => {}} days={requestSaleDays || 1} onDaysChange={() => {}} disabled={!saleOpen} /><small className="vacation-form-note">{period.abono_solicitado_em ? `Opção de abono registrada em ${dateLabel(period.abono_solicitado_em.slice(0, 10))}; a quantidade acima é a definida no prazo legal.` : 'Nenhuma intenção de venda foi registrada no prazo legal; este pedido seguirá sem abono.'} O pedido será enviado aos administradores para análise.</small><button className="btn btn-primary" disabled={busyId === period.id} onClick={() => submitRequest(period)}>Enviar solicitação aos administradores</button></div>}
+        {pending.length > 0 && <div className="vacation-request-history">{pending.map((request) => <article className="vacation-request-row" key={request.id}><div><strong>Saída: {dateLabel(request.data_inicio)} · Retorno: {dateLabel(request.data_retorno || addIsoDays(request.data_fim, 1))}</strong><small>Solicitado em {dateLabel(request.created_at?.slice(0, 10))}</small></div><Badge variant="warning">Aguardando decisão</Badge></article>)}</div>}
         {existing.some((request) => request.status !== 'pendente') && <p className="vacation-email-only-note">A devolutiva das decisões é enviada exclusivamente ao seu e-mail corporativo.</p>}
       </section>;
     })}
 
     {!isAdmin && periods.length === 0 && profile?.data_admissao && <div className="empty-state"><h3 className="empty-state-title">Ainda não há período aquisitivo disponível.</h3></div>}
 
-    {isAdmin && <section className="vacation-admin-queue"><h3>Solicitações pendentes</h3>{pendingRequests.length === 0 && <p className="employee-no-results">Nenhuma solicitação aguardando decisão.</p>}{pendingRequests.map((request) => { const employee = employees[request.funcionario_id]; return <article className="vacation-admin-request" key={request.id}><div className="vacation-cycle-heading"><div><h4>{employee?.nome || 'Funcionário'} · {employee?.cargo || 'Cargo não informado'}</h4><p>{employee?.email}</p></div><Badge variant="warning">Pendente</Badge></div><p>Período solicitado: <strong>{dateLabel(request.data_inicio)} – {dateLabel(request.data_fim)}</strong></p><label className="form-group">Justificativa (obrigatória para recusa)<textarea className="form-input" rows="3" value={reasons[request.id] || ''} onChange={(event) => setReasons((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="Explique o motivo caso a solicitação seja recusada" /></label><div className="vacation-admin-actions"><button className="btn btn-primary" disabled={busyId === request.id} onClick={() => decide(request, true)}>Aprovar e enviar e-mail</button><button className="btn btn-secondary" disabled={busyId === request.id} onClick={() => decide(request, false)}>Recusar e enviar e-mail</button></div></article>; })}
-      <h3 className="vacation-history-title">Histórico de decisões</h3>{requests.filter((request) => request.status !== 'pendente').map((request) => <article className="vacation-request-row" key={request.id}><div><strong>{employees[request.funcionario_id]?.nome || 'Funcionário'} · {dateLabel(request.data_inicio)} – {dateLabel(request.data_fim)}</strong><small>{statusLabel(request.status)} · {request.email_enviado_em ? `E-mail enviado ${dateLabel(request.email_enviado_em.slice(0, 10))}` : request.email_erro ? `Erro no e-mail: ${request.email_erro}` : 'E-mail pendente'}</small>{request.status === 'recusada' && <small>Motivo: {request.justificativa_recusa}</small>}</div>{!request.email_enviado_em && <button className="btn btn-secondary btn-sm" disabled={busyId === request.id} onClick={() => sendDecisionEmail(request)}>Reenviar e-mail</button>}</article>)}</section>}
+    {isAdmin && <section className="vacation-admin-queue"><h3>Solicitações pendentes</h3>{pendingRequests.length === 0 && <p className="employee-no-results">Nenhuma solicitação aguardando decisão.</p>}{pendingRequests.map((request) => { const employee = employees[request.funcionario_id]; return <article className="vacation-admin-request" key={request.id}><div className="vacation-cycle-heading"><div><h4>{employee?.nome || 'Funcionário'} · {employee?.cargo || 'Cargo não informado'}</h4><p>{employee?.email}</p></div><Badge variant="warning">Pendente</Badge></div><p>Saída: <strong>{dateLabel(request.data_inicio)}</strong> · Retorno ao trabalho: <strong>{dateLabel(request.data_retorno || addIsoDays(request.data_fim, 1))}</strong></p><label className="form-group">Justificativa (obrigatória para recusa)<textarea className="form-input" rows="3" value={reasons[request.id] || ''} onChange={(event) => setReasons((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="Explique o motivo caso a solicitação seja recusada" /></label><div className="vacation-admin-actions"><button className="btn btn-primary" disabled={busyId === request.id} onClick={() => decide(request, true)}>Aprovar e enviar e-mail</button><button className="btn btn-secondary" disabled={busyId === request.id} onClick={() => decide(request, false)}>Recusar e enviar e-mail</button></div></article>; })}
+      <h3 className="vacation-history-title">Histórico de decisões</h3>{requests.filter((request) => request.status !== 'pendente').map((request) => <article className="vacation-request-row" key={request.id}><div><strong>{employees[request.funcionario_id]?.nome || 'Funcionário'} · Saída: {dateLabel(request.data_inicio)} · Retorno: {dateLabel(request.data_retorno || addIsoDays(request.data_fim, 1))}</strong><small>{statusLabel(request.status)} · {request.email_enviado_em ? `E-mail enviado ${dateLabel(request.email_enviado_em.slice(0, 10))}` : request.email_erro ? `Erro no e-mail: ${request.email_erro}` : 'E-mail pendente'}</small>{request.status === 'recusada' && <small>Motivo: {request.justificativa_recusa}</small>}</div>{!request.email_enviado_em && <button className="btn btn-secondary btn-sm" disabled={busyId === request.id} onClick={() => sendDecisionEmail(request)}>Reenviar e-mail</button>}</article>)}</section>}
 
     {isAdmin && periods.length === 0 && <div className="alert alert-info">Preencha a data de admissão e a escala de trabalho de cada funcionário na tela Funcionários para iniciar o controle de férias.</div>}
   </div>;

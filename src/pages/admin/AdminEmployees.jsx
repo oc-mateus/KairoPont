@@ -7,6 +7,7 @@ import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
 import WorkScheduleCard from '../../components/WorkScheduleCard';
+import { getAssignedShiftId, getShiftLabel, inferShiftFromEntry, makeEmployeeSchedule, WORK_SHIFTS } from '../../lib/workShifts';
 
 const FILTERS = [
   { id: 'day', label: 'Dia' },
@@ -14,13 +15,6 @@ const FILTERS = [
   { id: 'month', label: 'Mês' },
   { id: 'custom', label: 'Período personalizado' },
 ];
-const WEEKDAYS = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
-
-function defaultHoursForDay(day) {
-  return day === 6 || day === 7
-    ? { entrada: '08:00', saida_almoco: null, retorno_almoco: null, saida: '12:00' }
-    : { entrada: '08:00', saida_almoco: '12:00', retorno_almoco: '13:00', saida: '17:00' };
-}
 
 function addIsoDays(value, days) {
   if (!value) return '';
@@ -88,17 +82,23 @@ function getScheduleComparison(record, schedule) {
   if (!schedule?.dias_semana?.length) return { expected: '—', balance: '—' };
   const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
   if (!schedule.dias_semana.includes(weekday)) return { expected: 'Folga', balance: record.saida ? 'Extra' : '—' };
-  const daily = schedule.horarios_por_dia?.[String(weekday)] || schedule;
+  const actualShiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada);
+  const shiftDay = weekday !== 6 && actualShiftId ? makeEmployeeSchedule(actualShiftId).horarios_por_dia[String(weekday)] : null;
+  const daily = weekday === 6
+    ? { entrada: '08:00', saida: '12:00' }
+    : shiftDay || schedule.horarios_por_dia?.[String(weekday)] || schedule;
   const entry = timeMinutes(daily.entrada);
   const lunchOut = timeMinutes(daily.saida_almoco);
   const lunchIn = timeMinutes(daily.retorno_almoco);
   const exit = timeMinutes(daily.saida);
-  const expectedMinutes = entry != null && exit != null ? (lunchOut != null && lunchIn != null ? (lunchOut - entry) + (exit - lunchIn) : exit - entry) : null;
+  let expectedMinutes = entry != null && exit != null ? (lunchOut != null && lunchIn != null ? (lunchOut - entry) + (exit - lunchIn) : exit - entry) : null;
+  if (expectedMinutes != null && expectedMinutes < 0) expectedMinutes += 24 * 60;
   const actualEntry = timeMinutes(record.entrada);
   const actualLunchOut = timeMinutes(record.saida_almoco);
   const actualLunchIn = timeMinutes(record.retorno_almoco);
   const actualExit = timeMinutes(record.saida);
-  const actualMinutes = actualEntry != null && actualExit != null ? (actualLunchOut != null && actualLunchIn != null ? (actualLunchOut - actualEntry) + (actualExit - actualLunchIn) : actualExit - actualEntry) : null;
+  let actualMinutes = actualEntry != null && actualExit != null ? (actualLunchOut != null && actualLunchIn != null ? (actualLunchOut - actualEntry) + (actualExit - actualLunchIn) : actualExit - actualEntry) : null;
+  if (actualMinutes != null && actualMinutes < 0 && (record.saida_data > record.data || record.turno_trabalhado === 'turno3')) actualMinutes += 24 * 60;
   const expected = expectedMinutes == null ? '—' : `${Math.floor(expectedMinutes / 60)}h ${String(expectedMinutes % 60).padStart(2, '0')}min`;
   return { expected, balance: durationLabel(actualMinutes == null || expectedMinutes == null ? null : actualMinutes - expectedMinutes) };
 }
@@ -129,7 +129,7 @@ export default function AdminEmployees() {
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [editingAdmission, setEditingAdmission] = useState(false);
-  const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), tipo: '5x2', dias_semana: [1, 2, 3, 4, 5], horarios_por_dia: Object.fromEntries([1, 2, 3, 4, 5].map((day) => [day, defaultHoursForDay(day)])) });
+  const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), turno_id: 'turno1', ...makeEmployeeSchedule('turno1') });
 
   const hasSavedSchedule = Boolean(selectedEmp?.escala_trabalho?.dias_semana?.length || (selectedEmp?.escala_trabalho?.entrada && selectedEmp?.escala_trabalho?.saida));
 
@@ -179,48 +179,16 @@ export default function AdminEmployees() {
 
   const setFormField = (field, value) => setEmployeeForm((current) => ({ ...current, [field]: value }));
 
-  const toggleWorkDay = (day, checked) => setEmployeeForm((current) => {
-    const days = checked ? [...current.dias_semana, day].sort((a, b) => a - b) : current.dias_semana.filter((item) => item !== day);
-    return { ...current, tipo: 'personalizada', dias_semana: days, horarios_por_dia: checked && !current.horarios_por_dia[String(day)] ? { ...current.horarios_por_dia, [day]: defaultHoursForDay(day) } : current.horarios_por_dia };
-  });
+  const setScheduleType = (turnoId) => setEmployeeForm((current) => ({ ...current, ...makeEmployeeSchedule(turnoId), turno_id: turnoId }));
 
-  const setScheduleType = (type) => setEmployeeForm((current) => {
-    const days = type === '5x2' ? [1, 2, 3, 4, 5] : type === '6x1' ? [1, 2, 3, 4, 5, 6] : current.dias_semana;
-    const hours = { ...current.horarios_por_dia };
-    days.forEach((day) => { if (!hours[String(day)]) hours[String(day)] = defaultHoursForDay(day); });
-    return { ...current, tipo: type, dias_semana: days, horarios_por_dia: hours };
-  });
-
-  const setDayTime = (day, field, value) => setEmployeeForm((current) => ({
-    ...current,
-    tipo: 'personalizada',
-    horarios_por_dia: { ...current.horarios_por_dia, [day]: { ...current.horarios_por_dia[String(day)], [field]: value || null } },
-  }));
-
-  const setDayHasLunch = (day, hasLunch) => setEmployeeForm((current) => {
-    const daily = current.horarios_por_dia[String(day)] || defaultHoursForDay(day);
-    const needsLaterExit = (timeMinutes(daily.saida) ?? 0) <= 13 * 60;
-    return { ...current, tipo: 'personalizada', horarios_por_dia: { ...current.horarios_por_dia, [day]: hasLunch ? { ...daily, saida_almoco: '12:00', retorno_almoco: '13:00', saida: needsLaterExit ? '17:00' : daily.saida } : { ...daily, saida_almoco: null, retorno_almoco: null } } };
-  });
-
-  const scheduleFromForm = (form) => ({
-    tipo: form.tipo,
-    dias_semana: form.dias_semana,
-    horarios_por_dia: Object.fromEntries(form.dias_semana.map((day) => [String(day), form.horarios_por_dia[String(day)]])),
-  });
+  const scheduleFromForm = (form) => makeEmployeeSchedule(form.turno_id || form.tipo || 'turno1');
 
   const formFromEmployee = (employee) => {
     const schedule = employee.escala_trabalho || {};
-    const days = schedule.dias_semana || [1, 2, 3, 4, 5];
+    const shiftId = WORK_SHIFTS[schedule.turno_id || schedule.tipo] ? (schedule.turno_id || schedule.tipo) : inferShiftFromEntry(schedule.horarios_por_dia?.['1']?.entrada || schedule.entrada) || 'turno1';
     return {
       nome: employee.nome || '', email: employee.email || '', cpf: formatCPF(employee.cpf) || '', cargo: employee.cargo || '',
-      data_admissao: employee.data_admissao || '', tipo: schedule.tipo || 'personalizada', dias_semana: days,
-      horarios_por_dia: Object.fromEntries(days.map((day) => [String(day), schedule.horarios_por_dia?.[String(day)] || {
-        entrada: schedule.entrada || defaultHoursForDay(day).entrada,
-        saida_almoco: schedule.saida_almoco || defaultHoursForDay(day).saida_almoco,
-        retorno_almoco: schedule.retorno_almoco || defaultHoursForDay(day).retorno_almoco,
-        saida: schedule.saida || defaultHoursForDay(day).saida,
-      }])),
+      data_admissao: employee.data_admissao || '', turno_id: shiftId, ...makeEmployeeSchedule(shiftId),
     };
   };
 
@@ -234,7 +202,7 @@ export default function AdminEmployees() {
       if (error) throw error;
       toast.success('Convite enviado. O funcionário receberá um e-mail para definir a senha.');
       setShowInviteForm(false);
-      setEmployeeForm({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), tipo: '5x2', dias_semana: [1, 2, 3, 4, 5], horarios_por_dia: Object.fromEntries([1, 2, 3, 4, 5].map((day) => [day, defaultHoursForDay(day)])) });
+      setEmployeeForm({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), turno_id: 'turno1', ...makeEmployeeSchedule('turno1') });
       await fetchEmployees();
     } catch (error) {
       toast.error(error.message || 'Não foi possível enviar o convite.');
@@ -272,22 +240,8 @@ export default function AdminEmployees() {
       {showInviteForm && <div className="form-row"><label className="form-group">CPF<input className="form-input" required inputMode="numeric" value={employeeForm.cpf} onChange={(event) => setFormField('cpf', maskCPF(event.target.value))} /></label><label className="form-group">Cargo<input className="form-input" required value={employeeForm.cargo} onChange={(event) => setFormField('cargo', event.target.value)} /></label></div>}
       {(!editingAdmission && !showInviteForm && selectedEmp?.data_admissao) && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingAdmission(true)}>Editar data de admissão</button>}
       {(editingAdmission || showInviteForm || !selectedEmp?.data_admissao) && <label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>}
-      {(!hasSavedSchedule || editingSchedule || showInviteForm) && <label className="form-group">Modelo inicial<select className="form-input" value={employeeForm.tipo} onChange={(event) => setScheduleType(event.target.value)}><option value="5x2">5x2</option><option value="6x1">6x1</option><option value="personalizada">Personalizada</option></select></label>}
-      {hasSavedSchedule && !editingSchedule && !showInviteForm ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar escala</button> : <div className="employee-day-schedule-list"><h4>Configure cada dia trabalhado</h4>{WEEKDAYS.map((dayName, index) => {
-        const day = index + 1;
-        const selected = employeeForm.dias_semana.includes(day);
-        const daily = employeeForm.horarios_por_dia[String(day)] || defaultHoursForDay(day);
-        const hasLunch = daily.saida_almoco != null && daily.retorno_almoco != null;
-        return <fieldset className={`employee-day-schedule ${selected ? 'selected' : ''}`} key={day}>
-          <legend><label><input type="checkbox" checked={selected} onChange={(event) => toggleWorkDay(day, event.target.checked)} />{dayName}</label></legend>
-          {selected && <>
-            <div className="form-row employee-day-time-fields"><label className="form-group">Entrada<input className="form-input" type="time" required value={daily.entrada || ''} onChange={(event) => setDayTime(day, 'entrada', event.target.value)} /></label>
-              {hasLunch && <><label className="form-group">Saída para almoço<input className="form-input" type="time" required value={daily.saida_almoco || ''} onChange={(event) => setDayTime(day, 'saida_almoco', event.target.value)} /></label><label className="form-group">Retorno do almoço<input className="form-input" type="time" required value={daily.retorno_almoco || ''} onChange={(event) => setDayTime(day, 'retorno_almoco', event.target.value)} /></label></>}
-              <label className="form-group">Saída final<input className="form-input" type="time" required value={daily.saida || ''} onChange={(event) => setDayTime(day, 'saida', event.target.value)} /></label></div>
-            <label className="employee-lunch-toggle"><input type="checkbox" checked={hasLunch} onChange={(event) => setDayHasLunch(day, event.target.checked)} />Possui intervalo de almoço</label>
-          </>}
-        </fieldset>;
-      })}</div>}
+      {(!hasSavedSchedule || editingSchedule || showInviteForm) && <label className="form-group">Turno habitual<select className="form-input" value={employeeForm.turno_id} onChange={(event) => setScheduleType(event.target.value)}><option value="turno1">1º turno — 08:00 às 17:00</option><option value="turno2">2º turno — 14:00 às 22:45</option><option value="turno3">3º turno — 22:45 às 06:15 (dia seguinte)</option></select></label>}
+      {hasSavedSchedule && !editingSchedule && !showInviteForm ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar escala</button> : <div className="employee-day-schedule-list"><h4>Jornada fixa</h4><p className="page-subtitle">De segunda a sexta, vale o turno escolhido. Todos trabalham aos sábados das 08:00 às 12:00, sem intervalo; domingo é folga.</p>{employeeForm.turno_id === 'turno1' && <p className="page-subtitle">Intervalo atual do 1º turno: 12:00 às 13:00. No 2º e no 3º, as marcações de intervalo ficam desativadas até os horários serem definidos.</p>}{employeeForm.turno_id !== 'turno1' && <p className="page-subtitle">As marcações de intervalo deste turno ficam desativadas até os horários serem definidos.</p>}</div>}
       {(editingAdmission || editingSchedule || !hasSavedSchedule || !selectedEmp?.data_admissao || showInviteForm) && <button className="btn btn-primary" disabled={savingEmployment || ((editingSchedule || !hasSavedSchedule || showInviteForm) && employeeForm.dias_semana.length === 0)}>{savingEmployment ? 'Salvando…' : editingSchedule || !hasSavedSchedule || showInviteForm ? submitLabel : 'Salvar data de admissão'}</button>}
     </form>
   );
@@ -371,6 +325,8 @@ export default function AdminEmployees() {
         filename: `ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.xlsx`,
         calcDailyTotal,
         extraColumns: [
+          { key: 'shift', header: 'Turno trabalhado', width: 20, value: (record) => getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)) },
+          { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
           { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).expected },
           { key: 'balance', header: 'Saldo diário', width: 17, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).balance },
         ],
@@ -388,7 +344,7 @@ export default function AdminEmployees() {
     setExportingPdf(true);
     try {
       const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
-      const pdf = new jsPDF();
+      const pdf = new jsPDF({ orientation: 'landscape' });
       const tableStartY = await addKairoPdfHeader(pdf, {
         title: `Relatório de ponto - ${selectedEmp.nome}`,
         details: [
@@ -399,10 +355,10 @@ export default function AdminEmployees() {
       });
       autoTable(pdf, {
         startY: tableStartY + 3,
-        head: [['Data', 'Entrada', 'Saída almoço', 'Retorno', 'Saída', 'Total', 'Previsto', 'Saldo', 'Status']],
+        head: [['Data', 'Entrada', 'Turno', 'Saída almoço', 'Retorno', 'Saída', 'Saída em', 'Total', 'Previsto', 'Saldo', 'Status']],
         body: records.map((record) => [
-          formatDate(`${record.data}T12:00:00`), formatTime(record.entrada), formatTime(record.saida_almoco),
-          formatTime(record.retorno_almoco), formatTime(record.saida), calcDailyTotal(record), getScheduleComparison(record, selectedEmp.escala_trabalho).expected,
+          formatDate(`${record.data}T12:00:00`), formatTime(record.entrada), getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), formatTime(record.saida_almoco),
+          formatTime(record.retorno_almoco), formatTime(record.saida), record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia', calcDailyTotal(record), getScheduleComparison(record, selectedEmp.escala_trabalho).expected,
           getScheduleComparison(record, selectedEmp.escala_trabalho).balance,
           record.saida ? 'Completo' : 'Incompleto',
         ]),
@@ -492,7 +448,7 @@ export default function AdminEmployees() {
               <div><span>Cargo</span><strong>{selectedEmp.cargo || 'Não informado'}</strong></div>
               <div><span>Perfil de acesso</span><strong>{selectedEmp.role === 'admin' ? 'Administrador' : 'Funcionário'}</strong></div>
               <div><span>Data de admissão</span><strong>{selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</strong></div>
-              <div><span>Escala de trabalho</span><strong>{selectedEmp.escala_trabalho ? `${selectedEmp.escala_trabalho.tipo} · ${selectedEmp.escala_trabalho.entrada}–${selectedEmp.escala_trabalho.saida}` : 'Não informada'}</strong></div>
+              <div><span>Turno habitual</span><strong>{selectedEmp.escala_trabalho ? getShiftLabel(getAssignedShiftId(selectedEmp.escala_trabalho)) : 'Não informado'}</strong></div>
             </div>
           </section>
 
@@ -528,7 +484,7 @@ export default function AdminEmployees() {
               {filter === 'custom' && <div className="employee-custom-range"><label className="employee-date-filter">De<input className="form-input" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label className="employee-date-filter">Até<input className="form-input" type="date" min={customStart} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
             </div>
             {detailLoading ? <div className="flex flex-center" style={{ minHeight: '160px' }}><Spinner /></div> : records.length ? (
-              <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th><th>Saída almoço</th><th>Retorno almoço</th><th>Saída</th><th>Total</th><th>Previsto</th><th>Saldo</th><th>Status</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.escala_trabalho); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td><td>{formatTime(record.saida)}</td><td><strong>{calcDailyTotal(record)}</strong></td><td>{comparison.expected}</td><td>{comparison.balance}</td><td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td></tr>; })}</tbody></table></div>
+              <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th><th>Turno do dia</th><th>Saída almoço</th><th>Retorno almoço</th><th>Saída</th><th>Total</th><th>Previsto</th><th>Saldo</th><th>Status</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.escala_trabalho); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td><td>{getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada))}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td><td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{calcDailyTotal(record)}</strong></td><td>{comparison.expected}</td><td>{comparison.balance}</td><td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td></tr>; })}</tbody></table></div>
             ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
           </section>
 

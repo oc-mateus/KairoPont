@@ -1,3 +1,5 @@
+import { getAssignedShiftId, getShiftLabel } from '../lib/workShifts';
+
 const WEEKDAYS = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
 
 export function WorkScheduleSummary({ schedule }) {
@@ -23,7 +25,7 @@ export function WorkScheduleSummary({ schedule }) {
 export default function WorkScheduleCard({ schedule, admissionDate, compact = false }) {
   return <section className={`work-schedule-card ${compact ? 'compact' : ''}`}>
     <div className="work-schedule-heading">
-      <div><h3>Escala de trabalho</h3><p>{schedule?.tipo ? `Escala ${schedule.tipo}` : 'Jornada semanal'}</p></div>
+      <div><h3>Escala de trabalho</h3><p>{getAssignedShiftId(schedule) ? getShiftLabel(getAssignedShiftId(schedule)) : 'Jornada semanal'}</p></div>
       {admissionDate && <span className="work-schedule-admission">Admissão: {new Date(`${admissionDate}T12:00:00`).toLocaleDateString('pt-BR')}</span>}
     </div>
     <WorkScheduleSummary schedule={schedule} />

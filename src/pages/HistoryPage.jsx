@@ -9,9 +9,11 @@ import {
 import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
 import { addKairoPdfHeader } from '../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../lib/exportTimesheetXlsx';
+import { getShiftLabel, inferShiftForRecord } from '../lib/workShifts';
 
 export default function HistoryPage() {
   const { profile } = useAuth();
+  const shiftFor = (record) => getShiftLabel(inferShiftForRecord(record, profile?.escala_trabalho?.turno_id));
   const toast = useToast();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ export default function HistoryPage() {
         import('jspdf-autotable'),
       ]);
 
-      const doc = new jsPDF();
+      const doc = new jsPDF({ orientation: 'landscape' });
 
       const { start, end } = getDateRange();
       const tableStartY = await addKairoPdfHeader(doc, {
@@ -92,16 +94,17 @@ export default function HistoryPage() {
       const tableData = records.map(r => [
         formatDate(r.data + 'T00:00:00'),
         formatTime(r.entrada),
+        shiftFor(r),
         formatTime(r.saida_almoco),
         formatTime(r.retorno_almoco),
-        formatTime(r.saida),
+        `${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}`,
         calcDailyTotal(r),
         r.saida ? 'Completo' : 'Incompleto',
       ]);
 
       autoTable(doc, {
         startY: tableStartY + 3,
-        head: [['Data', 'Entrada', 'Saída Almoço', 'Retorno', 'Saída', 'Total', 'Status']],
+        head: [['Data', 'Entrada', 'Turno', 'Saída Almoço', 'Retorno', 'Saída', 'Total', 'Status']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -153,6 +156,10 @@ export default function HistoryPage() {
         period: `Período: ${formatDate(`${start}T12:00:00`)} a ${formatDate(`${end}T12:00:00`)}`,
         filename: `ponto_${profile.nome.replace(/\s+/g, '_')}_${start}_${end}.xlsx`,
         calcDailyTotal,
+        extraColumns: [
+          { key: 'shift', header: 'Turno trabalhado', width: 20, value: shiftFor },
+          { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
+        ],
       });
       toast.success('Planilha Excel exportada com sucesso!');
     } catch (err) {
@@ -169,11 +176,11 @@ export default function HistoryPage() {
       md += `**Funcionário:** ${profile.nome}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n`;
       md += `**Gerado em:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`;
-      md += `| Data | Entrada | Saída Almoço | Retorno | Saída | Total | Status |\n`;
-      md += `|------|---------|-------------|---------|-------|-------|--------|\n`;
+      md += `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Total | Status |\n`;
+      md += `|------|---------|-------|-------------|---------|-------|-------|--------|\n`;
 
       records.forEach(r => {
-        md += `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)} | ${calcDailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
+        md += `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${calcDailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
       });
 
       const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
@@ -194,11 +201,11 @@ export default function HistoryPage() {
       const { start, end } = getDateRange();
       let md = `## Relatório de Ponto - ${profile.nome}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n\n`;
-      md += `| Data | Entrada | Saída Almoço | Retorno | Saída | Total | Status |\n`;
-      md += `|---|---|---|---|---|---|---|\n`;
+      md += `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Total | Status |\n`;
+      md += `|---|---|---|---|---|---|---|---|\n`;
 
       records.forEach(r => {
-        md += `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)} | ${calcDailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
+        md += `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${calcDailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
       });
 
       await navigator.clipboard.writeText(md);
@@ -287,6 +294,7 @@ export default function HistoryPage() {
                 <tr>
                   <th>Data</th>
                   <th>Entrada</th>
+                  <th>Turno do dia</th>
                   <th>Saída Almoço</th>
                   <th>Retorno</th>
                   <th>Saída</th>
@@ -299,9 +307,10 @@ export default function HistoryPage() {
                   <tr key={r.id}>
                     <td>{formatDate(r.data + 'T00:00:00')}</td>
                     <td>{formatTime(r.entrada)}</td>
+                    <td>{shiftFor(r)}</td>
                     <td>{formatTime(r.saida_almoco)}</td>
                     <td>{formatTime(r.retorno_almoco)}</td>
-                    <td>{formatTime(r.saida)}</td>
+                    <td>{formatTime(r.saida)}{r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}</td>
                     <td><strong>{calcDailyTotal(r)}</strong></td>
                     <td>
                       <Badge variant={r.saida ? 'success' : 'warning'}>
@@ -327,6 +336,10 @@ export default function HistoryPage() {
                   <span className="table-card-value">{formatTime(r.entrada)}</span>
                 </div>
                 <div className="table-card-row">
+                  <span className="table-card-label">Turno do dia</span>
+                  <span className="table-card-value">{shiftFor(r)}</span>
+                </div>
+                <div className="table-card-row">
                   <span className="table-card-label">Saída Almoço</span>
                   <span className="table-card-value">{formatTime(r.saida_almoco)}</span>
                 </div>
@@ -336,7 +349,7 @@ export default function HistoryPage() {
                 </div>
                 <div className="table-card-row">
                   <span className="table-card-label">Saída</span>
-                  <span className="table-card-value">{formatTime(r.saida)}</span>
+                  <span className="table-card-value">{formatTime(r.saida)}{r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}</span>
                 </div>
                 <div className="table-card-row">
                   <span className="table-card-label">Total</span>

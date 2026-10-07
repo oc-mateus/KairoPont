@@ -4,6 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { formatTime, getTodayInSP, formatDate } from '../lib/utils';
 import { Spinner, Badge } from '../components/ui';
+import { inferShiftForRecord } from '../lib/workShifts';
 
 export const PunchInIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>;
 export const LunchOutIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>;
@@ -19,16 +20,20 @@ const PUNCH_STEPS = [
   { field: 'saida', label: 'Saída', icon: PunchOutIcon, description: 'Registrar saída da empresa' },
 ];
 
-function getDailyPunchSteps(schedule) {
+function getDailyPunchSteps(schedule, record) {
   if (!schedule) return PUNCH_STEPS;
-  const today = getTodayInSP();
-  const day = new Date(`${today}T12:00:00`).getDay() || 7;
-  if (!schedule.dias_semana?.includes(day)) return PUNCH_STEPS;
-  const daily = schedule.horarios_por_dia?.[String(day)] || schedule;
-  if (!daily.entrada || !daily.saida) return PUNCH_STEPS;
-  return daily.saida_almoco && daily.retorno_almoco
+  const date = record?.data || getTodayInSP();
+  const day = new Date(`${date}T12:00:00`).getDay() || 7;
+  const shiftId = inferShiftForRecord(record, schedule.turno_id || schedule.tipo);
+  return shiftId === 'turno1' && day >= 1 && day <= 5
     ? PUNCH_STEPS
     : PUNCH_STEPS.filter((step) => !['saida_almoco', 'retorno_almoco'].includes(step.field));
+}
+
+function previousIsoDate(date) {
+  const value = new Date(`${date}T12:00:00`);
+  value.setDate(value.getDate() - 1);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
 
 export default function PunchPage() {
@@ -51,16 +56,29 @@ export default function PunchPage() {
     if (!profile?.id) return;
     setLoading(true);
     try {
-      const today = getTodayInSP();
-      const { data, error } = await supabase
+      const todayDate = getTodayInSP();
+      const { data: todayRecord, error } = await supabase
         .from('registros_ponto')
         .select('*')
         .eq('funcionario_id', profile.id)
-        .eq('data', today)
+        .eq('data', todayDate)
         .maybeSingle();
 
       if (error) throw error;
-      setTodayRecord(data);
+      if (todayRecord) {
+        setTodayRecord(todayRecord);
+      } else {
+        const { data: previous, error: previousError } = await supabase
+          .from('registros_ponto')
+          .select('*')
+          .eq('funcionario_id', profile.id)
+          .eq('data', previousIsoDate(todayDate))
+          .eq('turno_trabalhado', 'turno3')
+          .is('saida', null)
+          .maybeSingle();
+        if (previousError) throw previousError;
+        setTodayRecord(previous);
+      }
     } catch (err) {
       toast.error('Erro ao carregar registro do dia: ' + err.message);
     } finally {
@@ -73,7 +91,7 @@ export default function PunchPage() {
   }, [fetchTodayRecord]);
 
   // Determina o próximo passo
-  const punchSteps = getDailyPunchSteps(profile?.escala_trabalho);
+  const punchSteps = getDailyPunchSteps(profile?.escala_trabalho, todayRecord);
   const getNextStep = () => {
     if (!todayRecord) return 0; // entrada
     for (let i = 0; i < punchSteps.length; i++) {

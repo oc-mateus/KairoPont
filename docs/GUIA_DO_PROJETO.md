@@ -21,7 +21,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 
 - Entrar com e-mail e senha.
 - Receber convite do administrador e definir a própria senha.
-- Registrar quatro etapas de jornada na ordem: entrada, saída para almoço, retorno do almoço e saída.
+- Registrar jornada conforme o turno efetivo do dia: entrada e saída; no 1º turno de segunda a sexta também registra saída e retorno do almoço.
 - Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
 - Enviar atestado médico ou declaração de horas e baixar documentos autorizados.
 - Atualizar dados básicos do perfil e a foto.
@@ -39,12 +39,12 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
 - Criar funcionário por convite, informando admissão, cargo e escala semanal; editar admissão/escala dos perfis existentes.
-- Configurar cada dia separadamente: dias trabalhados, entrada, saída/retorno do almoço e saída final; um dia pode ser jornada contínua sem intervalo (por exemplo, sábado 08h–12h). A escala completa fica visível na ficha administrativa e em Meu Perfil, e a jornada contínua tem só marcações de entrada e saída. Depois de salvar, o formulário detalhado recolhe; o administrador pode reabri-lo em **Editar escala**. A data de admissão também permanece como informação depois do cadastro e só vira campo editável ao selecionar **Editar data de admissão**; ao salvar, o campo e o botão de salvamento recolhem novamente.
+- Escolher entre três turnos fixos para cada funcionário: 1º (08h–17h, almoço 12h–13h), 2º (14h–22h45) e 3º (22h45–06h15 do dia seguinte). Todos trabalham aos sábados das 08h às 12h sem intervalo e folgam aos domingos. Os intervalos do 2º e do 3º turno aguardam definição. O turno habitual permanece no perfil; a batida de entrada classifica o turno realmente feito para aquele registro, sem alterar o perfil. A saída do 3º turno é vinculada ao registro iniciado na véspera e traz data própria. Depois de salvar, a seleção recolhe; o administrador pode reabri-la em **Editar escala**. A data de admissão também permanece como informação depois do cadastro e só vira campo editável ao selecionar **Editar data de admissão**; ao salvar, o campo e o botão de salvamento recolhem novamente.
 - Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
 - Na ficha do funcionário, consultar a data de admissão, quando o pedido será liberado e a primeira data possível de saída; na fila, revisar saída e retorno solicitados.
 - Comparar nas tabelas de ponto as horas registradas, a jornada planejada para cada dia e o saldo diário.
 
-Os relatórios PDF de ponto do funcionário e do administrador exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. Na ficha administrativa, PDF, Excel e tabela diária também comparam a jornada prevista com o total marcado. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
+Os relatórios PDF de ponto do funcionário e do administrador exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. As folhas mostram o turno real do dia e a data de saída quando atravessa a meia-noite; a ficha administrativa, PDF e Excel também comparam a jornada prevista com o total marcado. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
 
 Operações administrativas dependem do papel armazenado no banco. Novos perfis comuns só podem ser convidados pelo administrador; cadastros sem convite são recusados pelo banco.
 
@@ -88,7 +88,7 @@ As migrações criam as tabelas principais no esquema public:
 | Tabela | Dados armazenados | Proteção aplicada |
 | --- | --- | --- |
 | funcionarios | Perfil, vínculo com Auth, CPF, cargo, status, papel, admissão e escala semanal | Funcionário consulta o próprio perfil; admin pode consultar a equipe |
-| registros_ponto | Data e quatro marcações de horário | Funcionário consulta os próprios registros; admin consulta a equipe |
+| registros_ponto | Data de entrada, quatro marcações, turno efetivo e data de saída (para jornada noturna) | Funcionário consulta os próprios registros; admin consulta a equipe |
 | documentos | Tipo, nome, caminho no Storage e período informado | Funcionário consulta os próprios metadados; admin consulta os autorizados |
 | auditoria | Ação administrativa, alvo e detalhes | Leitura limitada ao perfil admin |
 | periodos_aquisitivos_ferias | Períodos aquisitivos/concessivos e intenção de abono de 0–10 dias | Funcionário acessa os próprios períodos; admin consulta todos |
@@ -158,7 +158,7 @@ A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIA
 
 Para perfis existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível.
 
-Na escala personalizada, cada dia guarda seus próprios horários; o intervalo de almoço pode ser desativado em um dia específico. A sequência de ponto desse dia passa a ser entrada e saída, e a folha calcula a jornada sem subtrair almoço.
+Existem três escalas fixas. O turno efetivo é classificado pela entrada mais próxima do horário de início e salvo no registro diário. O turno 3 cruza a meia-noite; a data de saída fica separada da data da entrada, e o cálculo considera a virada do dia. Sábado é jornada contínua comum a todos (08h–12h, sem intervalo). Até que sejam informados, o 2º e o 3º turno não têm marcações de almoço configuradas.
 
 ### GitHub Pages
 

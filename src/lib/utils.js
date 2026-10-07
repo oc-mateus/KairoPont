@@ -115,9 +115,18 @@ export function calcDailyTotal(record) {
   let totalMs = 0;
   
   const baseDate = '1970-01-01T';
+  const shiftExit = (endTime) => {
+    if (!endTime) return null;
+    const endDate = record.saida_data || record.data;
+    const startDate = record.data;
+    const dayOffset = startDate && endDate
+      ? Math.max(0, Math.round((new Date(`${endDate}T12:00:00`) - new Date(`${startDate}T12:00:00`)) / 86400000))
+      : 0;
+    return new Date(baseDate + endTime).getTime() + dayOffset * 86400000;
+  };
 
   if (record.entrada && record.saida && !record.saida_almoco && !record.retorno_almoco) {
-    const continuousDay = new Date(baseDate + record.saida) - new Date(baseDate + record.entrada);
+    const continuousDay = shiftExit(record.saida) - new Date(baseDate + record.entrada).getTime();
     if (continuousDay > 0) totalMs = continuousDay;
   }
 
@@ -127,7 +136,7 @@ export function calcDailyTotal(record) {
   }
   
   if (record.retorno_almoco && record.saida) {
-    const diff = new Date(baseDate + record.saida) - new Date(baseDate + record.retorno_almoco);
+    const diff = shiftExit(record.saida) - new Date(baseDate + record.retorno_almoco).getTime();
     if (diff > 0) totalMs += diff;
   }
   

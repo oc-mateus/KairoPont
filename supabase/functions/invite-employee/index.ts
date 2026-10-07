@@ -25,39 +25,28 @@ function validCPF(value: string) {
   return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
 }
 
-function isTime(value: unknown) {
-  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
-}
-
-function timeToMinutes(value: unknown) {
-  if (!isTime(value)) return -1;
-  const [hours, minutes] = String(value).split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-function isSchedule(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const schedule = value as Record<string, unknown>;
-  const days = schedule.dias_semana;
-  const hoursByDay = schedule.horarios_por_dia;
-  return ["5x2", "6x1", "personalizada"].includes(String(schedule.tipo))
-    && Array.isArray(days) && days.length >= 1 && days.length <= 7
-    && days.every((day) => Number.isInteger(day) && Number(day) >= 1 && Number(day) <= 7)
-    && new Set(days).size === days.length
-    && Boolean(hoursByDay) && typeof hoursByDay === "object" && !Array.isArray(hoursByDay)
-    && days.every((day) => {
-      const hours = (hoursByDay as Record<string, unknown>)[String(day)];
-      if (!hours || typeof hours !== "object" || Array.isArray(hours)) return false;
-      const daily = hours as Record<string, unknown>;
-      if (!isTime(daily.entrada) || !isTime(daily.saida)) return false;
-      if (daily.saida_almoco == null && daily.retorno_almoco == null) {
-        return timeToMinutes(daily.entrada) < timeToMinutes(daily.saida);
-      }
-      return isTime(daily.saida_almoco) && isTime(daily.retorno_almoco)
-        && timeToMinutes(daily.entrada) < timeToMinutes(daily.saida_almoco)
-        && timeToMinutes(daily.saida_almoco) < timeToMinutes(daily.retorno_almoco)
-        && timeToMinutes(daily.retorno_almoco) < timeToMinutes(daily.saida);
-    });
+function makeSchedule(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const submitted = value as Record<string, unknown>;
+  const id = String(submitted.turno_id || "");
+  const shifts: Record<string, { start: string; end: string; lunchOut?: string; lunchReturn?: string }> = {
+    turno1: { start: "08:00", end: "17:00", lunchOut: "12:00", lunchReturn: "13:00" },
+    turno2: { start: "14:00", end: "22:45" },
+    turno3: { start: "22:45", end: "06:15" },
+  };
+  const shift = shifts[id];
+  if (!shift) return null;
+  const horarios_por_dia: Record<string, Record<string, string | null>> = {};
+  for (const day of [1, 2, 3, 4, 5]) {
+    horarios_por_dia[String(day)] = {
+      entrada: shift.start,
+      saida_almoco: shift.lunchOut || null,
+      retorno_almoco: shift.lunchReturn || null,
+      saida: shift.end,
+    };
+  }
+  horarios_por_dia["6"] = { entrada: "08:00", saida_almoco: null, retorno_almoco: null, saida: "12:00" };
+  return { tipo: id, turno_id: id, dias_semana: [1, 2, 3, 4, 5, 6], horarios_por_dia };
 }
 
 Deno.serve(async (req) => {
@@ -83,13 +72,13 @@ Deno.serve(async (req) => {
     const cpf = String(input.cpf || "").replace(/\D/g, "");
     const cargo = String(input.cargo || "").trim();
     const dataAdmissao = String(input.data_admissao || "");
-    const escala = input.escala_trabalho;
+    const escala = makeSchedule(input.escala_trabalho);
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
     if (!/^\S+@\S+\.\S+$/.test(email) || nome.length < 3 || cargo.length < 2 || !validCPF(cpf)) {
       return response({ error: "Confira o nome, e-mail, CPF e cargo informados." }, 400);
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataAdmissao) || dataAdmissao > today || !isSchedule(escala)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataAdmissao) || dataAdmissao > today || !escala) {
       return response({ error: "Informe uma data de admissão válida e uma escala semanal completa." }, 400);
     }
 

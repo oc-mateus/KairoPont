@@ -14,6 +14,13 @@ function statusLabel(status) {
   return ({ pendente: 'Pendente', aprovada: 'Aprovada', recusada: 'Recusada' })[status] || status;
 }
 
+function addIsoDays(dateValue, days) {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export default function VacationsPage() {
   const { profile, isAdmin } = useAuth();
   const [searchParams] = useSearchParams();
@@ -153,6 +160,7 @@ export default function VacationsPage() {
       return <section className="vacation-cycle-card" key={period.id}>
         <div className="vacation-cycle-heading"><div><h3>Período aquisitivo {dateLabel(period.periodo_inicio)} – {dateLabel(period.periodo_fim)}</h3><p>Prazo para concessão até {dateLabel(period.prazo_concessivo)}</p></div><Badge variant={period.prazo_concessivo < today ? 'danger' : eligible ? 'success' : 'info'}>{period.prazo_concessivo < today ? 'Prazo vencido' : eligible ? 'Direito adquirido' : 'Em aquisição'}</Badge></div>
         <p className="vacation-cycle-summary">Direito: {period.dias_direito} dias · Abono registrado: {period.dias_abono} dia(s)</p>
+        {!eligible && today <= period.periodo_fim && <p className="vacation-ineligible-message">Funcionário ainda não elegível para gozo de férias. A solicitação estará disponível a partir de {dateLabel(addIsoDays(period.periodo_fim, 1))}, após completar um ano de empresa.</p>}
         {saleOpen && <div className="vacation-inline-form"><label className="form-group">Pretende converter dias em abono? (0 a 10)<select className="form-input" value={daysByPeriod[period.id] ?? period.dias_abono} onChange={(event) => setDaysByPeriod((current) => ({ ...current, [period.id]: event.target.value }))}>{Array.from({ length: 11 }, (_, day) => <option key={day} value={day}>{day} {day === 1 ? 'dia' : 'dias'}</option>)}</select></label><button className="btn btn-secondary" disabled={busyId === period.id} onClick={() => submitSaleIntention(period)}>Registrar intenção de abono</button><small>Disponível até 15 dias antes do fim do período aquisitivo. O pedido de gozo só abre após completar 1 ano.</small></div>}
         {eligible && !requested && <div className="vacation-inline-form"><p>Informe o período desejado. A duração deve corresponder aos dias de direito, descontado eventual abono.</p><div className="form-row"><label className="form-group">Início<input className="form-input" type="date" min={today} value={requestDates.start || ''} onChange={(event) => setPeriodValue(setDatesByPeriod, period.id, 'start', event.target.value)} /></label><label className="form-group">Fim<input className="form-input" type="date" min={requestDates.start || today} value={requestDates.end || ''} onChange={(event) => setPeriodValue(setDatesByPeriod, period.id, 'end', event.target.value)} /></label></div><button className="btn btn-primary" disabled={busyId === period.id} onClick={() => submitRequest(period)}>Solicitar férias</button></div>}
         {pending.length > 0 && <div className="vacation-request-history">{pending.map((request) => <article className="vacation-request-row" key={request.id}><div><strong>{dateLabel(request.data_inicio)} – {dateLabel(request.data_fim)}</strong><small>Solicitado em {dateLabel(request.created_at?.slice(0, 10))}</small></div><Badge variant="warning">Aguardando decisão</Badge></article>)}</div>}

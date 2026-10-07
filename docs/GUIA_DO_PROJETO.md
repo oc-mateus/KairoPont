@@ -25,7 +25,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
 - Enviar atestado médico ou declaração de horas e baixar documentos autorizados.
 - Atualizar dados básicos do perfil e a foto.
-- Consultar períodos aquisitivos e solicitar o gozo das férias após completar um ano de empresa.
+- Consultar períodos aquisitivos; a solicitação de gozo só é liberada após completar um ano de empresa. Antes disso, a tela informa que o funcionário ainda não está elegível e mostra a data de liberação.
 - Registrar intenção de conversão de até 10 dias em abono dentro do prazo; acompanhar prazos e avisos na tela de férias.
 - Receber exclusivamente por e-mail a decisão de aprovação ou recusa; recusas incluem a justificativa. A tela não revela o resultado da decisão.
 

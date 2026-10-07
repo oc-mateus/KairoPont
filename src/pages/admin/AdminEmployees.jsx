@@ -7,7 +7,7 @@ import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
 import WorkScheduleCard from '../../components/WorkScheduleCard';
-import { getAssignedShiftId, getShiftLabel, inferShiftFromEntry, makeEmployeeSchedule, WORK_SHIFTS } from '../../lib/workShifts';
+import { getAssignedShiftId, getShiftLabel, inferShiftFromEntry, makeEmployeeSchedule, summarizeWorkedShifts, WORK_SHIFTS } from '../../lib/workShifts';
 
 const FILTERS = [
   { id: 'day', label: 'Dia' },
@@ -401,6 +401,7 @@ export default function AdminEmployees() {
     try {
       const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
       const pdf = new jsPDF({ orientation: 'landscape' });
+      const shiftSummary = summarizeWorkedShifts(records);
       const tableStartY = await addKairoPdfHeader(pdf, {
         title: `Relatório de ponto - ${selectedEmp.nome}`,
         details: [
@@ -409,8 +410,21 @@ export default function AdminEmployees() {
           `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
         ],
       });
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(60, 60, 60);
+      pdf.text(`Turnos trabalhados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
       autoTable(pdf, {
-        startY: tableStartY + 3,
+        startY: tableStartY + 4,
+        head: [['1º turno', '2º turno', '3º turno', 'Sem turno identificado']],
+        body: [[shiftSummary.turno1, shiftSummary.turno2, shiftSummary.turno3, shiftSummary.unidentified].map((count) => `${count} dia${count === 1 ? '' : 's'}`)],
+        theme: 'grid',
+        headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+        bodyStyles: { fontSize: 8, halign: 'center' },
+        styles: { cellPadding: 2.5 },
+      });
+      autoTable(pdf, {
+        startY: pdf.lastAutoTable.finalY + 5,
         head: [['Data', 'Entrada', 'Turno', 'Saída almoço', 'Retorno', 'Saída', 'Saída em', 'Total', 'Previsto', 'Saldo', 'Status']],
         body: records.map((record) => [
           formatDate(`${record.data}T12:00:00`), formatTime(record.entrada), getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), formatTime(record.saida_almoco),

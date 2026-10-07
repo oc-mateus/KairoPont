@@ -48,3 +48,13 @@ export function makeEmployeeSchedule(shiftId) {
 export function inferShiftForRecord(record, assignedShiftId) {
   return record?.turno_trabalhado || inferShiftFromEntry(record?.entrada) || assignedShiftId || null;
 }
+
+export function summarizeWorkedShifts(records = []) {
+  const summary = { turno1: 0, turno2: 0, turno3: 0, unidentified: 0 };
+  records.forEach((record) => {
+    const shiftId = record?.turno_trabalhado || inferShiftFromEntry(record?.entrada);
+    if (Object.hasOwn(summary, shiftId)) summary[shiftId] += 1;
+    else summary.unidentified += 1;
+  });
+  return summary;
+}

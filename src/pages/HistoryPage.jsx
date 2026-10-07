@@ -9,7 +9,7 @@ import {
 import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
 import { addKairoPdfHeader } from '../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../lib/exportTimesheetXlsx';
-import { getShiftLabel, inferShiftForRecord } from '../lib/workShifts';
+import { getShiftLabel, inferShiftForRecord, summarizeWorkedShifts } from '../lib/workShifts';
 
 export default function HistoryPage() {
   const { profile } = useAuth();
@@ -80,6 +80,7 @@ export default function HistoryPage() {
       ]);
 
       const doc = new jsPDF({ orientation: 'landscape' });
+      const shiftSummary = summarizeWorkedShifts(records);
 
       const { start, end } = getDateRange();
       const tableStartY = await addKairoPdfHeader(doc, {
@@ -88,6 +89,20 @@ export default function HistoryPage() {
           `Período: ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}`,
           `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
         ],
+      });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`Turnos trabalhados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
+      autoTable(doc, {
+        startY: tableStartY + 4,
+        head: [['1º turno', '2º turno', '3º turno', 'Sem turno identificado']],
+        body: [[shiftSummary.turno1, shiftSummary.turno2, shiftSummary.turno3, shiftSummary.unidentified].map((count) => `${count} dia${count === 1 ? '' : 's'}`)],
+        theme: 'grid',
+        headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+        bodyStyles: { fontSize: 8, halign: 'center' },
+        styles: { cellPadding: 2.5 },
       });
 
       // Table
@@ -103,7 +118,7 @@ export default function HistoryPage() {
       ]);
 
       autoTable(doc, {
-        startY: tableStartY + 3,
+        startY: doc.lastAutoTable.finalY + 5,
         head: [['Data', 'Entrada', 'Turno', 'Saída Almoço', 'Retorno', 'Saída', 'Total', 'Status']],
         body: tableData,
         theme: 'grid',

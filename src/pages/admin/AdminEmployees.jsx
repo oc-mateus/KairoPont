@@ -221,7 +221,7 @@ export default function AdminEmployees() {
         p_escala_trabalho: scheduleFromForm(employeeForm),
       });
       if (error) throw error;
-      toast.success('Data de admissão e escala atualizadas.');
+      toast.success('Data de admissão e turno habitual atualizados.');
       await fetchEmployees();
       const { data } = await supabase.from('funcionarios').select('*').eq('id', selectedEmp.id).maybeSingle();
       if (data) setSelectedEmp(data);
@@ -241,7 +241,7 @@ export default function AdminEmployees() {
       {(!editingAdmission && !showInviteForm && selectedEmp?.data_admissao) && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingAdmission(true)}>Editar data de admissão</button>}
       {(editingAdmission || showInviteForm || !selectedEmp?.data_admissao) && <label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>}
       {(!hasSavedSchedule || editingSchedule || showInviteForm) && <label className="form-group">Turno habitual<select className="form-input" value={employeeForm.turno_id} onChange={(event) => setScheduleType(event.target.value)}><option value="turno1">1º turno — 08:00 às 17:00</option><option value="turno2">2º turno — 14:00 às 22:45</option><option value="turno3">3º turno — 22:45 às 06:15 (dia seguinte)</option></select></label>}
-      {hasSavedSchedule && !editingSchedule && !showInviteForm ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar escala</button> : <div className="employee-day-schedule-list"><h4>Jornada fixa</h4><p className="page-subtitle">De segunda a sexta, vale o turno escolhido. Todos trabalham aos sábados das 08:00 às 12:00, sem intervalo; domingo é folga.</p>{employeeForm.turno_id === 'turno1' && <p className="page-subtitle">Intervalo atual do 1º turno: 12:00 às 13:00. No 2º e no 3º, as marcações de intervalo ficam desativadas até os horários serem definidos.</p>}{employeeForm.turno_id !== 'turno1' && <p className="page-subtitle">As marcações de intervalo deste turno ficam desativadas até os horários serem definidos.</p>}</div>}
+      {hasSavedSchedule && !editingSchedule && !showInviteForm && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar turno</button>}
       {(editingAdmission || editingSchedule || !hasSavedSchedule || !selectedEmp?.data_admissao || showInviteForm) && <button className="btn btn-primary" disabled={savingEmployment || ((editingSchedule || !hasSavedSchedule || showInviteForm) && employeeForm.dias_semana.length === 0)}>{savingEmployment ? 'Salvando…' : editingSchedule || !hasSavedSchedule || showInviteForm ? submitLabel : 'Salvar data de admissão'}</button>}
     </form>
   );
@@ -452,7 +452,7 @@ export default function AdminEmployees() {
             </div>
           </section>
 
-          <section className="employee-records-section"><h3>Admissão e escala semanal</h3><p className="page-subtitle">Usadas para liberar férias e comparar o previsto com as marcações de ponto.</p>{employmentForm(saveEmployment, 'Salvar dados trabalhistas')}</section>
+          <section className="employee-records-section"><h3>Data de admissão e turno habitual</h3><p className="page-subtitle">Os horários são preenchidos automaticamente pelo turno escolhido. Todos trabalham aos sábados das 08:00 às 12:00, sem intervalo.</p>{employmentForm(saveEmployment, 'Salvar dados trabalhistas')}</section>
           <WorkScheduleCard schedule={selectedEmp.escala_trabalho} admissionDate={selectedEmp.data_admissao} />
 
           <section className="employee-records-section employee-vacation-section">

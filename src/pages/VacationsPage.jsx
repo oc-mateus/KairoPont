@@ -124,6 +124,7 @@ export default function VacationsPage() {
     {!isAdmin && periods.map((period) => {
       const existing = requestsByPeriod[period.id] || [];
       const requested = existing.find((request) => ['pendente', 'aprovada'].includes(request.status));
+      const pending = existing.filter((request) => request.status === 'pendente');
       const today = getTodayInSP();
       const saleOpen = today <= new Date(new Date(`${period.periodo_fim}T12:00:00`).getTime() - 15 * 86400000).toISOString().slice(0, 10);
       const eligible = today > period.periodo_fim && today <= period.prazo_concessivo;
@@ -133,7 +134,8 @@ export default function VacationsPage() {
         <p className="vacation-cycle-summary">Direito: {period.dias_direito} dias · Abono registrado: {period.dias_abono} dia(s)</p>
         {saleOpen && <div className="vacation-inline-form"><label className="form-group">Pretende converter dias em abono? (0 a 10)<select className="form-input" value={daysByPeriod[period.id] ?? period.dias_abono} onChange={(event) => setDaysByPeriod((current) => ({ ...current, [period.id]: event.target.value }))}>{Array.from({ length: 11 }, (_, day) => <option key={day} value={day}>{day} {day === 1 ? 'dia' : 'dias'}</option>)}</select></label><button className="btn btn-secondary" disabled={busyId === period.id} onClick={() => submitSaleIntention(period)}>Registrar intenção de abono</button><small>Disponível até 15 dias antes do fim do período aquisitivo. O pedido de gozo só abre após completar 1 ano.</small></div>}
         {eligible && !requested && <div className="vacation-inline-form"><p>Informe o período desejado. A duração deve corresponder aos dias de direito, descontado eventual abono.</p><div className="form-row"><label className="form-group">Início<input className="form-input" type="date" min={today} value={requestDates.start || ''} onChange={(event) => setPeriodValue(setDatesByPeriod, period.id, 'start', event.target.value)} /></label><label className="form-group">Fim<input className="form-input" type="date" min={requestDates.start || today} value={requestDates.end || ''} onChange={(event) => setPeriodValue(setDatesByPeriod, period.id, 'end', event.target.value)} /></label></div><button className="btn btn-primary" disabled={busyId === period.id} onClick={() => submitRequest(period)}>Solicitar férias</button></div>}
-        {existing.length > 0 && <div className="vacation-request-history">{existing.map((request) => <article className="vacation-request-row" key={request.id}><div><strong>{dateLabel(request.data_inicio)} – {dateLabel(request.data_fim)}</strong><small>Solicitado em {dateLabel(request.created_at?.slice(0, 10))}</small>{request.status === 'recusada' && <p>Justificativa registrada: {request.justificativa_recusa}</p>}</div><Badge variant={request.status === 'aprovada' ? 'success' : request.status === 'recusada' ? 'danger' : 'warning'}>{statusLabel(request.status)}</Badge></article>)}</div>}
+        {pending.length > 0 && <div className="vacation-request-history">{pending.map((request) => <article className="vacation-request-row" key={request.id}><div><strong>{dateLabel(request.data_inicio)} – {dateLabel(request.data_fim)}</strong><small>Solicitado em {dateLabel(request.created_at?.slice(0, 10))}</small></div><Badge variant="warning">Aguardando decisão</Badge></article>)}</div>}
+        {existing.some((request) => request.status !== 'pendente') && <p className="vacation-email-only-note">A devolutiva das decisões é enviada exclusivamente ao seu e-mail corporativo.</p>}
       </section>;
     })}
 

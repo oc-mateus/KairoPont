@@ -27,7 +27,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Atualizar dados básicos do perfil e a foto.
 - Consultar períodos aquisitivos e solicitar o gozo das férias após completar um ano de empresa.
 - Registrar intenção de conversão de até 10 dias em abono dentro do prazo; acompanhar prazos e avisos na tela de férias.
-- Receber por e-mail a decisão de aprovação ou recusa; recusas incluem a justificativa. A decisão não gera notificação interna.
+- Receber exclusivamente por e-mail a decisão de aprovação ou recusa; recusas incluem a justificativa. A tela não revela o resultado da decisão.
 
 ### Para administradores
 

@@ -35,7 +35,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Consultar indicadores e registros da equipe.
 - Gerenciar perfis e status de funcionários.
 - Selecionar um funcionário para consultar nome completo, CPF, cargo, registros de ponto e documentos enviados, incluindo data e tipo.
-- O menu administrativo concentra-se no Painel Admin e em Funcionários; ponto e documentos são acessados pela ficha individual.
+- O menu de administradores mostra Painel Admin, Funcionários e Férias; Meu Perfil permanece na seção Conta. Registrar Ponto, Meu Histórico, Documentos e Minhas Férias não aparecem para administradores, pois ponto e documentos são acessados pela ficha individual e as férias pela gestão administrativa.
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
 - Criar funcionário por convite, informando admissão, cargo e escala semanal; editar admissão/escala dos perfis existentes.

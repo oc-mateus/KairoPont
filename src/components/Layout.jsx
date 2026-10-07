@@ -27,6 +27,8 @@ const adminNav = [
   { id: 'admin-ferias', label: 'Férias', icon: VacationIcon, path: '/ferias' },
 ];
 
+const adminAccountNav = employeeNav.filter(item => item.id === 'perfil');
+
 export default function Layout({ children }) {
   const { profile, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
@@ -65,7 +67,7 @@ export default function Layout({ children }) {
         </div>
 
         <nav className="sidebar-nav">
-          <div className="sidebar-nav-group">
+          {!isAdmin && <div className="sidebar-nav-group">
             <div className="sidebar-nav-group-title">Funcionário</div>
             {employeeNav.map(item => (
               <button
@@ -77,7 +79,21 @@ export default function Layout({ children }) {
                 {item.label}
               </button>
             ))}
-          </div>
+          </div>}
+
+          {isAdmin && <div className="sidebar-nav-group">
+            <div className="sidebar-nav-group-title">Conta</div>
+            {adminAccountNav.map(item => (
+              <button
+                key={item.id}
+                className={`sidebar-nav-item ${location.pathname === item.path ? 'active' : ''}`}
+                onClick={() => handleNav(item.path)}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </div>}
 
           {isAdmin && (
             <div className="sidebar-nav-group">

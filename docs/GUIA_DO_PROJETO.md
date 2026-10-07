@@ -1,6 +1,6 @@
 # KairoPont — guia do projeto
 
-Revisado em 6 de outubro de 2026
+Revisado em 7 de outubro de 2026
 
 **Aplicação:** [https://oc-mateus.github.io/KairoPont/](https://oc-mateus.github.io/KairoPont/)  
 **Código-fonte:** [https://github.com/oc-mateus/KairoPont](https://github.com/oc-mateus/KairoPont)
@@ -9,7 +9,7 @@ Revisado em 6 de outubro de 2026
 
 KairoPont é uma aplicação web da Kairo Automações para registrar a jornada dos funcionários, consultar históricos e enviar atestados médicos ou declarações de horas. O frontend é servido pelo GitHub Pages; autenticação, banco de dados e armazenamento de arquivos usam o Supabase.
 
-O site está publicado e o workflow automatizado de build e publicação está ativo. O banco tem o esquema e as políticas das migrações do projeto. A verificação de 6 de outubro de 2026 encontrou o projeto sem contas de funcionário/admin e sem documentos.
+O site está publicado e o workflow automatizado de build e publicação está ativo. O banco tem o esquema e as políticas das migrações do projeto. Em 7 de outubro de 2026 foi provisionada uma conta administrativa destinada a testes; valide os fluxos apenas com dados fictícios e revise as credenciais antes da operação real.
 
 **O projeto ainda não está validado para operação real.** Antes de registrar jornadas da equipe, é necessário configurar os redirecionamentos do Supabase Auth, provisionar e verificar a conta inicial de administração, resolver a chamada ausente usada pelo login por CPF e reforçar a validação de arquivos no servidor.
 
@@ -28,8 +28,9 @@ O site está publicado e o workflow automatizado de build e publicação está a
 
 - Consultar indicadores e registros da equipe.
 - Gerenciar perfis e status de funcionários.
-- Consultar documentos enviados e baixar cópias autorizadas.
-- Consultar a trilha de auditoria.
+- Selecionar um funcionário para consultar nome completo, CPF, cargo, registros de ponto e documentos enviados, incluindo data e tipo.
+- Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em CSV.
+- Baixar documentos individuais por links assinados temporários.
 
 Operações administrativas dependem do papel armazenado no banco. O cadastro público cria novos perfis como funcionário; não há promoção de papel no frontend.
 
@@ -76,6 +77,8 @@ As migrações criam quatro tabelas no esquema public:
 | auditoria | Ação administrativa, alvo e detalhes | Leitura limitada ao perfil admin |
 
 O CPF é dado pessoal. Não inclua CPFs, nomes de funcionários, documentos ou capturas com dados reais em issues, exemplos públicos, commits ou arquivos de documentação.
+
+A tabela `auditoria` continua no banco e recebe eventos administrativos previstos nas funções SQL, mas a interface não possui uma tela de consulta de auditoria.
 
 ## Documentos e armazenamento
 
@@ -138,7 +141,7 @@ A URL pública da aplicação é https://oc-mateus.github.io/KairoPont/. O READM
 As verificações abaixo foram feitas em 6 de outubro de 2026. Reconfirme o estado antes de usar a aplicação com funcionários.
 
 1. **Configurar Auth:** definir a URL do site no Supabase Auth como https://oc-mateus.github.io/KairoPont/ e adicionar o retorno exato à lista permitida. A configuração não foi confirmada no painel.
-2. **Provisionar a administração:** criar a conta pelo fluxo de cadastro, confirmar o e-mail e atribuir o papel admin pelo SQL Editor usando o UUID da conta. A consulta não encontrou conta/perfil administrativo no projeto.
+2. **Revisar a administração de teste:** uma conta administrativa de teste foi provisionada em 7 de outubro de 2026. Troque ou remova suas credenciais antes de usar a aplicação com dados reais.
 3. **Revisar cadastro público:** a tela permite auto cadastro e o gatilho cria perfis de funcionário. Definir se o acesso será aberto, restrito ou precedido por convite antes de divulgar o endereço aos funcionários.
 4. **Corrigir login por CPF:** o frontend chama a função RPC get_email_by_cpf, mas ela não consta nas migrações nem nas funções atualmente instaladas. Até implementá-la e revisá-la com proteção contra enumeração de contas, use o login por e-mail.
 5. **Impor validação no Storage:** configurar no bucket privado o limite máximo e os MIME types adequados no servidor, além da validação existente no frontend.

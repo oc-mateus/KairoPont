@@ -15,7 +15,6 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminEmployees from './pages/admin/AdminEmployees';
 import AdminRecords from './pages/admin/AdminRecords';
 import AdminDocuments from './pages/admin/AdminDocuments';
-import AdminAudit from './pages/admin/AdminAudit';
 
 function PrivateRoute({ children, requireAdmin = false }) {
   const { session, profile, loading } = useAuth();
@@ -66,7 +65,6 @@ export default function App() {
       <Route path="/admin/funcionarios" element={<PrivateRoute requireAdmin><AdminEmployees /></PrivateRoute>} />
       <Route path="/admin/registros" element={<PrivateRoute requireAdmin><AdminRecords /></PrivateRoute>} />
       <Route path="/admin/documentos" element={<PrivateRoute requireAdmin><AdminDocuments /></PrivateRoute>} />
-      <Route path="/admin/auditoria" element={<PrivateRoute requireAdmin><AdminAudit /></PrivateRoute>} />
 
       <Route path="*" element={<Navigate to="/ponto" replace />} />
     </Routes>

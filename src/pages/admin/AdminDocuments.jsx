@@ -87,7 +87,7 @@ export default function AdminDocuments() {
                       className="btn btn-ghost btn-sm"
                       onClick={() => handleDownload(doc)}
                     >
-                      📥 Baixar
+                      Baixar
                     </button>
                   </td>
                 </tr>

@@ -39,7 +39,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
 - Criar funcionário por convite, informando admissão, cargo e escala semanal; editar admissão/escala dos perfis existentes.
-- Configurar cada dia separadamente: dias trabalhados, entrada, saída/retorno do almoço e saída final; um dia pode ser jornada contínua sem intervalo (por exemplo, sábado 08h–12h). A escala completa fica visível na ficha administrativa e em Meu Perfil, e a jornada contínua tem só marcações de entrada e saída.
+- Configurar cada dia separadamente: dias trabalhados, entrada, saída/retorno do almoço e saída final; um dia pode ser jornada contínua sem intervalo (por exemplo, sábado 08h–12h). A escala completa fica visível na ficha administrativa e em Meu Perfil, e a jornada contínua tem só marcações de entrada e saída. Depois de salvar, o formulário detalhado recolhe; o administrador pode reabri-lo em **Editar escala**.
 - Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
 - Na ficha do funcionário, consultar a data de admissão, quando o pedido será liberado e a primeira data possível de saída; na fila, revisar saída e retorno solicitados.
 - Comparar nas tabelas de ponto as horas registradas, a jornada planejada para cada dia e o saldo diário.

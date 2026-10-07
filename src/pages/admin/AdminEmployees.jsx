@@ -15,6 +15,16 @@ const FILTERS = [
   { id: 'month', label: 'Mês' },
   { id: 'custom', label: 'Período personalizado' },
 ];
+const PUNCH_EDIT_WINDOW_MS = 4 * 24 * 60 * 60 * 1000;
+
+function canEditPunch(record) {
+  const createdAt = Date.parse(record?.created_at || '');
+  return Number.isFinite(createdAt) && Date.now() < createdAt + PUNCH_EDIT_WINDOW_MS;
+}
+
+function timeInputValue(value) {
+  return value ? String(value).slice(0, 5) : '';
+}
 
 function addIsoDays(value, days) {
   if (!value) return '';
@@ -110,6 +120,9 @@ export default function AdminEmployees() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [records, setRecords] = useState([]);
+  const [editingPunchId, setEditingPunchId] = useState(null);
+  const [punchEditForm, setPunchEditForm] = useState({ entrada: '', saida_almoco: '', retorno_almoco: '', saida: '', saida_data: '' });
+  const [savingPunch, setSavingPunch] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [vacationPeriods, setVacationPeriods] = useState([]);
   const [vacationRequests, setVacationRequests] = useState([]);
@@ -247,6 +260,49 @@ export default function AdminEmployees() {
   );
 
   const range = useMemo(() => getRange(filter, selectedDay, customStart, customEnd, referenceDate), [filter, selectedDay, customStart, customEnd, referenceDate]);
+
+  const startPunchEdit = (record) => {
+    if (!canEditPunch(record)) {
+      toast.error('O prazo de 4 dias para ajustar este registro já terminou.');
+      return;
+    }
+    setEditingPunchId(record.id);
+    setPunchEditForm({
+      entrada: timeInputValue(record.entrada),
+      saida_almoco: timeInputValue(record.saida_almoco),
+      retorno_almoco: timeInputValue(record.retorno_almoco),
+      saida: timeInputValue(record.saida),
+      saida_data: record.saida ? (record.saida_data || record.data) : '',
+    });
+  };
+
+  const savePunchEdit = async (event) => {
+    event.preventDefault();
+    if (!editingPunchId || savingPunch) return;
+    setSavingPunch(true);
+    try {
+      const { error } = await supabase.rpc('admin_edit_punch_record', {
+        p_record_id: editingPunchId,
+        p_entrada: punchEditForm.entrada || null,
+        p_saida_almoco: punchEditForm.saida_almoco || null,
+        p_retorno_almoco: punchEditForm.retorno_almoco || null,
+        p_saida: punchEditForm.saida || null,
+        p_saida_data: punchEditForm.saida ? (punchEditForm.saida_data || null) : null,
+      });
+      if (error) throw error;
+      const { data, error: fetchError } = await supabase.from('registros_ponto').select('*').eq('id', editingPunchId).single();
+      if (fetchError) throw fetchError;
+      setRecords((current) => current.map((record) => record.id === editingPunchId ? data : record));
+      setEditingPunchId(null);
+      toast.success('Horários do registro atualizados. A alteração ficou registrada na auditoria.');
+    } catch (error) {
+      toast.error(error.message?.includes('Prazo expirado')
+        ? 'O prazo de 4 dias terminou. Este registro não pode mais ser alterado.'
+        : 'Não foi possível atualizar o registro: ' + error.message);
+    } finally {
+      setSavingPunch(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -484,7 +540,20 @@ export default function AdminEmployees() {
               {filter === 'custom' && <div className="employee-custom-range"><label className="employee-date-filter">De<input className="form-input" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label className="employee-date-filter">Até<input className="form-input" type="date" min={customStart} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
             </div>
             {detailLoading ? <div className="flex flex-center" style={{ minHeight: '160px' }}><Spinner /></div> : records.length ? (
-              <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th><th>Turno do dia</th><th>Saída almoço</th><th>Retorno almoço</th><th>Saída</th><th>Total</th><th>Previsto</th><th>Saldo</th><th>Status</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.escala_trabalho); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td><td>{getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada))}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td><td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{calcDailyTotal(record)}</strong></td><td>{comparison.expected}</td><td>{comparison.balance}</td><td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td></tr>; })}</tbody></table></div>
+              <>
+                {editingPunchId && <form className="employee-punch-edit-form" onSubmit={savePunchEdit}>
+                  <div><h4>Ajustar horários do ponto</h4><p>Este registro pode ser ajustado somente até 96 horas após sua criação. O prazo é validado pelo sistema.</p></div>
+                  <div className="employee-punch-edit-fields">
+                    <label className="form-group">Entrada<input className="form-input" required type="time" value={punchEditForm.entrada} onChange={(event) => setPunchEditForm((current) => ({ ...current, entrada: event.target.value }))} /></label>
+                    <label className="form-group">Saída para almoço<input className="form-input" type="time" value={punchEditForm.saida_almoco} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida_almoco: event.target.value }))} /></label>
+                    <label className="form-group">Retorno do almoço<input className="form-input" type="time" value={punchEditForm.retorno_almoco} onChange={(event) => setPunchEditForm((current) => ({ ...current, retorno_almoco: event.target.value }))} /></label>
+                    <label className="form-group">Saída<input className="form-input" type="time" value={punchEditForm.saida} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida: event.target.value }))} /></label>
+                    {punchEditForm.saida && <label className="form-group">Data da saída<input className="form-input" required type="date" min={records.find((record) => record.id === editingPunchId)?.data} max={addIsoDays(records.find((record) => record.id === editingPunchId)?.data || '', 1)} value={punchEditForm.saida_data} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida_data: event.target.value }))} /></label>}
+                  </div>
+                  <div className="employee-punch-edit-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingPunchId(null)} disabled={savingPunch}>Cancelar</button><button className="btn btn-primary btn-sm" disabled={savingPunch}>{savingPunch ? 'Salvando…' : 'Salvar horários'}</button></div>
+                </form>}
+                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th><th>Turno do dia</th><th>Saída almoço</th><th>Retorno almoço</th><th>Saída</th><th>Total</th><th>Previsto</th><th>Saldo</th><th>Status</th><th>Ajuste</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.escala_trabalho); const editable = canEditPunch(record); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td><td>{getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada))}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td><td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{calcDailyTotal(record)}</strong></td><td>{comparison.expected}</td><td>{comparison.balance}</td><td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td>{editable ? <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Editar horários</button> : <span className="employee-punch-locked" title="Prazo de 96 horas após a criação encerrado">Prazo encerrado</span>}</td></tr>; })}</tbody></table></div>
+              </>
             ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
           </section>
 

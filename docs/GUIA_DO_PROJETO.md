@@ -149,6 +149,8 @@ As migrações devem ser aplicadas nesta ordem:
 4. supabase/migrations/20261007162427_vacation_requests_employee_schedule.sql
 5. supabase/migrations/20261007164037_custom_daily_work_schedules.sql
 6. supabase/migrations/20261007171841_vacation_request_return_date.sql
+7. supabase/migrations/20261007185959_admin_punch_edit_window.sql
+8. supabase/migrations/20261007190207_correct_punch_created_at_clock.sql
 
 O projeto KairoPont registra as migrações listadas, com os buckets documentos (privado) e fotos-funcionarios (público). Não reaplique nem resete o banco de produção para seguir este guia.
 
@@ -159,6 +161,10 @@ A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIA
 Para perfis existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível.
 
 Existem três escalas fixas. O turno efetivo é classificado pela entrada mais próxima do horário de início e salvo no registro diário. O turno 3 cruza a meia-noite; a data de saída fica separada da data da entrada, e o cálculo considera a virada do dia. Sábado é jornada contínua comum a todos (08h–12h, sem intervalo). Até que sejam informados, o 2º e o 3º turno não têm marcações de almoço configuradas.
+
+Na ficha do funcionário, administradores podem corrigir os horários do registro de ponto individual até 96 horas após sua criação. O limite é contado e validado no banco, não apenas na interface. Depois do prazo, um gatilho bloqueia alterações e exclusões, inclusive por chamadas diretas; data-base e identificadores também não podem ser alterados. Cada correção gera um item na tabela `auditoria`. A tela apresenta “Editar horários” dentro do prazo e “Prazo encerrado” após o vencimento.
+
+A migração também corrigiu o fuso de criação dos registros já existentes e mudou o padrão futuro para `now()`, para que a janela de 96 horas seja precisa no banco configurado em UTC.
 
 ### GitHub Pages
 

@@ -1,38 +1,38 @@
-async function getKairoLogoDataUrl() {
-  const logoUrl = `${import.meta.env.BASE_URL}assets/brand/adesivo_nome_simbolo.png`;
-  const response = await fetch(logoUrl);
-  if (!response.ok) throw new Error('Não foi possível carregar a logo da Kairo.');
-  const blob = await response.blob();
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error('Não foi possível preparar a logo da Kairo.'));
-    reader.readAsDataURL(blob);
-  });
-}
-
-export async function addKairoPdfHeader(pdf, { title, details = [] }) {
-  let textX = 14;
-  try {
-    const logo = await getKairoLogoDataUrl();
-    const dimensions = pdf.getImageProperties(logo);
-    const logoWidth = 42;
-    const logoHeight = logoWidth * (dimensions.height / dimensions.width);
-    pdf.addImage(logo, 'PNG', 14, 8, logoWidth, logoHeight);
-    textX = 64;
-  } catch {
-    // The text header remains complete if the optional logo cannot be loaded.
-  }
+function drawKairoPontBrand(pdf) {
+  // Símbolo de relógio e marcação inspirado na paleta verde e vermelha da Kairo.
+  pdf.setFillColor(241, 248, 243);
+  pdf.circle(23, 17, 9, 'F');
+  pdf.setDrawColor(20, 91, 47);
+  pdf.setLineWidth(1.2);
+  pdf.circle(23, 17, 8, 'S');
+  pdf.setLineWidth(1.1);
+  pdf.line(23, 12.5, 23, 17);
+  pdf.line(23, 17, 26.2, 18.8);
+  pdf.setDrawColor(194, 45, 42);
+  pdf.setLineWidth(1.4);
+  pdf.line(27.1, 22.1, 29.2, 24.1);
+  pdf.line(29.2, 24.1, 33.1, 19.6);
 
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(17);
-  pdf.setTextColor(27, 94, 32);
-  pdf.text('KairoPont', textX, 17);
+  pdf.setFontSize(19);
+  pdf.setTextColor(15, 72, 39);
+  pdf.text('KAIRO', 39, 18);
+  const pontX = 39 + pdf.getTextWidth('KAIRO') + 0.6;
+  pdf.setTextColor(49, 137, 69);
+  pdf.text('PONT', pontX, 18);
+
+  pdf.setDrawColor(194, 45, 42);
+  pdf.setLineWidth(1.1);
+  pdf.line(pontX, 21.1, pontX + pdf.getTextWidth('PONT'), 21.1);
   pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(9);
-  pdf.setTextColor(90, 90, 90);
-  pdf.text('Kairo Automações', textX, 23);
+  pdf.setFontSize(6.5);
+  pdf.setTextColor(100, 112, 104);
+  pdf.text('CONTROLE DE PONTO', 39, 26);
+}
+
+export function addKairoPdfHeader(pdf, { title, details = [] }) {
+  drawKairoPontBrand(pdf);
+
   pdf.setDrawColor(46, 125, 50);
   pdf.setLineWidth(0.5);
   pdf.line(14, 30, 196, 30);

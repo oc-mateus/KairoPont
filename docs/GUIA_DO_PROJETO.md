@@ -35,7 +35,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em CSV ou PDF.
 - Baixar documentos individuais por links assinados temporários.
 
-Os relatórios PDF de ponto do funcionário e do administrador usam a identidade visual da Kairo no cabeçalho (logo, KairoPont e Kairo Automações). As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
+Os relatórios PDF de ponto do funcionário e do administrador usam um lockup próprio do KairoPont no cabeçalho, com símbolo de ponto e marcação nas cores da Kairo. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
 
 Operações administrativas dependem do papel armazenado no banco. O cadastro público cria novos perfis como funcionário; não há promoção de papel no frontend.
 
@@ -62,7 +62,7 @@ Operações administrativas dependem do papel armazenado no banco. O cadastro p�
 | src/components | Layout e componentes reutilizados |
 | supabase/migrations | Esquema, segurança, buckets e políticas do banco |
 | .github/workflows/pages.yml | Automação do GitHub Pages |
-| public/assets/brand | Arquivos públicos de identidade visual |
+| public/assets/brand | Arquivos públicos de identidade visual, incluindo o lockup vetorial kairopont-logo.svg |
 | public/manifest.webmanifest e public/sw.js | Manifesto instalável, escopo do app e cache básico da interface |
 
 ## Registro de ponto

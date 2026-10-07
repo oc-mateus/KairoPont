@@ -29,7 +29,8 @@ O site está publicado e o workflow automatizado de build e publicação está a
 - Consultar indicadores e registros da equipe.
 - Gerenciar perfis e status de funcionários.
 - Selecionar um funcionário para consultar nome completo, CPF, cargo, registros de ponto e documentos enviados, incluindo data e tipo.
-- Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em CSV.
+- O menu administrativo concentra-se no Painel Admin e em Funcionários; ponto e documentos são acessados pela ficha individual.
+- Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em CSV ou PDF.
 - Baixar documentos individuais por links assinados temporários.
 
 Operações administrativas dependem do papel armazenado no banco. O cadastro público cria novos perfis como funcionário; não há promoção de papel no frontend.

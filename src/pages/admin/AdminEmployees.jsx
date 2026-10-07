@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { calcDailyTotal, formatCPF, formatDate, formatDateTime, formatTime, getTodayInSP } from '../../lib/utils';
@@ -70,6 +71,7 @@ function safeFilename(name) {
 
 export default function AdminEmployees() {
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -85,6 +87,7 @@ export default function AdminEmployees() {
   const [actionType, setActionType] = useState('');
   const [actionEmployee, setActionEmployee] = useState(null);
   const [downloadingDocument, setDownloadingDocument] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -100,6 +103,26 @@ export default function AdminEmployees() {
   };
 
   useEffect(() => { fetchEmployees(); }, []);
+
+  useEffect(() => {
+    const employeeId = searchParams.get('funcionario');
+    if (!employeeId) {
+      setSelectedEmp(null);
+      return;
+    }
+    const employee = employees.find((item) => item.id === employeeId);
+    if (employee) setSelectedEmp(employee);
+  }, [employees, searchParams]);
+
+  const openEmployee = (employee) => {
+    setSelectedEmp(employee);
+    setSearchParams({ funcionario: employee.id });
+  };
+
+  const closeEmployee = () => {
+    setSelectedEmp(null);
+    setSearchParams({});
+  };
 
   const range = useMemo(() => getRange(filter, selectedDay, customStart, customEnd, referenceDate), [filter, selectedDay, customStart, customEnd, referenceDate]);
 
@@ -169,6 +192,52 @@ export default function AdminEmployees() {
     downloadCsv(`ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.csv`, [headers, ...rows]);
   };
 
+  const downloadEmployeeRecordsPdf = async () => {
+    if (!records.length) return toast.error('Não há registros para baixar neste período.');
+    setExportingPdf(true);
+    try {
+      const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+      const pdf = new jsPDF();
+      pdf.setFontSize(18);
+      pdf.setTextColor(27, 94, 32);
+      pdf.text('KairoPont - Kairo Automações', 14, 20);
+      pdf.setFontSize(12);
+      pdf.setTextColor(80);
+      pdf.text(`Relatório de ponto - ${selectedEmp.nome}`, 14, 30);
+      pdf.setFontSize(10);
+      pdf.text(`CPF: ${formatCPF(selectedEmp.cpf)}`, 14, 37);
+      pdf.text(`Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`, 14, 44);
+      pdf.text(`Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`, 14, 50);
+      autoTable(pdf, {
+        startY: 58,
+        head: [['Data', 'Entrada', 'Saída almoço', 'Retorno', 'Saída', 'Total', 'Status']],
+        body: records.map((record) => [
+          formatDate(`${record.data}T12:00:00`), formatTime(record.entrada), formatTime(record.saida_almoco),
+          formatTime(record.retorno_almoco), formatTime(record.saida), calcDailyTotal(record),
+          record.saida ? 'Completo' : 'Incompleto',
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        alternateRowStyles: { fillColor: [232, 245, 233] },
+        styles: { cellPadding: 3 },
+      });
+      const pageCount = pdf.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        pdf.setPage(page);
+        pdf.setFontSize(8);
+        pdf.setTextColor(150);
+        pdf.text(`Página ${page} de ${pageCount} - KairoPont © ${new Date().getFullYear()}`, 14, pdf.internal.pageSize.height - 10);
+      }
+      pdf.save(`ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.pdf`);
+      toast.success('Relatório PDF baixado.');
+    } catch (error) {
+      toast.error('Erro ao gerar PDF: ' + error.message);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const downloadDocument = async (doc) => {
     setDownloadingDocument(doc.id);
     try {
@@ -195,14 +264,14 @@ export default function AdminEmployees() {
     <div className="admin-employees-page">
       <div className="page-header">
         <div><h2 className="page-title">Funcionários</h2><p className="page-subtitle">Selecione um funcionário para ver os dados, documentos e registros de ponto.</p></div>
-        {selectedEmp && <button className="btn btn-ghost" onClick={() => setSelectedEmp(null)}>Voltar à lista</button>}
+        {selectedEmp && <button className="btn btn-ghost" onClick={closeEmployee}>Voltar à lista</button>}
       </div>
 
       {!selectedEmp ? (
         <div className="employee-select-list">
           {employees.map((emp) => (
             <article className="employee-select-card" key={emp.id}>
-              <button className="employee-select-main" onClick={() => setSelectedEmp(emp)} aria-label={`Abrir informações de ${emp.nome}`}>
+              <button className="employee-select-main" onClick={() => openEmployee(emp)} aria-label={`Abrir informações de ${emp.nome}`}>
                 <Avatar src={emp.foto_url} name={emp.nome} />
                 <span className="employee-select-copy"><strong>{emp.nome}</strong><small>{emp.cargo} · {emp.email}</small></span>
                 <span className="employee-select-cpf">{formatCPF(emp.cpf)}</span>
@@ -232,7 +301,7 @@ export default function AdminEmployees() {
           </section>
 
           <section className="employee-records-section">
-            <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecords} disabled={detailLoading || !records.length}>Baixar registros CSV</button></div>
+            <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecords} disabled={detailLoading || !records.length}>Baixar CSV</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>
           <div className="employee-record-filters">
               <div className="filter-chips">{FILTERS.map((item) => <button key={item.id} className={`filter-chip ${filter === item.id ? 'active' : ''}`} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
               {filter === 'day' && <label className="employee-date-filter">Dia<input className="form-input" type="date" value={selectedDay} onChange={(event) => setSelectedDay(event.target.value)} /></label>}

@@ -18,7 +18,7 @@ function excelTime(timeValue) {
   return seconds / 86400;
 }
 
-export async function downloadTimesheetXlsx({ records, title, period, filename, calcDailyTotal }) {
+export async function downloadTimesheetXlsx({ records, title, period, filename, calcDailyTotal, extraColumns = [] }) {
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Kairo Automações';
@@ -37,29 +37,31 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
     { key: 'exit', width: 17 },
     { key: 'total', width: 20 },
     { key: 'status', width: 16 },
+    ...extraColumns.map((column) => ({ key: column.key, width: column.width || 17 })),
   ];
+  const finalColumn = String.fromCharCode(64 + 7 + extraColumns.length);
 
-  sheet.mergeCells('A1:G1');
+  sheet.mergeCells(`A1:${finalColumn}1`);
   sheet.getCell('A1').value = title;
   sheet.getRow(1).height = 34;
   sheet.getRow(1).font = { name: 'Aptos Display', size: 17, bold: true, color: { argb: 'FFFFFFFF' } };
   sheet.getRow(1).alignment = { vertical: 'middle', indent: 1 };
   sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123D27' } };
 
-  sheet.mergeCells('A2:G2');
+  sheet.mergeCells(`A2:${finalColumn}2`);
   sheet.getCell('A2').value = period;
   sheet.getRow(2).height = 24;
   sheet.getRow(2).font = { name: 'Aptos', size: 10, color: { argb: 'FF355542' } };
   sheet.getRow(2).alignment = { vertical: 'middle', indent: 1 };
   sheet.getRow(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF3EC' } };
 
-  sheet.mergeCells('A3:G3');
+  sheet.mergeCells(`A3:${finalColumn}3`);
   sheet.getCell('A3').value = `Gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
   sheet.getRow(3).height = 22;
   sheet.getRow(3).font = { name: 'Aptos', size: 9, color: { argb: 'FF66746B' }, italic: true };
   sheet.getRow(3).alignment = { vertical: 'middle', indent: 1 };
 
-  const headers = ['Data', 'Entrada', 'Saída almoço', 'Retorno almoço', 'Saída', 'Total trabalhado', 'Status'];
+  const headers = ['Data', 'Entrada', 'Saída almoço', 'Retorno almoço', 'Saída', 'Total trabalhado', 'Status', ...extraColumns.map((column) => column.header)];
   const header = sheet.addRow(headers);
   header.height = 26;
   header.eachCell((cell) => {
@@ -78,6 +80,7 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
       excelTime(record.saida),
       calcDailyTotal(record),
       record.saida ? 'Completo' : 'Incompleto',
+      ...extraColumns.map((column) => column.value(record)),
     ]);
     row.height = 23;
     row.eachCell((cell) => {
@@ -105,7 +108,7 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
     };
   });
 
-  sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + records.length, column: 7 } };
+  sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + records.length, column: 7 + extraColumns.length } };
   const buffer = await workbook.xlsx.writeBuffer({ useStyles: true });
   const url = URL.createObjectURL(new Blob([buffer], { type: spreadsheetMime }));
   const anchor = document.createElement('a');

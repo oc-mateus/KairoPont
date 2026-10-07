@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import { calcDailyTotal, formatCPF, formatDate, formatDateTime, formatTime, getTodayInSP } from '../../lib/utils';
+import { calcDailyTotal, formatCPF, formatDate, formatDateTime, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
+import WorkScheduleCard from '../../components/WorkScheduleCard';
 
 const FILTERS = [
   { id: 'day', label: 'Dia' },
@@ -55,6 +56,37 @@ function safeFilename(name) {
   return (name || 'funcionario').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9-_]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
 }
 
+function timeMinutes(value) {
+  if (!value) return null;
+  const [hours, minutes] = String(value).slice(0, 5).split(':').map(Number);
+  return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : null;
+}
+
+function durationLabel(minutes) {
+  if (minutes == null) return '—';
+  const sign = minutes < 0 ? '−' : '+';
+  const absolute = Math.abs(minutes);
+  return `${sign}${Math.floor(absolute / 60)}h ${String(absolute % 60).padStart(2, '0')}min`;
+}
+
+function getScheduleComparison(record, schedule) {
+  if (!schedule?.dias_semana?.length) return { expected: '—', balance: '—' };
+  const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
+  if (!schedule.dias_semana.includes(weekday)) return { expected: 'Folga', balance: record.saida ? 'Extra' : '—' };
+  const entry = timeMinutes(schedule.entrada);
+  const lunchOut = timeMinutes(schedule.saida_almoco);
+  const lunchIn = timeMinutes(schedule.retorno_almoco);
+  const exit = timeMinutes(schedule.saida);
+  const expectedMinutes = entry != null && lunchOut != null && lunchIn != null && exit != null ? (lunchOut - entry) + (exit - lunchIn) : null;
+  const actualEntry = timeMinutes(record.entrada);
+  const actualLunchOut = timeMinutes(record.saida_almoco);
+  const actualLunchIn = timeMinutes(record.retorno_almoco);
+  const actualExit = timeMinutes(record.saida);
+  const actualMinutes = actualEntry != null && actualLunchOut != null && actualLunchIn != null && actualExit != null ? (actualLunchOut - actualEntry) + (actualExit - actualLunchIn) : null;
+  const expected = expectedMinutes == null ? '—' : `${Math.floor(expectedMinutes / 60)}h ${String(expectedMinutes % 60).padStart(2, '0')}min`;
+  return { expected, balance: durationLabel(actualMinutes == null || expectedMinutes == null ? null : actualMinutes - expectedMinutes) };
+}
+
 export default function AdminEmployees() {
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -75,6 +107,9 @@ export default function AdminEmployees() {
   const [downloadingDocument, setDownloadingDocument] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [savingEmployment, setSavingEmployment] = useState(false);
+  const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), tipo: '5x2', dias_semana: [1, 2, 3, 4, 5], entrada: '08:00', saida_almoco: '12:00', retorno_almoco: '13:00', saida: '17:00' });
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -90,6 +125,10 @@ export default function AdminEmployees() {
   };
 
   useEffect(() => { fetchEmployees(); }, []);
+
+  useEffect(() => {
+    if (selectedEmp) setEmployeeForm(formFromEmployee(selectedEmp));
+  }, [selectedEmp]);
 
   useEffect(() => {
     const employeeId = searchParams.get('funcionario');
@@ -110,6 +149,77 @@ export default function AdminEmployees() {
     setSelectedEmp(null);
     setSearchParams({});
   };
+
+  const setFormField = (field, value) => setEmployeeForm((current) => ({ ...current, [field]: value }));
+
+  const scheduleFromForm = (form) => ({
+    tipo: form.tipo,
+    dias_semana: form.dias_semana,
+    entrada: form.entrada,
+    saida_almoco: form.saida_almoco,
+    retorno_almoco: form.retorno_almoco,
+    saida: form.saida,
+  });
+
+  const formFromEmployee = (employee) => {
+    const schedule = employee.escala_trabalho || {};
+    return {
+      nome: employee.nome || '', email: employee.email || '', cpf: formatCPF(employee.cpf) || '', cargo: employee.cargo || '',
+      data_admissao: employee.data_admissao || '', tipo: schedule.tipo || '5x2', dias_semana: schedule.dias_semana || [1, 2, 3, 4, 5],
+      entrada: schedule.entrada || '08:00', saida_almoco: schedule.saida_almoco || '12:00', retorno_almoco: schedule.retorno_almoco || '13:00', saida: schedule.saida || '17:00',
+    };
+  };
+
+  const inviteEmployee = async (event) => {
+    event.preventDefault();
+    setSavingEmployment(true);
+    try {
+      const { error } = await supabase.functions.invoke('invite-employee', {
+        body: { ...employeeForm, cpf: employeeForm.cpf.replace(/\D/g, ''), escala_trabalho: scheduleFromForm(employeeForm) },
+      });
+      if (error) throw error;
+      toast.success('Convite enviado. O funcionário receberá um e-mail para definir a senha.');
+      setShowInviteForm(false);
+      setEmployeeForm({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), tipo: '5x2', dias_semana: [1, 2, 3, 4, 5], entrada: '08:00', saida_almoco: '12:00', retorno_almoco: '13:00', saida: '17:00' });
+      await fetchEmployees();
+    } catch (error) {
+      toast.error(error.message || 'Não foi possível enviar o convite.');
+    } finally {
+      setSavingEmployment(false);
+    }
+  };
+
+  const saveEmployment = async (event) => {
+    event.preventDefault();
+    setSavingEmployment(true);
+    try {
+      const { error } = await supabase.rpc('admin_update_employee_employment', {
+        p_funcionario_id: selectedEmp.id,
+        p_data_admissao: employeeForm.data_admissao,
+        p_escala_trabalho: scheduleFromForm(employeeForm),
+      });
+      if (error) throw error;
+      toast.success('Data de admissão e escala atualizadas.');
+      await fetchEmployees();
+      const { data } = await supabase.from('funcionarios').select('*').eq('id', selectedEmp.id).maybeSingle();
+      if (data) setSelectedEmp(data);
+    } catch (error) {
+      toast.error('Não foi possível salvar: ' + error.message);
+    } finally {
+      setSavingEmployment(false);
+    }
+  };
+
+  const employmentForm = (onSubmit, submitLabel) => (
+    <form className="vacation-form employee-employment-form" onSubmit={onSubmit}>
+      {showInviteForm && <div className="form-row"><label className="form-group">Nome completo<input className="form-input" required minLength={3} value={employeeForm.nome} onChange={(event) => setFormField('nome', event.target.value)} /></label><label className="form-group">E-mail corporativo<input className="form-input" required type="email" value={employeeForm.email} onChange={(event) => setFormField('email', event.target.value)} /></label></div>}
+      {showInviteForm && <div className="form-row"><label className="form-group">CPF<input className="form-input" required inputMode="numeric" value={employeeForm.cpf} onChange={(event) => setFormField('cpf', maskCPF(event.target.value))} /></label><label className="form-group">Cargo<input className="form-input" required value={employeeForm.cargo} onChange={(event) => setFormField('cargo', event.target.value)} /></label></div>}
+      <div className="form-row"><label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label><label className="form-group">Escala<select className="form-input" value={employeeForm.tipo} onChange={(event) => setFormField('tipo', event.target.value)}><option value="5x2">5x2</option><option value="6x1">6x1</option><option value="personalizada">Personalizada</option></select></label></div>
+      <fieldset className="employee-weekdays"><legend>Dias de trabalho</legend>{['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((day, index) => <label key={day}><input type="checkbox" checked={employeeForm.dias_semana.includes(index + 1)} onChange={(event) => setFormField('dias_semana', event.target.checked ? [...employeeForm.dias_semana, index + 1].sort() : employeeForm.dias_semana.filter((value) => value !== index + 1))} />{day}</label>)}</fieldset>
+      <div className="form-row employee-schedule-times">{[['entrada', 'Entrada'], ['saida_almoco', 'Saída almoço'], ['retorno_almoco', 'Retorno'], ['saida', 'Saída']].map(([field, label]) => <label className="form-group" key={field}>{label}<input className="form-input" type="time" required value={employeeForm[field]} onChange={(event) => setFormField(field, event.target.value)} /></label>)}</div>
+      <button className="btn btn-primary" disabled={savingEmployment || employeeForm.dias_semana.length === 0}>{savingEmployment ? 'Salvando…' : submitLabel}</button>
+    </form>
+  );
 
   const range = useMemo(() => getRange(filter, selectedDay, customStart, customEnd, referenceDate), [filter, selectedDay, customStart, customEnd, referenceDate]);
 
@@ -179,6 +289,10 @@ export default function AdminEmployees() {
         period: `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
         filename: `ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.xlsx`,
         calcDailyTotal,
+        extraColumns: [
+          { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).expected },
+          { key: 'balance', header: 'Saldo diário', width: 17, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).balance },
+        ],
       });
       toast.success('Planilha Excel baixada.');
     } catch (error) {
@@ -204,15 +318,16 @@ export default function AdminEmployees() {
       });
       autoTable(pdf, {
         startY: tableStartY + 3,
-        head: [['Data', 'Entrada', 'Saída almoço', 'Retorno', 'Saída', 'Total', 'Status']],
+        head: [['Data', 'Entrada', 'Saída almoço', 'Retorno', 'Saída', 'Total', 'Previsto', 'Saldo', 'Status']],
         body: records.map((record) => [
           formatDate(`${record.data}T12:00:00`), formatTime(record.entrada), formatTime(record.saida_almoco),
-          formatTime(record.retorno_almoco), formatTime(record.saida), calcDailyTotal(record),
+          formatTime(record.retorno_almoco), formatTime(record.saida), calcDailyTotal(record), getScheduleComparison(record, selectedEmp.escala_trabalho).expected,
+          getScheduleComparison(record, selectedEmp.escala_trabalho).balance,
           record.saida ? 'Completo' : 'Incompleto',
         ]),
         theme: 'grid',
-        headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        bodyStyles: { fontSize: 8 },
+        headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 },
+        bodyStyles: { fontSize: 7 },
         alternateRowStyles: { fillColor: [232, 245, 233] },
         styles: { cellPadding: 3 },
       });
@@ -262,6 +377,9 @@ export default function AdminEmployees() {
       </div>
 
       {!selectedEmp ? (
+        <>
+          <div className="flex justify-between gap-3 employee-list-toolbar"><p className="page-subtitle">Contas novas só podem ser criadas por um administrador.</p><button className="btn btn-primary" onClick={() => setShowInviteForm((value) => !value)}>{showInviteForm ? 'Cancelar' : 'Novo funcionário'}</button></div>
+          {showInviteForm && <section className="employee-records-section"><h3>Convidar funcionário</h3><p className="page-subtitle">Enviaremos o convite para o e-mail informado, onde a pessoa poderá definir a própria senha.</p>{employmentForm(inviteEmployee, 'Enviar convite')}</section>}
         <div className="employee-select-list">
           {employees.map((emp) => (
             <article className="employee-select-card" key={emp.id}>
@@ -280,6 +398,7 @@ export default function AdminEmployees() {
           ))}
           {!employees.length && <div className="empty-state"><h3 className="empty-state-title">Nenhum funcionário cadastrado</h3></div>}
         </div>
+        </>
       ) : (
         <>
           <section className="employee-profile-card">
@@ -291,8 +410,13 @@ export default function AdminEmployees() {
               <div><span>CPF</span><strong>{formatCPF(selectedEmp.cpf)}</strong></div>
               <div><span>Cargo</span><strong>{selectedEmp.cargo || 'Não informado'}</strong></div>
               <div><span>Perfil de acesso</span><strong>{selectedEmp.role === 'admin' ? 'Administrador' : 'Funcionário'}</strong></div>
+              <div><span>Data de admissão</span><strong>{selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</strong></div>
+              <div><span>Escala de trabalho</span><strong>{selectedEmp.escala_trabalho ? `${selectedEmp.escala_trabalho.tipo} · ${selectedEmp.escala_trabalho.entrada}–${selectedEmp.escala_trabalho.saida}` : 'Não informada'}</strong></div>
             </div>
           </section>
+
+          <section className="employee-records-section"><h3>Admissão e escala semanal</h3><p className="page-subtitle">Usadas para liberar férias e comparar o previsto com as marcações de ponto.</p>{employmentForm(saveEmployment, 'Salvar dados trabalhistas')}</section>
+          <WorkScheduleCard schedule={selectedEmp.escala_trabalho} admissionDate={selectedEmp.data_admissao} />
 
           <section className="employee-records-section">
             <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecordsExcel} disabled={detailLoading || !records.length || exportingExcel}>{exportingExcel ? 'Gerando Excel…' : 'Baixar Excel'}</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>
@@ -303,7 +427,7 @@ export default function AdminEmployees() {
               {filter === 'custom' && <div className="employee-custom-range"><label className="employee-date-filter">De<input className="form-input" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label className="employee-date-filter">Até<input className="form-input" type="date" min={customStart} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
             </div>
             {detailLoading ? <div className="flex flex-center" style={{ minHeight: '160px' }}><Spinner /></div> : records.length ? (
-              <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th><th>Saída almoço</th><th>Retorno almoço</th><th>Saída</th><th>Total</th><th>Status</th></tr></thead><tbody>{records.map((record) => <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td><td>{formatTime(record.saida)}</td><td><strong>{calcDailyTotal(record)}</strong></td><td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td></tr>)}</tbody></table></div>
+              <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th><th>Saída almoço</th><th>Retorno almoço</th><th>Saída</th><th>Total</th><th>Previsto</th><th>Saldo</th><th>Status</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.escala_trabalho); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td><td>{formatTime(record.saida)}</td><td><strong>{calcDailyTotal(record)}</strong></td><td>{comparison.expected}</td><td>{comparison.balance}</td><td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td></tr>; })}</tbody></table></div>
             ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
           </section>
 

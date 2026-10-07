@@ -73,24 +73,6 @@ export function AuthProvider({ children }) {
     return data;
   }
 
-  async function signUp({ email, password, nome, cpf, cargo }) {
-    // Primeiro cria o usuário no Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          nome,
-          cpf: cpf.replace(/\D/g, ''),
-          cargo,
-        },
-      },
-    });
-
-    if (authError) throw authError;
-    return authData;
-  }
-
   async function signOut() {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -112,7 +94,6 @@ export function AuthProvider({ children }) {
     isAdmin: profile?.role === 'admin',
     isActive: profile?.ativo === true,
     signInWithEmail,
-    signUp,
     signOut,
     refreshProfile,
   };

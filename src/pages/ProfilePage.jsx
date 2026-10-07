@@ -4,6 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { formatCPF } from '../lib/utils';
 import { Spinner, Avatar } from '../components/ui';
+import WorkScheduleCard from '../components/WorkScheduleCard';
 
 export default function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
@@ -154,6 +155,8 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      <WorkScheduleCard schedule={profile.escala_trabalho} admissionDate={profile.data_admissao} />
 
       {/* Info Card */}
       <div className="card mb-6">

@@ -1543,6 +1543,49 @@ select.form-input {
 .employee-document-copy strong { color: var(--text-primary); font-size: var(--font-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .employee-document-copy span, .employee-document-copy small { color: var(--text-muted); font-size: var(--font-xs); }
 
+.employee-list-toolbar { align-items: center; margin-bottom: var(--space-4); }
+.employee-employment-form { display: grid; gap: var(--space-4); }
+.employee-weekdays { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-secondary); }
+.employee-weekdays legend { padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--font-xs); }
+.employee-weekdays label { display: flex; align-items: center; gap: var(--space-1); }
+.employee-schedule-times .form-group { min-width: 110px; }
+.work-schedule-card { margin-bottom: var(--space-6); padding: var(--space-5); background: var(--gradient-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.work-schedule-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.work-schedule-heading h3 { color: var(--text-primary); font-size: var(--font-lg); }
+.work-schedule-heading p, .work-schedule-admission { color: var(--text-muted); font-size: var(--font-sm); }
+.work-schedule-days { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.work-schedule-days span { padding: 6px 10px; color: var(--text-muted); background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-full); font-size: var(--font-xs); }
+.work-schedule-days span.scheduled { color: var(--kairo-green-300); border-color: rgba(74, 222, 128, .4); background: rgba(22, 101, 52, .16); }
+.work-schedule-times { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.work-schedule-times > div { display: grid; gap: 3px; min-width: 0; padding: var(--space-3); background: var(--bg-card); border-radius: var(--radius-md); }
+.work-schedule-times span { color: var(--text-muted); font-size: var(--font-xs); }
+.work-schedule-times strong { color: var(--text-primary); font-size: var(--font-base); }
+.work-schedule-empty { color: var(--text-muted); font-size: var(--font-sm); }
+.work-schedule-card.compact { padding: var(--space-4); }
+
+.vacations-page { display: grid; gap: var(--space-4); }
+.vacation-cycle-card, .vacation-admin-queue { padding: var(--space-5); background: var(--gradient-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.vacation-cycle-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+.vacation-cycle-heading h3, .vacation-admin-queue > h3, .vacation-history-title { color: var(--text-primary); font-size: var(--font-lg); }
+.vacation-cycle-heading p, .vacation-cycle-summary { margin-top: var(--space-1); color: var(--text-muted); font-size: var(--font-sm); }
+.vacation-inline-form { display: grid; justify-items: start; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-4); background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.vacation-inline-form .form-group { min-width: min(100%, 280px); }
+.vacation-inline-form small { color: var(--text-muted); font-size: var(--font-xs); }
+.vacation-request-history { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+.vacation-request-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.vacation-request-row > div { display: grid; gap: var(--space-1); min-width: 0; }
+.vacation-request-row strong { color: var(--text-primary); font-size: var(--font-sm); }
+.vacation-request-row small, .vacation-request-row p { color: var(--text-muted); font-size: var(--font-xs); overflow-wrap: anywhere; }
+.vacation-admin-queue { display: grid; gap: var(--space-3); }
+.vacation-admin-request { display: grid; gap: var(--space-3); padding: var(--space-4); background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.vacation-admin-request h4 { color: var(--text-primary); }
+.vacation-admin-request p { color: var(--text-secondary); font-size: var(--font-sm); }
+.vacation-admin-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.vacation-history-title { margin-top: var(--space-4); }
+.alert { padding: var(--space-4); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-secondary); background: var(--bg-card); }
+.alert-warning { border-color: rgba(245, 158, 11, .45); }
+.alert-info { border-color: rgba(59, 130, 246, .4); }
+
 /* =========================================
    Confirmation Dialog
    ========================================= */
@@ -1751,6 +1794,13 @@ select.form-input {
   .employee-document-item { align-items: flex-start; flex-wrap: wrap; }
   .employee-document-copy { flex-basis: calc(100% - 80px); }
   .employee-document-item .btn { margin-left: auto; }
+  .employee-list-toolbar { align-items: stretch; flex-direction: column; }
+  .employee-schedule-times { display: grid; grid-template-columns: 1fr 1fr; }
+  .work-schedule-times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .work-schedule-heading { flex-direction: column; }
+  .vacation-cycle-card, .vacation-admin-queue { padding: var(--space-3); }
+  .vacation-cycle-heading, .vacation-request-row { align-items: flex-start; }
+  .vacation-request-row { flex-wrap: wrap; }
 
   .employee-detail-block + .employee-detail-block {
     border-top: 1px solid var(--border-default);

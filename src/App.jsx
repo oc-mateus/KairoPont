@@ -9,6 +9,8 @@ import PunchPage from './pages/PunchPage';
 import HistoryPage from './pages/HistoryPage';
 import DocumentsPage from './pages/DocumentsPage';
 import ProfilePage from './pages/ProfilePage';
+import VacationsPage from './pages/VacationsPage';
+import SetPasswordPage from './pages/SetPasswordPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -51,12 +53,14 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+      <Route path="/definir-senha" element={<SetPasswordPage />} />
 
       {/* Rotas de Funcionário */}
       <Route path="/ponto" element={<PrivateRoute><PunchPage /></PrivateRoute>} />
       <Route path="/historico" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
       <Route path="/documentos" element={<PrivateRoute><DocumentsPage /></PrivateRoute>} />
       <Route path="/perfil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+      <Route path="/ferias" element={<PrivateRoute><VacationsPage /></PrivateRoute>} />
 
       {/* Rotas de Administração */}
       <Route path="/admin" element={<PrivateRoute requireAdmin><AdminDashboard /></PrivateRoute>} />

@@ -13,18 +13,21 @@ O site está publicado e o workflow automatizado de build e publicação está a
 
 A aplicação também pode ser instalada como PWA em navegadores compatíveis. No Android, abra o endereço HTTPS no Chrome e use **Instalar aplicativo** (no botão do sistema, quando disponível, ou no menu do navegador). O modo instalado abre em janela própria; recursos que dependem do Supabase ainda precisam de conexão. O Chrome para iOS não oferece o mesmo fluxo de instalação do Android; nesse sistema, use a opção de adicionar à tela inicial oferecida pelo navegador compatível.
 
-**O projeto ainda não está validado para operação real.** Antes de registrar jornadas da equipe, é necessário configurar os redirecionamentos do Supabase Auth, provisionar e verificar a conta inicial de administração e reforçar a validação de arquivos no servidor. O acesso é feito com e-mail corporativo e senha; o CPF continua sendo usado no cadastro e na identificação do funcionário.
+**O projeto ainda não está validado para operação real.** O acesso é feito com e-mail corporativo e senha. Contas comuns são criadas somente por convite do administrador; o funcionário define a própria senha pelo link enviado ao e-mail. O CPF permanece como dado de identificação, não como forma de login.
 
 ## O que a aplicação oferece
 
 ### Para funcionários
 
 - Entrar com e-mail e senha.
-- Cadastrar uma conta com nome, e-mail, CPF, cargo e senha.
+- Receber convite do administrador e definir a própria senha.
 - Registrar quatro etapas de jornada na ordem: entrada, saída para almoço, retorno do almoço e saída.
 - Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
 - Enviar atestado médico ou declaração de horas e baixar documentos autorizados.
 - Atualizar dados básicos do perfil e a foto.
+- Consultar períodos aquisitivos e solicitar o gozo das férias após completar um ano de empresa.
+- Registrar intenção de conversão de até 10 dias em abono dentro do prazo; acompanhar prazos e avisos na tela de férias.
+- Receber por e-mail a decisão de aprovação ou recusa; recusas incluem a justificativa. A decisão não gera notificação interna.
 
 ### Para administradores
 
@@ -34,10 +37,14 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - O menu administrativo concentra-se no Painel Admin e em Funcionários; ponto e documentos são acessados pela ficha individual.
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
+- Criar funcionário por convite, informando admissão, cargo e escala semanal; editar admissão/escala dos perfis existentes.
+- Configurar a escala por dias específicos da semana e horários de entrada, saída para almoço, retorno e saída final. A escala completa fica visível na ficha administrativa e em Meu Perfil.
+- Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
+- Comparar nas tabelas de ponto as horas registradas, a jornada planejada para cada dia e o saldo diário.
 
-Os relatórios PDF de ponto do funcionário e do administrador exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
+Os relatórios PDF de ponto do funcionário e do administrador exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. Na ficha administrativa, PDF, Excel e tabela diária também comparam a jornada prevista com o total marcado. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
 
-Operações administrativas dependem do papel armazenado no banco. O cadastro público cria novos perfis como funcionário; não há promoção de papel no frontend.
+Operações administrativas dependem do papel armazenado no banco. Novos perfis comuns só podem ser convidados pelo administrador; cadastros sem convite são recusados pelo banco.
 
 ## Como o sistema funciona
 
@@ -51,6 +58,7 @@ Operações administrativas dependem do papel armazenado no banco. O cadastro p�
 | Supabase Auth | Contas, confirmação de e-mail e sessões |
 | Supabase Postgres | Perfis, registros de ponto, metadados de documentos e auditoria |
 | Supabase Storage | Arquivos dos documentos e fotos de perfil |
+| Supabase Edge Functions | Convites administrativos e e-mails de decisões de férias |
 
 ### Pastas principais
 
@@ -77,10 +85,13 @@ As migrações criam quatro tabelas no esquema public:
 
 | Tabela | Dados armazenados | Proteção aplicada |
 | --- | --- | --- |
-| funcionarios | Perfil, vínculo com Auth, CPF, cargo, status e papel | Funcionário consulta o próprio perfil; admin pode consultar a equipe |
+| funcionarios | Perfil, vínculo com Auth, CPF, cargo, status, papel, admissão e escala semanal | Funcionário consulta o próprio perfil; admin pode consultar a equipe |
 | registros_ponto | Data e quatro marcações de horário | Funcionário consulta os próprios registros; admin consulta a equipe |
 | documentos | Tipo, nome, caminho no Storage e período informado | Funcionário consulta os próprios metadados; admin consulta os autorizados |
 | auditoria | Ação administrativa, alvo e detalhes | Leitura limitada ao perfil admin |
+| periodos_aquisitivos_ferias | Períodos aquisitivos/concessivos e intenção de abono de 0–10 dias | Funcionário acessa os próprios períodos; admin consulta todos |
+| solicitacoes_ferias | Datas desejadas, situação, justificativa e estado do e-mail | Funcionário acessa as próprias solicitações; admin consulta e decide |
+| notificacoes | Avisos de prazo de férias próximos ou vencidos | Funcionário acessa os próprios avisos; decisões não são notificadas internamente |
 
 O CPF é dado pessoal. Não inclua CPFs, nomes de funcionários, documentos ou capturas com dados reais em issues, exemplos públicos, commits ou arquivos de documentação.
 
@@ -102,6 +113,9 @@ O bucket fotos-funcionarios é público porque a interface usa URLs públicas pa
 - Políticas do banco limitam funcionários aos próprios dados e deixam operações administrativas condicionadas ao papel admin.
 - A RPC admin_update_employee verifica no banco que a sessão pertence a um administrador ativo antes de alterar papel ou status.
 - O gatilho de cadastro cria perfis com papel employee. Ele não confia em e-mail ou metadados enviados pelo navegador para conceder admin.
+- O gatilho exige convite de uso único emitido pela Edge Function administrativa; cadastro sem convite é rejeitado no banco.
+- `invite-employee` aceita apenas administrador ativo e cria convite para o Auth enviar o link de definição de senha.
+- `vacation-decision-email` valida o administrador e envia aprovação/recusa pelo Resend; as credenciais ficam apenas nos secrets do Supabase.
 - A chave pública do Supabase é necessária no frontend e não substitui as políticas RLS. Chaves service_role, secrets, senhas e tokens não devem ser adicionados ao frontend, ao README ou a variáveis públicas do GitHub.
 - Os três avisos do Advisor sobre funções SECURITY DEFINER acessíveis a usuários autenticados refletem funções que a aplicação chama. As funções administrativas e de ponto verificam internamente o papel ou a identidade do usuário; reavalie esses avisos após qualquer mudança nas funções.
 
@@ -130,8 +144,13 @@ As migrações devem ser aplicadas nesta ordem:
 1. supabase/migrations/20261006000000_initial_schema.sql
 2. supabase/migrations/20261006001000_security_hardening.sql
 3. supabase/migrations/20261006002000_restrict_internal_trigger.sql
+4. supabase/migrations/20261007162427_vacation_requests_employee_schedule.sql
 
 O projeto KairoPont já registrava as três migrações, com os buckets documentos (privado) e fotos-funcionarios (público). Não reaplique nem resete o banco de produção para seguir este guia.
+
+A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` (endereço verificado no Resend). Sem eles, a decisão é gravada, mas o envio falha e pode ser tentado novamente na fila administrativa. O envio do convite depende do SMTP configurado no Supabase Auth e da URL permitida `https://oc-mateus.github.io/KairoPont/definir-senha`, onde o funcionário define sua senha.
+
+Para perfis existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível.
 
 ### GitHub Pages
 
@@ -148,10 +167,11 @@ As verificações abaixo foram feitas em 6 de outubro de 2026. Reconfirme o esta
 
 1. **Configurar Auth:** definir a URL do site no Supabase Auth como https://oc-mateus.github.io/KairoPont/ e adicionar o retorno exato à lista permitida. A configuração não foi confirmada no painel.
 2. **Revisar a administração de teste:** uma conta administrativa de teste foi provisionada em 7 de outubro de 2026. Troque ou remova suas credenciais antes de usar a aplicação com dados reais.
-3. **Revisar cadastro público:** a tela permite auto cadastro e o gatilho cria perfis de funcionário. Definir se o acesso será aberto, restrito ou precedido por convite antes de divulgar o endereço aos funcionários.
+3. **Configurar convites e e-mail:** verificar SMTP/URLs do Supabase Auth e cadastrar `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` como secrets da Edge Function.
 4. **Impor validação no Storage:** configurar no bucket privado o limite máximo e os MIME types adequados no servidor, além da validação existente no frontend.
 5. **Evitar arquivos órfãos:** se o insert dos metadados falhar, remover o objeto enviado ou disponibilizar um processo administrativo de reconciliação.
-6. **Validar sem dados reais:** testar cadastro, confirmação, login, isolamento entre dois usuários fictícios, envio de arquivo descartável, link assinado e fluxo admin antes da ativação.
+6. **Completar dados de vínculo:** conferir data de admissão e escala semanal de cada funcionário com o RH.
+7. **Validar sem dados reais:** testar convite, definição de senha, login, isolamento entre usuários fictícios, arquivo descartável, link assinado, comparação de ponto, prazos e e-mails de aprovação/recusa.
 
 ## Operação e suporte
 

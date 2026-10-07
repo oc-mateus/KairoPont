@@ -128,6 +128,7 @@ export default function AdminEmployees() {
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(false);
+  const [editingAdmission, setEditingAdmission] = useState(false);
   const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), tipo: '5x2', dias_semana: [1, 2, 3, 4, 5], horarios_por_dia: Object.fromEntries([1, 2, 3, 4, 5].map((day) => [day, defaultHoursForDay(day)])) });
 
   const hasSavedSchedule = Boolean(selectedEmp?.escala_trabalho?.dias_semana?.length || (selectedEmp?.escala_trabalho?.entrada && selectedEmp?.escala_trabalho?.saida));
@@ -152,6 +153,7 @@ export default function AdminEmployees() {
       setEmployeeForm(formFromEmployee(selectedEmp));
       const savedSchedule = selectedEmp.escala_trabalho;
       setEditingSchedule(!(savedSchedule?.dias_semana?.length || (savedSchedule?.entrada && savedSchedule?.saida)));
+      setEditingAdmission(!selectedEmp.data_admissao);
     }
   }, [selectedEmp]);
 
@@ -256,6 +258,7 @@ export default function AdminEmployees() {
       const { data } = await supabase.from('funcionarios').select('*').eq('id', selectedEmp.id).maybeSingle();
       if (data) setSelectedEmp(data);
       setEditingSchedule(false);
+      setEditingAdmission(false);
     } catch (error) {
       toast.error('Não foi possível salvar: ' + error.message);
     } finally {
@@ -267,7 +270,9 @@ export default function AdminEmployees() {
     <form className="vacation-form employee-employment-form" onSubmit={onSubmit}>
       {showInviteForm && <div className="form-row"><label className="form-group">Nome completo<input className="form-input" required minLength={3} value={employeeForm.nome} onChange={(event) => setFormField('nome', event.target.value)} /></label><label className="form-group">E-mail corporativo<input className="form-input" required type="email" value={employeeForm.email} onChange={(event) => setFormField('email', event.target.value)} /></label></div>}
       {showInviteForm && <div className="form-row"><label className="form-group">CPF<input className="form-input" required inputMode="numeric" value={employeeForm.cpf} onChange={(event) => setFormField('cpf', maskCPF(event.target.value))} /></label><label className="form-group">Cargo<input className="form-input" required value={employeeForm.cargo} onChange={(event) => setFormField('cargo', event.target.value)} /></label></div>}
-      <div className="form-row"><label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>{(!hasSavedSchedule || editingSchedule || showInviteForm) && <label className="form-group">Modelo inicial<select className="form-input" value={employeeForm.tipo} onChange={(event) => setScheduleType(event.target.value)}><option value="5x2">5x2</option><option value="6x1">6x1</option><option value="personalizada">Personalizada</option></select></label>}</div>
+      {(!editingAdmission && !showInviteForm && selectedEmp?.data_admissao) && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingAdmission(true)}>Editar data de admissão</button>}
+      {(editingAdmission || showInviteForm || !selectedEmp?.data_admissao) && <label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>}
+      {(!hasSavedSchedule || editingSchedule || showInviteForm) && <label className="form-group">Modelo inicial<select className="form-input" value={employeeForm.tipo} onChange={(event) => setScheduleType(event.target.value)}><option value="5x2">5x2</option><option value="6x1">6x1</option><option value="personalizada">Personalizada</option></select></label>}
       {hasSavedSchedule && !editingSchedule && !showInviteForm ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar escala</button> : <div className="employee-day-schedule-list"><h4>Configure cada dia trabalhado</h4>{WEEKDAYS.map((dayName, index) => {
         const day = index + 1;
         const selected = employeeForm.dias_semana.includes(day);
@@ -283,7 +288,7 @@ export default function AdminEmployees() {
           </>}
         </fieldset>;
       })}</div>}
-      <button className="btn btn-primary" disabled={savingEmployment || ((editingSchedule || !hasSavedSchedule || showInviteForm) && employeeForm.dias_semana.length === 0)}>{savingEmployment ? 'Salvando…' : hasSavedSchedule && !editingSchedule && !showInviteForm ? 'Salvar data de admissão' : submitLabel}</button>
+      {(editingAdmission || editingSchedule || !hasSavedSchedule || !selectedEmp?.data_admissao || showInviteForm) && <button className="btn btn-primary" disabled={savingEmployment || ((editingSchedule || !hasSavedSchedule || showInviteForm) && employeeForm.dias_semana.length === 0)}>{savingEmployment ? 'Salvando…' : editingSchedule || !hasSavedSchedule || showInviteForm ? submitLabel : 'Salvar data de admissão'}</button>}
     </form>
   );
 

@@ -7,6 +7,7 @@ import {
   getTodayInSP, getCurrentWeekRange, getCurrentMonthRange,
 } from '../lib/utils';
 import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
+import { addKairoPdfHeader } from '../lib/pdfBranding';
 
 export default function HistoryPage() {
   const { profile } = useAuth();
@@ -76,19 +77,14 @@ export default function HistoryPage() {
 
       const doc = new jsPDF();
 
-      // Header
-      doc.setFontSize(18);
-      doc.setTextColor(27, 94, 32);
-      doc.text('KairoPont - Kairo Automações', 14, 20);
-
-      doc.setFontSize(12);
-      doc.setTextColor(100);
-      doc.text(`Relatório de Ponto - ${profile.nome}`, 14, 30);
-
       const { start, end } = getDateRange();
-      doc.setFontSize(10);
-      doc.text(`Período: ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}`, 14, 38);
-      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`, 14, 44);
+      const tableStartY = await addKairoPdfHeader(doc, {
+        title: `Relatório de Ponto - ${profile.nome}`,
+        details: [
+          `Período: ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}`,
+          `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
+        ],
+      });
 
       // Table
       const tableData = records.map(r => [
@@ -102,7 +98,7 @@ export default function HistoryPage() {
       ]);
 
       autoTable(doc, {
-        startY: 52,
+        startY: tableStartY + 3,
         head: [['Data', 'Entrada', 'Saída Almoço', 'Retorno', 'Saída', 'Total', 'Status']],
         body: tableData,
         theme: 'grid',

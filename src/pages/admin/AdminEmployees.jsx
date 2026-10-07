@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { calcDailyTotal, formatCPF, formatDate, formatDateTime, formatTime, getTodayInSP } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
+import { addKairoPdfHeader } from '../../lib/pdfBranding';
 
 const FILTERS = [
   { id: 'day', label: 'Dia' },
@@ -198,18 +199,16 @@ export default function AdminEmployees() {
     try {
       const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
       const pdf = new jsPDF();
-      pdf.setFontSize(18);
-      pdf.setTextColor(27, 94, 32);
-      pdf.text('KairoPont - Kairo Automações', 14, 20);
-      pdf.setFontSize(12);
-      pdf.setTextColor(80);
-      pdf.text(`Relatório de ponto - ${selectedEmp.nome}`, 14, 30);
-      pdf.setFontSize(10);
-      pdf.text(`CPF: ${formatCPF(selectedEmp.cpf)}`, 14, 37);
-      pdf.text(`Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`, 14, 44);
-      pdf.text(`Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`, 14, 50);
+      const tableStartY = await addKairoPdfHeader(pdf, {
+        title: `Relatório de ponto - ${selectedEmp.nome}`,
+        details: [
+          `CPF: ${formatCPF(selectedEmp.cpf)}`,
+          `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
+          `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
+        ],
+      });
       autoTable(pdf, {
-        startY: 58,
+        startY: tableStartY + 3,
         head: [['Data', 'Entrada', 'Saída almoço', 'Retorno', 'Saída', 'Total', 'Status']],
         body: records.map((record) => [
           formatDate(`${record.data}T12:00:00`), formatTime(record.entrada), formatTime(record.saida_almoco),

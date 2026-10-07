@@ -366,6 +366,23 @@ input, select, textarea {
   gap: var(--space-3);
 }
 
+.install-app-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.install-app-button > span {
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+.login-brand-content .install-app-button {
+  margin-top: var(--space-6);
+}
+
 .menu-toggle {
   display: none;
   font-size: var(--font-xl);
@@ -1654,6 +1671,7 @@ select.form-input {
   
   .login-page {
     flex-direction: column;
+    min-height: 100svh;
   }
   
   .login-brand {
@@ -1672,6 +1690,19 @@ select.form-input {
   
   .login-form-container {
     padding: var(--space-6);
+  }
+
+  .app-header {
+    gap: var(--space-3);
+    padding-inline: var(--space-4);
+  }
+
+  .app-header-title {
+    font-size: var(--font-lg);
+  }
+
+  .app-content {
+    padding: var(--space-4);
   }
   
   .page-title {
@@ -1752,6 +1783,23 @@ select.form-input {
 }
 
 @media (max-width: 480px) {
+  .app-header-title {
+    font-size: var(--font-base);
+  }
+
+  .install-app-button-compact {
+    padding: var(--space-2);
+    font-size: var(--font-xs);
+  }
+
+  .login-brand-content img {
+    max-width: min(180px, 62vw);
+  }
+
+  .login-form-container {
+    padding: var(--space-4);
+  }
+
   .stats-grid {
     grid-template-columns: 1fr;
   }

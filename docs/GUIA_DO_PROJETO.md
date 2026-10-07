@@ -11,6 +11,8 @@ KairoPont é uma aplicação web da Kairo Automações para registrar a jornada 
 
 O site está publicado e o workflow automatizado de build e publicação está ativo. O banco tem o esquema e as políticas das migrações do projeto. Em 7 de outubro de 2026 foi provisionada uma conta administrativa destinada a testes; valide os fluxos apenas com dados fictícios e revise as credenciais antes da operação real.
 
+A aplicação também pode ser instalada como PWA em navegadores compatíveis. No Android, abra o endereço HTTPS no Chrome e use **Instalar aplicativo** (no botão do sistema, quando disponível, ou no menu do navegador). O modo instalado abre em janela própria; recursos que dependem do Supabase ainda precisam de conexão. O Chrome para iOS não oferece o mesmo fluxo de instalação do Android; nesse sistema, use a opção de adicionar à tela inicial oferecida pelo navegador compatível.
+
 **O projeto ainda não está validado para operação real.** Antes de registrar jornadas da equipe, é necessário configurar os redirecionamentos do Supabase Auth, provisionar e verificar a conta inicial de administração, resolver a chamada ausente usada pelo login por CPF e reforçar a validação de arquivos no servidor.
 
 ## O que a aplicação oferece
@@ -32,6 +34,8 @@ O site está publicado e o workflow automatizado de build e publicação está a
 - O menu administrativo concentra-se no Painel Admin e em Funcionários; ponto e documentos são acessados pela ficha individual.
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em CSV ou PDF.
 - Baixar documentos individuais por links assinados temporários.
+
+Os relatórios PDF de ponto do funcionário e do administrador usam a identidade visual da Kairo no cabeçalho (logo, KairoPont e Kairo Automações). As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
 
 Operações administrativas dependem do papel armazenado no banco. O cadastro público cria novos perfis como funcionário; não há promoção de papel no frontend.
 
@@ -59,6 +63,7 @@ Operações administrativas dependem do papel armazenado no banco. O cadastro p�
 | supabase/migrations | Esquema, segurança, buckets e políticas do banco |
 | .github/workflows/pages.yml | Automação do GitHub Pages |
 | public/assets/brand | Arquivos públicos de identidade visual |
+| public/manifest.webmanifest e public/sw.js | Manifesto instalável, escopo do app e cache básico da interface |
 
 ## Registro de ponto
 

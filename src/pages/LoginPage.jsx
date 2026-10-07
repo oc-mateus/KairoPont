@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { validateCPF, maskCPF } from '../lib/utils';
 import { Spinner } from '../components/ui';
+import InstallAppButton from '../components/InstallAppButton';
 
 export default function LoginPage() {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -107,6 +108,7 @@ export default function LoginPage() {
           <img src={`${import.meta.env.BASE_URL}assets/brand/adesivo_nome_simbolo.png`} alt="Kairo Automações" />
           <h2>Controle de Ponto</h2>
           <p>Onde automação vira sistema confiável.</p>
+          <InstallAppButton />
         </div>
       </div>
 

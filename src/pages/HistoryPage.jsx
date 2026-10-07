@@ -8,6 +8,7 @@ import {
 } from '../lib/utils';
 import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
 import { addKairoPdfHeader } from '../lib/pdfBranding';
+import { downloadTimesheetXlsx } from '../lib/exportTimesheetXlsx';
 
 export default function HistoryPage() {
   const { profile } = useAuth();
@@ -18,6 +19,7 @@ export default function HistoryPage() {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const getDateRange = useCallback(() => {
     switch (filter) {
@@ -141,35 +143,22 @@ export default function HistoryPage() {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportExcel = async () => {
+    setExportingExcel(true);
     try {
-      const headers = ['Data', 'Entrada', 'Saída Almoço', 'Retorno Almoço', 'Saída', 'Total Trabalhado', 'Status'];
-      const rows = records.map(r => [
-        formatDate(r.data + 'T00:00:00'),
-        formatTime(r.entrada),
-        formatTime(r.saida_almoco),
-        formatTime(r.retorno_almoco),
-        formatTime(r.saida),
-        calcDailyTotal(r),
-        r.saida ? 'Completo' : 'Incompleto',
-      ]);
-
-      const csvContent = [headers, ...rows]
-        .map(row => row.map(cell => `"${cell}"`).join(','))
-        .join('\n');
-
-      // BOM for UTF-8
-      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
       const { start, end } = getDateRange();
-      link.download = `ponto_${profile.nome.replace(/\s+/g, '_')}_${start}_${end}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success('CSV exportado com sucesso!');
+      await downloadTimesheetXlsx({
+        records,
+        title: `Histórico de ponto - ${profile.nome}`,
+        period: `Período: ${formatDate(`${start}T12:00:00`)} a ${formatDate(`${end}T12:00:00`)}`,
+        filename: `ponto_${profile.nome.replace(/\s+/g, '_')}_${start}_${end}.xlsx`,
+        calcDailyTotal,
+      });
+      toast.success('Planilha Excel exportada com sucesso!');
     } catch (err) {
-      toast.error('Erro ao exportar CSV: ' + err.message);
+      toast.error('Erro ao exportar Excel: ' + err.message);
+    } finally {
+      setExportingExcel(false);
     }
   };
 
@@ -234,8 +223,8 @@ export default function HistoryPage() {
           <p className="page-subtitle">Consulte seus registros de ponto</p>
         </div>
         <div className="page-header-actions">
-          <button className="btn btn-secondary btn-sm" onClick={handleExportCSV} disabled={records.length === 0}>
-            📊 CSV
+          <button className="btn btn-secondary btn-sm" onClick={handleExportExcel} disabled={records.length === 0 || exportingExcel}>
+            {exportingExcel ? <Spinner /> : '📊 Excel'}
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleExportMarkdown} disabled={records.length === 0}>
             📝 Markdown

@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { calcDailyTotal, formatCPF, formatDate, formatDateTime, formatTime, getTodayInSP } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
+import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
 
 const FILTERS = [
   { id: 'day', label: 'Dia' },
@@ -37,22 +38,6 @@ function getCurrentWeekRangeForDate(dateValue) {
   sunday.setDate(monday.getDate() + 6);
   const asIsoDate = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
   return { start: asIsoDate(monday), end: asIsoDate(sunday) };
-}
-
-function csvCell(value) {
-  return `"${String(value ?? '').replaceAll('"', '""')}"`;
-}
-
-function downloadCsv(filename, rows) {
-  const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(';')).join('\r\n')}`;
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
 }
 
 async function fetchAllRows(buildQuery) {
@@ -89,6 +74,7 @@ export default function AdminEmployees() {
   const [actionEmployee, setActionEmployee] = useState(null);
   const [downloadingDocument, setDownloadingDocument] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -183,14 +169,23 @@ export default function AdminEmployees() {
     }
   };
 
-  const downloadEmployeeRecords = () => {
+  const downloadEmployeeRecordsExcel = async () => {
     if (!records.length) return toast.error('Não há registros para baixar neste período.');
-    const headers = ['Data', 'Entrada', 'Saída almoço', 'Retorno almoço', 'Saída', 'Total trabalhado', 'Status'];
-    const rows = records.map((record) => [
-      formatDate(`${record.data}T12:00:00`), formatTime(record.entrada), formatTime(record.saida_almoco),
-      formatTime(record.retorno_almoco), formatTime(record.saida), calcDailyTotal(record), record.saida ? 'Completo' : 'Incompleto',
-    ]);
-    downloadCsv(`ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.csv`, [headers, ...rows]);
+    setExportingExcel(true);
+    try {
+      await downloadTimesheetXlsx({
+        records,
+        title: `Registro de ponto - ${selectedEmp.nome}`,
+        period: `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
+        filename: `ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.xlsx`,
+        calcDailyTotal,
+      });
+      toast.success('Planilha Excel baixada.');
+    } catch (error) {
+      toast.error('Erro ao gerar planilha Excel: ' + error.message);
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   const downloadEmployeeRecordsPdf = async () => {
@@ -300,7 +295,7 @@ export default function AdminEmployees() {
           </section>
 
           <section className="employee-records-section">
-            <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecords} disabled={detailLoading || !records.length}>Baixar CSV</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>
+            <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecordsExcel} disabled={detailLoading || !records.length || exportingExcel}>{exportingExcel ? 'Gerando Excel…' : 'Baixar Excel'}</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>
           <div className="employee-record-filters">
               <div className="filter-chips">{FILTERS.map((item) => <button key={item.id} className={`filter-chip ${filter === item.id ? 'active' : ''}`} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
               {filter === 'day' && <label className="employee-date-filter">Dia<input className="form-input" type="date" value={selectedDay} onChange={(event) => setSelectedDay(event.target.value)} /></label>}

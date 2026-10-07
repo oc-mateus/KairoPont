@@ -22,7 +22,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Entrar com e-mail e senha.
 - Cadastrar uma conta com nome, e-mail, CPF, cargo e senha.
 - Registrar quatro etapas de jornada na ordem: entrada, saída para almoço, retorno do almoço e saída.
-- Consultar o próprio histórico e exportá-lo para PDF, CSV ou Markdown.
+- Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
 - Enviar atestado médico ou declaração de horas e baixar documentos autorizados.
 - Atualizar dados básicos do perfil e a foto.
 
@@ -32,10 +32,10 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Gerenciar perfis e status de funcionários.
 - Selecionar um funcionário para consultar nome completo, CPF, cargo, registros de ponto e documentos enviados, incluindo data e tipo.
 - O menu administrativo concentra-se no Painel Admin e em Funcionários; ponto e documentos são acessados pela ficha individual.
-- Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em CSV ou PDF.
+- Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
 
-Os relatórios PDF de ponto do funcionário e do administrador usam um lockup próprio do KairoPont no cabeçalho, com símbolo de ponto e marcação nas cores da Kairo. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
+Os relatórios PDF de ponto do funcionário e do administrador exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
 
 Operações administrativas dependem do papel armazenado no banco. O cadastro público cria novos perfis como funcionário; não há promoção de papel no frontend.
 

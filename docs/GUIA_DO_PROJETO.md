@@ -13,7 +13,7 @@ O site está publicado e o workflow automatizado de build e publicação está a
 
 A aplicação também pode ser instalada como PWA em navegadores compatíveis. No Android, abra o endereço HTTPS no Chrome e use **Instalar aplicativo** (no botão do sistema, quando disponível, ou no menu do navegador). O modo instalado abre em janela própria; recursos que dependem do Supabase ainda precisam de conexão. O Chrome para iOS não oferece o mesmo fluxo de instalação do Android; nesse sistema, use a opção de adicionar à tela inicial oferecida pelo navegador compatível.
 
-**O projeto ainda não está validado para operação real.** Antes de registrar jornadas da equipe, é necessário configurar os redirecionamentos do Supabase Auth, provisionar e verificar a conta inicial de administração, resolver a chamada ausente usada pelo login por CPF e reforçar a validação de arquivos no servidor.
+**O projeto ainda não está validado para operação real.** Antes de registrar jornadas da equipe, é necessário configurar os redirecionamentos do Supabase Auth, provisionar e verificar a conta inicial de administração e reforçar a validação de arquivos no servidor. O acesso é feito com e-mail corporativo e senha; o CPF continua sendo usado no cadastro e na identificação do funcionário.
 
 ## O que a aplicação oferece
 
@@ -149,10 +149,9 @@ As verificações abaixo foram feitas em 6 de outubro de 2026. Reconfirme o esta
 1. **Configurar Auth:** definir a URL do site no Supabase Auth como https://oc-mateus.github.io/KairoPont/ e adicionar o retorno exato à lista permitida. A configuração não foi confirmada no painel.
 2. **Revisar a administração de teste:** uma conta administrativa de teste foi provisionada em 7 de outubro de 2026. Troque ou remova suas credenciais antes de usar a aplicação com dados reais.
 3. **Revisar cadastro público:** a tela permite auto cadastro e o gatilho cria perfis de funcionário. Definir se o acesso será aberto, restrito ou precedido por convite antes de divulgar o endereço aos funcionários.
-4. **Corrigir login por CPF:** o frontend chama a função RPC get_email_by_cpf, mas ela não consta nas migrações nem nas funções atualmente instaladas. Até implementá-la e revisá-la com proteção contra enumeração de contas, use o login por e-mail.
-5. **Impor validação no Storage:** configurar no bucket privado o limite máximo e os MIME types adequados no servidor, além da validação existente no frontend.
-6. **Evitar arquivos órfãos:** se o insert dos metadados falhar, remover o objeto enviado ou disponibilizar um processo administrativo de reconciliação.
-7. **Validar sem dados reais:** testar cadastro, confirmação, login, isolamento entre dois usuários fictícios, envio de arquivo descartável, link assinado e fluxo admin antes da ativação.
+4. **Impor validação no Storage:** configurar no bucket privado o limite máximo e os MIME types adequados no servidor, além da validação existente no frontend.
+5. **Evitar arquivos órfãos:** se o insert dos metadados falhar, remover o objeto enviado ou disponibilizar um processo administrativo de reconciliação.
+6. **Validar sem dados reais:** testar cadastro, confirmação, login, isolamento entre dois usuários fictícios, envio de arquivo descartável, link assinado e fluxo admin antes da ativação.
 
 ## Operação e suporte
 

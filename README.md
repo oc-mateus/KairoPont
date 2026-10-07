@@ -42,7 +42,7 @@ O cadastro cria perfis de funcionário. A atribuição do papel de administrador
 - As políticas RLS limitam funcionários aos próprios dados; ações administrativas exigem perfil de administrador.
 - O bucket `documentos` é privado. O bucket de fotos de perfil é público para exibir avatares.
 - A tela valida formato e tamanho de arquivo, mas essas restrições ainda precisam ser configuradas no próprio Storage para serem impostas no servidor.
-- O login deve ser usado por e-mail até a integração de login por CPF ser concluída.
+- O acesso é feito com e-mail corporativo e senha. O CPF é solicitado no cadastro e usado para identificar o funcionário, não para entrar.
 
 O site está publicado. Antes do uso operacional, ainda é necessário concluir a configuração de redirecionamento do Auth, provisionar a conta administrativa e reforçar a validação de arquivos no Storage.
 

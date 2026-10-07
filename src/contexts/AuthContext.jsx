@@ -73,20 +73,6 @@ export function AuthProvider({ children }) {
     return data;
   }
 
-  async function signInWithCPF(cpf, password) {
-    // Busca o e-mail associado ao CPF via função RPC segura
-    const cleanCPF = cpf.replace(/\D/g, '');
-    const { data, error: rpcError } = await supabase.rpc('get_email_by_cpf', {
-      p_cpf: cleanCPF,
-    });
-
-    if (rpcError || !data) {
-      throw new Error('CPF não encontrado ou inválido.');
-    }
-
-    return signInWithEmail(data, password);
-  }
-
   async function signUp({ email, password, nome, cpf, cargo }) {
     // Primeiro cria o usuário no Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -126,7 +112,6 @@ export function AuthProvider({ children }) {
     isAdmin: profile?.role === 'admin',
     isActive: profile?.ativo === true,
     signInWithEmail,
-    signInWithCPF,
     signUp,
     signOut,
     refreshProfile,

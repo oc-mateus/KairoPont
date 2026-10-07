@@ -8,15 +8,13 @@ import InstallAppButton from '../components/InstallAppButton';
 
 export default function LoginPage() {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [loginType, setLoginType] = useState('email'); // 'email' | 'cpf'
   const [loading, setLoading] = useState(false);
-  const { signInWithEmail, signInWithCPF, signUp } = useAuth();
+  const { signInWithEmail, signUp } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
-  const [loginCPF, setLoginCPF] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
   // Register form state
@@ -31,24 +29,11 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (loginType === 'email') {
-        if (!loginEmail || !loginPassword) {
-          toast.warning('Preencha todos os campos.');
-          return;
-        }
-        await signInWithEmail(loginEmail, loginPassword);
-      } else {
-        const cleanCPF = loginCPF.replace(/\D/g, '');
-        if (!validateCPF(cleanCPF)) {
-          toast.error('CPF inválido.');
-          return;
-        }
-        if (!loginPassword) {
-          toast.warning('Preencha a senha.');
-          return;
-        }
-        await signInWithCPF(loginCPF, loginPassword);
+      if (!loginEmail || !loginPassword) {
+        toast.warning('Preencha todos os campos.');
+        return;
       }
+      await signInWithEmail(loginEmail, loginPassword);
       toast.success('Login realizado com sucesso!');
       navigate('/ponto');
     } catch (err) {
@@ -121,52 +106,20 @@ export default function LoginPage() {
               Acesse sua conta para registrar o ponto
             </p>
 
-            {/* Tabs Email/CPF */}
-            <div className="login-tabs">
-              <button
-                className={`login-tab ${loginType === 'email' ? 'active' : ''}`}
-                onClick={() => setLoginType('email')}
-              >
-                E-mail
-              </button>
-              <button
-                className={`login-tab ${loginType === 'cpf' ? 'active' : ''}`}
-                onClick={() => setLoginType('cpf')}
-              >
-                CPF
-              </button>
-            </div>
-
             <form onSubmit={handleLogin}>
-              {loginType === 'email' ? (
-                <div className="form-group">
-                  <label className="form-label" htmlFor="login-email">E-mail corporativo</label>
-                  <input
-                    id="login-email"
-                    type="email"
-                    className="form-input"
-                    placeholder="seu.nome@kairoautomacoes.com.br"
-                    value={loginEmail}
-                    onChange={e => setLoginEmail(e.target.value)}
-                    disabled={loading}
-                    autoComplete="email"
-                  />
-                </div>
-              ) : (
-                <div className="form-group">
-                  <label className="form-label" htmlFor="login-cpf">CPF</label>
-                  <input
-                    id="login-cpf"
-                    type="text"
-                    className="form-input"
-                    placeholder="000.000.000-00"
-                    value={loginCPF}
-                    onChange={e => setLoginCPF(maskCPF(e.target.value))}
-                    disabled={loading}
-                    inputMode="numeric"
-                  />
-                </div>
-              )}
+              <div className="form-group">
+                <label className="form-label" htmlFor="login-email">E-mail corporativo</label>
+                <input
+                  id="login-email"
+                  type="email"
+                  className="form-input"
+                  placeholder="seu.nome@kairoautomacoes.com.br"
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  disabled={loading}
+                  autoComplete="email"
+                />
+              </div>
 
               <div className="form-group">
                 <label className="form-label" htmlFor="login-password">Senha</label>

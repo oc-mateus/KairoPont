@@ -1,6 +1,6 @@
 export const WORK_SHIFTS = {
   turno1: { id: 'turno1', label: '1º turno', start: '08:00', end: '17:00', lunchOut: '12:00', lunchReturn: '13:00' },
-  turno2: { id: 'turno2', label: '2º turno', start: '14:00', end: '22:45' },
+  turno2: { id: 'turno2', label: '2º turno', start: '14:00', end: '22:45', lunchOut: '19:30', lunchReturn: '20:30' },
   turno3: { id: 'turno3', label: '3º turno', start: '22:45', end: '06:15', overnight: true },
 };
 

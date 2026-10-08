@@ -31,7 +31,7 @@ function makeSchedule(value: unknown) {
   const id = String(submitted.turno_id || "");
   const shifts: Record<string, { start: string; end: string; lunchOut?: string; lunchReturn?: string }> = {
     turno1: { start: "08:00", end: "17:00", lunchOut: "12:00", lunchReturn: "13:00" },
-    turno2: { start: "14:00", end: "22:45" },
+    turno2: { start: "14:00", end: "22:45", lunchOut: "19:30", lunchReturn: "20:30" },
     turno3: { start: "22:45", end: "06:15" },
   };
   const shift = shifts[id];

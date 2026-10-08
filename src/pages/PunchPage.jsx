@@ -25,7 +25,7 @@ function getDailyPunchSteps(schedule, record) {
   const date = record?.data || getTodayInSP();
   const day = new Date(`${date}T12:00:00`).getDay() || 7;
   const shiftId = inferShiftForRecord(record, schedule.turno_id || schedule.tipo);
-  return shiftId === 'turno1' && day >= 1 && day <= 5
+  return ['turno1', 'turno2'].includes(shiftId) && day >= 1 && day <= 5
     ? PUNCH_STEPS
     : PUNCH_STEPS.filter((step) => !['saida_almoco', 'retorno_almoco'].includes(step.field));
 }

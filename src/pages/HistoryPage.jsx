@@ -242,7 +242,7 @@ export default function HistoryPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h2 className="page-title">Meu Histórico</h2>
-          <p className="page-subtitle">Consulte seus registros. O trabalho entre 22h e 5h é computado em horas noturnas de 52min30s.</p>
+          <p className="page-subtitle">Consulte seus registros de ponto</p>
         </div>
         <div className="page-header-actions">
           <button className="btn btn-secondary btn-sm" onClick={handleExportExcel} disabled={records.length === 0 || exportingExcel}>

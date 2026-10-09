@@ -17,7 +17,7 @@ export function WorkScheduleSummary({ schedule }) {
         const hours = visibleSchedule.horarios_por_dia?.[String(weekday)] || visibleSchedule;
         const hasLunch = hours.saida_almoco && hours.retorno_almoco;
         return <div className={`work-schedule-row ${works ? 'scheduled' : 'day-off'}`} key={day}>
-          <strong>{day}</strong><span>{works ? hours.entrada || '—' : 'Folga'}</span><span>{works ? hasLunch ? hours.saida_almoco : 'Sem intervalo' : '—'}</span><span>{works && hasLunch ? hours.retorno_almoco : '—'}</span><span>{works ? hours.saida || '—' : '—'}{works && shiftId === 'turno3' && weekday <= 5 ? ' (dia seguinte)' : ''}</span>
+          <strong>{day}</strong><span>{works ? hours.entrada || '—' : 'Folga'}</span><span>{works ? hasLunch ? hours.saida_almoco : 'Sem intervalo' : '—'}</span><span>{works && hasLunch ? hours.retorno_almoco : '—'}</span><span>{works ? hours.saida || '—' : '—'}{works && shiftId === 'turno3' && weekday <= 6 ? ' (dia seguinte)' : ''}</span>
         </div>;
       })}
     </div>
@@ -27,7 +27,7 @@ export function WorkScheduleSummary({ schedule }) {
 export default function WorkScheduleCard({ schedule, admissionDate, compact = false }) {
   return <section className={`work-schedule-card ${compact ? 'compact' : ''}`}>
     <div className="work-schedule-heading">
-      <div><h3>Turno habitual</h3><p>{getAssignedShiftId(schedule) ? getShiftLabel(getAssignedShiftId(schedule)) : 'Turno ainda não informado'}</p></div>
+      <div><h3>Turno habitual</h3><p>{getAssignedShiftId(schedule) ? getShiftLabel(getAssignedShiftId(schedule)) : 'Turno ainda não informado'}</p>{getAssignedShiftId(schedule) && <p>Jornada semanal prevista: 44h</p>}</div>
       {admissionDate && <span className="work-schedule-admission">Admissão: {new Date(`${admissionDate}T12:00:00`).toLocaleDateString('pt-BR')}</span>}
     </div>
     <WorkScheduleSummary schedule={schedule} />

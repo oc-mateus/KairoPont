@@ -95,10 +95,8 @@ function getScheduleComparison(record, schedule) {
   const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
   if (!schedule.dias_semana.includes(weekday)) return { expected: 'Folga', balance: record.saida ? 'Extra' : '—' };
   const actualShiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada);
-  const shiftDay = weekday !== 6 && actualShiftId ? makeEmployeeSchedule(actualShiftId).horarios_por_dia[String(weekday)] : null;
-  const daily = weekday === 6
-    ? { entrada: '08:00', saida: '12:00' }
-    : shiftDay || schedule.horarios_por_dia?.[String(weekday)] || schedule;
+  const shiftDay = actualShiftId ? makeEmployeeSchedule(actualShiftId).horarios_por_dia[String(weekday)] : null;
+  const daily = shiftDay || schedule.horarios_por_dia?.[String(weekday)] || schedule;
   const entry = timeMinutes(daily.entrada);
   const lunchOut = timeMinutes(daily.saida_almoco);
   const lunchIn = timeMinutes(daily.retorno_almoco);
@@ -535,7 +533,7 @@ export default function AdminEmployees() {
             </div>
           </section>
 
-          <section className="employee-records-section"><h3>Data de admissão e turno habitual</h3><p className="page-subtitle">Os horários são preenchidos automaticamente pelo turno escolhido. Todos trabalham aos sábados das 08:00 às 12:00, sem intervalo.</p>{employmentForm(saveEmployment, 'Salvar dados trabalhistas')}</section>
+          <section className="employee-records-section"><h3>Data de admissão e turno habitual</h3><p className="page-subtitle">Os horários são preenchidos automaticamente pelo turno escolhido.</p>{employmentForm(saveEmployment, 'Salvar dados trabalhistas')}</section>
           <WorkScheduleCard schedule={selectedEmp.escala_trabalho} admissionDate={selectedEmp.data_admissao} />
 
           <section className="employee-records-section employee-vacation-section">

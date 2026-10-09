@@ -45,7 +45,17 @@ function makeSchedule(value: unknown) {
       saida: shift.end,
     };
   }
-  horarios_por_dia["6"] = { entrada: "08:00", saida_almoco: null, retorno_almoco: null, saida: "12:00" };
+  const saturdayHours: Record<string, { start: string; end: string }> = {
+    turno1: { start: "08:00", end: "12:00" },
+    turno2: { start: "14:30", end: "18:30" },
+    turno3: { start: "22:45", end: "00:32" },
+  };
+  horarios_por_dia["6"] = {
+    entrada: saturdayHours[id].start,
+    saida_almoco: null,
+    retorno_almoco: null,
+    saida: saturdayHours[id].end,
+  };
   return { tipo: id, turno_id: id, dias_semana: [1, 2, 3, 4, 5, 6], horarios_por_dia };
 }
 

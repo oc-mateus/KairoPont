@@ -27,7 +27,7 @@ export function formatTime(timeString) {
       second: '2-digit',
     });
   }
-  return timeString; // "08:00:00"
+  return timeString.replace(/^(\d{1,2}:\d{2}:\d{2})\.\d+$/, '$1'); // "08:00:00"
 }
 
 /**

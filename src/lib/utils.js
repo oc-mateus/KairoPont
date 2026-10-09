@@ -140,6 +140,14 @@ export function calcNightAdjustedMilliseconds(startDate, startTime, endDate, end
   return (end - start - reducedNightMs) + (reducedNightMs * 8 / 7);
 }
 
+export function formatMinutesAsHours(totalMinutes) {
+  if (!Number.isFinite(totalMinutes)) return '—';
+  const roundedMinutes = Math.round(Math.abs(totalMinutes));
+  const hours = Math.floor(roundedMinutes / 60);
+  const minutes = roundedMinutes % 60;
+  return `${hours}h ${String(minutes).padStart(2, '0')}min`;
+}
+
 /**
  * Calcula o total trabalhado no dia (entrada-almoço + retorno-saída)
  */
@@ -160,10 +168,8 @@ export function calcDailyTotal(record) {
   }
   
   if (totalMs === 0) return '—';
-  
-  const hours = Math.floor(totalMs / 3600000);
-  const minutes = Math.floor((totalMs % 3600000) / 60000);
-  return `${hours}h ${String(minutes).padStart(2, '0')}min`;
+
+  return formatMinutesAsHours(totalMs / 60000);
 }
 
 /**

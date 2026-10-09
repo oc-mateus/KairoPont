@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import { calcDailyTotal, calcNightAdjustedMilliseconds, formatCPF, formatDate, formatDateTime, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
+import { calcDailyTotal, calcNightAdjustedMilliseconds, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
@@ -83,9 +83,9 @@ function timeMinutes(value) {
 
 function durationLabel(minutes) {
   if (minutes == null) return '—';
-  const sign = minutes < 0 ? '−' : '+';
-  const absolute = Math.abs(minutes);
-  return `${sign}${Math.floor(absolute / 60)}h ${String(absolute % 60).padStart(2, '0')}min`;
+  const roundedMinutes = Math.round(minutes);
+  const sign = roundedMinutes < 0 ? '−' : '+';
+  return `${sign}${formatMinutesAsHours(roundedMinutes)}`;
 }
 
 function getScheduleComparison(record, schedule) {
@@ -120,7 +120,7 @@ function getScheduleComparison(record, schedule) {
     if (record.retorno_almoco && record.saida) actualMs += calcNightAdjustedMilliseconds(record.data, record.retorno_almoco, record.saida_data || record.data, record.saida);
   }
   const actualMinutes = actualEntry != null && actualExit != null ? actualMs / 60000 : null;
-  const expected = expectedMinutes == null ? '—' : `${Math.floor(expectedMinutes / 60)}h ${String(expectedMinutes % 60).padStart(2, '0')}min`;
+  const expected = expectedMinutes == null ? '—' : formatMinutesAsHours(expectedMinutes);
   return { expected, balance: durationLabel(actualMinutes == null || expectedMinutes == null ? null : actualMinutes - expectedMinutes) };
 }
 

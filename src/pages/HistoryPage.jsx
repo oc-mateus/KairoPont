@@ -119,7 +119,7 @@ export default function HistoryPage() {
 
       autoTable(doc, {
         startY: doc.lastAutoTable.finalY + 5,
-        head: [['Data', 'Entrada', 'Turno', 'Saída Almoço', 'Retorno', 'Saída', 'Total', 'Status']],
+        head: [['Data', 'Entrada', 'Turno', 'Saída Almoço', 'Retorno', 'Saída', 'Horas computadas', 'Status']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -191,7 +191,7 @@ export default function HistoryPage() {
       md += `**Funcionário:** ${profile.nome}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n`;
       md += `**Gerado em:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`;
-      md += `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Total | Status |\n`;
+      md += `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Horas computadas | Status |\n`;
       md += `|------|---------|-------|-------------|---------|-------|-------|--------|\n`;
 
       records.forEach(r => {
@@ -216,7 +216,7 @@ export default function HistoryPage() {
       const { start, end } = getDateRange();
       let md = `## Relatório de Ponto - ${profile.nome}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n\n`;
-      md += `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Total | Status |\n`;
+      md += `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Horas computadas | Status |\n`;
       md += `|---|---|---|---|---|---|---|---|\n`;
 
       records.forEach(r => {
@@ -242,7 +242,7 @@ export default function HistoryPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h2 className="page-title">Meu Histórico</h2>
-          <p className="page-subtitle">Consulte seus registros de ponto</p>
+          <p className="page-subtitle">Consulte seus registros. O trabalho entre 22h e 5h é computado em horas noturnas de 52min30s.</p>
         </div>
         <div className="page-header-actions">
           <button className="btn btn-secondary btn-sm" onClick={handleExportExcel} disabled={records.length === 0 || exportingExcel}>
@@ -313,7 +313,7 @@ export default function HistoryPage() {
                   <th>Saída Almoço</th>
                   <th>Retorno</th>
                   <th>Saída</th>
-                  <th>Total</th>
+                  <th>Horas computadas</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -367,7 +367,7 @@ export default function HistoryPage() {
                   <span className="table-card-value">{formatTime(r.saida)}{r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}</span>
                 </div>
                 <div className="table-card-row">
-                  <span className="table-card-label">Total</span>
+                  <span className="table-card-label">Horas computadas</span>
                   <span className="table-card-value"><strong>{calcDailyTotal(r)}</strong></span>
                 </div>
                 <div className="table-card-row">

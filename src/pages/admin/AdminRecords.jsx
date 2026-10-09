@@ -35,7 +35,7 @@ export default function AdminRecords() {
     <div>
       <div className="page-header">
         <h2 className="page-title">Registros de Ponto</h2>
-        <p className="page-subtitle">Últimos 100 registros de todos os funcionários.</p>
+        <p className="page-subtitle">Últimos 100 registros. Trabalho entre 22h e 5h é computado em horas noturnas de 52min30s.</p>
       </div>
 
       {loading ? (
@@ -51,7 +51,7 @@ export default function AdminRecords() {
                 <th>Saída Almoço</th>
                 <th>Retorno Almoço</th>
                 <th>Saída</th>
-                <th>Total</th>
+                <th>Horas computadas</th>
                 <th>Status</th>
               </tr>
             </thead>

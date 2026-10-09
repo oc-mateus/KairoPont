@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import { calcDailyTotal, formatCPF, formatDate, formatDateTime, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
+import { calcDailyTotal, calcNightAdjustedMilliseconds, formatCPF, formatDate, formatDateTime, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
@@ -101,14 +101,25 @@ function getScheduleComparison(record, schedule) {
   const lunchOut = timeMinutes(daily.saida_almoco);
   const lunchIn = timeMinutes(daily.retorno_almoco);
   const exit = timeMinutes(daily.saida);
-  let expectedMinutes = entry != null && exit != null ? (lunchOut != null && lunchIn != null ? (lunchOut - entry) + (exit - lunchIn) : exit - entry) : null;
-  if (expectedMinutes != null && expectedMinutes < 0) expectedMinutes += 24 * 60;
+  const expectedExitDate = entry != null && exit != null && exit <= entry ? addIsoDays(record.data, 1) : record.data;
+  let expectedMs = null;
+  if (entry != null && exit != null) {
+    expectedMs = 0;
+    if (lunchOut != null) expectedMs += calcNightAdjustedMilliseconds(record.data, daily.entrada, record.data, daily.saida_almoco);
+    if (lunchOut == null) expectedMs += calcNightAdjustedMilliseconds(record.data, daily.entrada, expectedExitDate, daily.saida);
+    if (lunchIn != null) expectedMs += calcNightAdjustedMilliseconds(record.data, daily.retorno_almoco, expectedExitDate, daily.saida);
+  }
+  const expectedMinutes = expectedMs == null ? null : expectedMs / 60000;
   const actualEntry = timeMinutes(record.entrada);
-  const actualLunchOut = timeMinutes(record.saida_almoco);
-  const actualLunchIn = timeMinutes(record.retorno_almoco);
   const actualExit = timeMinutes(record.saida);
-  let actualMinutes = actualEntry != null && actualExit != null ? (actualLunchOut != null && actualLunchIn != null ? (actualLunchOut - actualEntry) + (actualExit - actualLunchIn) : actualExit - actualEntry) : null;
-  if (actualMinutes != null && actualMinutes < 0 && (record.saida_data > record.data || record.turno_trabalhado === 'turno3')) actualMinutes += 24 * 60;
+  let actualMs = 0;
+  if (record.entrada && record.saida && !record.saida_almoco && !record.retorno_almoco) {
+    actualMs += calcNightAdjustedMilliseconds(record.data, record.entrada, record.saida_data || record.data, record.saida);
+  } else {
+    if (record.entrada && record.saida_almoco) actualMs += calcNightAdjustedMilliseconds(record.data, record.entrada, record.data, record.saida_almoco);
+    if (record.retorno_almoco && record.saida) actualMs += calcNightAdjustedMilliseconds(record.data, record.retorno_almoco, record.saida_data || record.data, record.saida);
+  }
+  const actualMinutes = actualEntry != null && actualExit != null ? actualMs / 60000 : null;
   const expected = expectedMinutes == null ? '—' : `${Math.floor(expectedMinutes / 60)}h ${String(expectedMinutes % 60).padStart(2, '0')}min`;
   return { expected, balance: durationLabel(actualMinutes == null || expectedMinutes == null ? null : actualMinutes - expectedMinutes) };
 }
@@ -425,7 +436,7 @@ export default function AdminEmployees() {
       });
       autoTable(pdf, {
         startY: pdf.lastAutoTable.finalY + 5,
-        head: [['Data', 'Entrada', 'Turno', 'Saída almoço', 'Retorno', 'Saída', 'Saída em', 'Total', 'Previsto', 'Saldo', 'Status']],
+        head: [['Data', 'Entrada', 'Turno', 'Saída almoço', 'Retorno', 'Saída', 'Saída em', 'Horas computadas', 'Previsto', 'Saldo', 'Status']],
         body: records.map((record) => [
           formatDate(`${record.data}T12:00:00`), formatTime(record.entrada), getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), formatTime(record.saida_almoco),
           formatTime(record.retorno_almoco), formatTime(record.saida), record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia', calcDailyTotal(record), getScheduleComparison(record, selectedEmp.escala_trabalho).expected,
@@ -546,7 +557,7 @@ export default function AdminEmployees() {
           </section>
 
           <section className="employee-records-section">
-            <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecordsExcel} disabled={detailLoading || !records.length || exportingExcel}>{exportingExcel ? 'Gerando Excel…' : 'Baixar Excel'}</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>
+            <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'} · Trabalho entre 22h e 5h é computado em horas noturnas de 52min30s.</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecordsExcel} disabled={detailLoading || !records.length || exportingExcel}>{exportingExcel ? 'Gerando Excel…' : 'Baixar Excel'}</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>
           <div className="employee-record-filters">
               <div className="filter-chips">{FILTERS.map((item) => <button key={item.id} className={`filter-chip ${filter === item.id ? 'active' : ''}`} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
               {filter === 'day' && <label className="employee-date-filter">Dia<input className="form-input" type="date" value={selectedDay} onChange={(event) => setSelectedDay(event.target.value)} /></label>}
@@ -566,7 +577,7 @@ export default function AdminEmployees() {
                   </div>
                   <div className="employee-punch-edit-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingPunchId(null)} disabled={savingPunch}>Cancelar</button><button className="btn btn-primary btn-sm" disabled={savingPunch}>{savingPunch ? 'Salvando…' : 'Salvar horários'}</button></div>
                 </form>}
-                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th><th>Turno do dia</th><th>Saída almoço</th><th>Retorno almoço</th><th>Saída</th><th>Total</th><th>Previsto</th><th>Saldo</th><th>Status</th><th>Ajuste</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.escala_trabalho); const editable = canEditPunch(record); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td><td>{getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada))}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td><td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{calcDailyTotal(record)}</strong></td><td>{comparison.expected}</td><td>{comparison.balance}</td><td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td>{editable ? <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Editar horários</button> : <span className="employee-punch-locked" title="Prazo de 96 horas após a criação encerrado">Prazo encerrado</span>}</td></tr>; })}</tbody></table></div>
+                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th><th>Turno do dia</th><th>Saída almoço</th><th>Retorno almoço</th><th>Saída</th><th>Horas computadas</th><th>Previsto</th><th>Saldo</th><th>Status</th><th>Ajuste</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.escala_trabalho); const editable = canEditPunch(record); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td><td>{getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada))}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td><td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{calcDailyTotal(record)}</strong></td><td>{comparison.expected}</td><td>{comparison.balance}</td><td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td>{editable ? <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Editar horários</button> : <span className="employee-punch-locked" title="Prazo de 96 horas após a criação encerrado">Prazo encerrado</span>}</td></tr>; })}</tbody></table></div>
               </>
             ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
           </section>

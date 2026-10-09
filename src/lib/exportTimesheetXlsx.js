@@ -61,7 +61,7 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
   sheet.getRow(3).font = { name: 'Aptos', size: 9, color: { argb: 'FF66746B' }, italic: true };
   sheet.getRow(3).alignment = { vertical: 'middle', indent: 1 };
 
-  const headers = ['Data', 'Entrada', 'Saída almoço', 'Retorno almoço', 'Saída', 'Total trabalhado', 'Status', ...extraColumns.map((column) => column.header)];
+  const headers = ['Data', 'Entrada', 'Saída almoço', 'Retorno almoço', 'Saída', 'Horas computadas', 'Status', ...extraColumns.map((column) => column.header)];
   const header = sheet.addRow(headers);
   header.height = 26;
   header.eachCell((cell) => {

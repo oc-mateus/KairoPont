@@ -107,37 +107,56 @@ export function calcDuration(startISO, endISO) {
   return `${hours}h ${String(minutes).padStart(2, '0')}min`;
 }
 
+function toUtcTimestamp(dateValue, timeValue) {
+  if (!dateValue || !timeValue) return null;
+  const [year, month, day] = String(dateValue).slice(0, 10).split('-').map(Number);
+  const [hour, minute, secondValue = '0'] = String(timeValue).split(':');
+  const seconds = Number(secondValue);
+  if (![year, month, day, Number(hour), Number(minute), seconds].every(Number.isFinite)) return null;
+  const wholeSeconds = Math.floor(seconds);
+  const milliseconds = Math.round((seconds - wholeSeconds) * 1000);
+  return Date.UTC(year, month - 1, day, Number(hour), Number(minute), wholeSeconds, milliseconds);
+}
+
+/** Returns elapsed time with work between 22:00 and 05:00 counted as 52m30s per hour. */
+export function calcNightAdjustedMilliseconds(startDate, startTime, endDate, endTime) {
+  const start = toUtcTimestamp(startDate, startTime);
+  const end = toUtcTimestamp(endDate, endTime);
+  if (start == null || end == null || end <= start) return 0;
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const nightStartOffset = 22 * 60 * 60 * 1000;
+  const nightEndOffset = 5 * 60 * 60 * 1000;
+  let reducedNightMs = 0;
+  const firstDay = Math.floor(start / dayMs) * dayMs - dayMs;
+  const lastDay = Math.floor(end / dayMs) * dayMs;
+
+  for (let dayStart = firstDay; dayStart <= lastDay; dayStart += dayMs) {
+    const nightStart = dayStart + nightStartOffset;
+    const nightEnd = dayStart + dayMs + nightEndOffset;
+    reducedNightMs += Math.max(0, Math.min(end, nightEnd) - Math.max(start, nightStart));
+  }
+
+  return (end - start - reducedNightMs) + (reducedNightMs * 8 / 7);
+}
+
 /**
  * Calcula o total trabalhado no dia (entrada-almoço + retorno-saída)
  */
 export function calcDailyTotal(record) {
   if (!record) return '—';
   let totalMs = 0;
-  
-  const baseDate = '1970-01-01T';
-  const shiftExit = (endTime) => {
-    if (!endTime) return null;
-    const endDate = record.saida_data || record.data;
-    const startDate = record.data;
-    const dayOffset = startDate && endDate
-      ? Math.max(0, Math.round((new Date(`${endDate}T12:00:00`) - new Date(`${startDate}T12:00:00`)) / 86400000))
-      : 0;
-    return new Date(baseDate + endTime).getTime() + dayOffset * 86400000;
-  };
 
+  const endDate = record.saida_data || record.data;
   if (record.entrada && record.saida && !record.saida_almoco && !record.retorno_almoco) {
-    const continuousDay = shiftExit(record.saida) - new Date(baseDate + record.entrada).getTime();
-    if (continuousDay > 0) totalMs = continuousDay;
-  }
-
-  if (!totalMs && record.entrada && record.saida_almoco) {
-    const diff = new Date(baseDate + record.saida_almoco) - new Date(baseDate + record.entrada);
-    if (diff > 0) totalMs += diff;
-  }
-  
-  if (record.retorno_almoco && record.saida) {
-    const diff = shiftExit(record.saida) - new Date(baseDate + record.retorno_almoco).getTime();
-    if (diff > 0) totalMs += diff;
+    totalMs += calcNightAdjustedMilliseconds(record.data, record.entrada, endDate, record.saida);
+  } else {
+    if (record.entrada && record.saida_almoco) {
+      totalMs += calcNightAdjustedMilliseconds(record.data, record.entrada, record.data, record.saida_almoco);
+    }
+    if (record.retorno_almoco && record.saida) {
+      totalMs += calcNightAdjustedMilliseconds(record.data, record.retorno_almoco, endDate, record.saida);
+    }
   }
   
   if (totalMs === 0) return '—';

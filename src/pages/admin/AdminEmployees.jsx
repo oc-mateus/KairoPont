@@ -83,10 +83,11 @@ function timeMinutes(value) {
 
 function durationLabel(minutes) {
   if (minutes == null) return '—';
-  const roundedHours = Math.ceil(minutes / 60);
-  if (roundedHours === 0) return '0h';
-  const sign = roundedHours < 0 ? '−' : '+';
-  return `${sign}${Math.abs(roundedHours)}h`;
+  const roundedMinutes = Math.round(Math.abs(minutes));
+  const hours = Math.floor(roundedMinutes / 60);
+  const remainingMinutes = roundedMinutes % 60;
+  const sign = minutes < 0 ? '−' : '+';
+  return `${sign}${hours}h ${remainingMinutes}min`;
 }
 
 function getScheduleComparison(record, schedule) {

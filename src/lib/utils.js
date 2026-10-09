@@ -142,10 +142,7 @@ export function calcNightAdjustedMilliseconds(startDate, startTime, endDate, end
 
 export function formatMinutesAsHours(totalMinutes) {
   if (!Number.isFinite(totalMinutes)) return '—';
-  const roundedMinutes = Math.round(Math.abs(totalMinutes));
-  const hours = Math.floor(roundedMinutes / 60);
-  const minutes = roundedMinutes % 60;
-  return `${hours}h ${String(minutes).padStart(2, '0')}min`;
+  return `${Math.ceil(Math.abs(totalMinutes) / 60)}h`;
 }
 
 /**

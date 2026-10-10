@@ -42,7 +42,7 @@ export default function LoginPage() {
         return;
       }
       toast.success('Login realizado com sucesso!');
-      navigate('/ponto');
+      navigate(profile.role === 'admin' ? '/admin' : '/ponto');
     } catch (error) {
       toast.error(error.message || 'Erro ao fazer login. Verifique suas credenciais.');
     } finally {

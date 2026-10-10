@@ -41,14 +41,14 @@ function PrivateRoute({ children, requireAdmin = false, requireClt = false }) {
 }
 
 function PublicRoute({ children }) {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
 
   if (loading) {
     return <div className="flex flex-center" style={{ minHeight: '100vh' }}><Spinner size="lg" /></div>;
   }
 
   if (session) {
-    return <Navigate to="/ponto" replace />;
+    return <Navigate to={profile?.role === 'admin' ? '/admin' : '/ponto'} replace />;
   }
 
   return children;

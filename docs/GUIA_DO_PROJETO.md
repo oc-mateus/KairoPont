@@ -19,7 +19,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 
 ### Para funcionários
 
-- Entrar com e-mail e senha e escolher CLT ou PJ na tela de login; se o vínculo selecionado não corresponder ao cadastro, a sessão é encerrada e o funcionário recebe uma orientação. Administradores podem entrar pelas duas opções.
+- Entrar com e-mail e senha e escolher CLT ou PJ na tela de login; se o vínculo selecionado não corresponder ao cadastro, a sessão é encerrada e o funcionário recebe uma orientação. Administradores podem entrar pelas duas opções e são encaminhados diretamente ao Painel Admin.
 - Receber convite do administrador e definir a própria senha.
 - Solicitar redefinição de senha pela tela de login; o link funciona para administradores, CLT e PJ e abre a página de nova senha.
 - CLT registra entrada e saída. O intervalo é descontado pelo horário fixo do turno, sem precisar marcar saída e retorno do almoço.

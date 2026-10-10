@@ -34,6 +34,9 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const visibleEmployeeNav = profile?.tipo_contrato === 'pj'
+    ? employeeNav.filter(item => !['documentos', 'ferias'].includes(item.id))
+    : employeeNav;
 
   const handleNav = (path) => {
     navigate(path);
@@ -69,7 +72,7 @@ export default function Layout({ children }) {
         <nav className="sidebar-nav">
           {!isAdmin && <div className="sidebar-nav-group">
             <div className="sidebar-nav-group-title">Funcionário</div>
-            {employeeNav.map(item => (
+            {visibleEmployeeNav.map(item => (
               <button
                 key={item.id}
                 className={`sidebar-nav-item ${location.pathname === item.path ? 'active' : ''}`}

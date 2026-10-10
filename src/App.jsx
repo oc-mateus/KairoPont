@@ -17,7 +17,7 @@ import SetPasswordPage from './pages/SetPasswordPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminEmployees from './pages/admin/AdminEmployees';
 
-function PrivateRoute({ children, requireAdmin = false }) {
+function PrivateRoute({ children, requireAdmin = false, requireClt = false }) {
   const { session, profile, loading } = useAuth();
   const location = useLocation();
 
@@ -30,6 +30,10 @@ function PrivateRoute({ children, requireAdmin = false }) {
   }
 
   if (requireAdmin && profile?.role !== 'admin') {
+    return <Navigate to="/ponto" replace />;
+  }
+
+  if (requireClt && profile?.role !== 'admin' && profile?.tipo_contrato !== 'clt') {
     return <Navigate to="/ponto" replace />;
   }
 
@@ -67,9 +71,9 @@ export default function App() {
       {/* Rotas de Funcionário */}
       <Route path="/ponto" element={<PrivateRoute><PunchPage /></PrivateRoute>} />
       <Route path="/historico" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
-      <Route path="/documentos" element={<PrivateRoute><DocumentsPage /></PrivateRoute>} />
+      <Route path="/documentos" element={<PrivateRoute requireClt><DocumentsPage /></PrivateRoute>} />
       <Route path="/perfil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
-      <Route path="/ferias" element={<PrivateRoute><VacationsPage /></PrivateRoute>} />
+      <Route path="/ferias" element={<PrivateRoute requireClt><VacationsPage /></PrivateRoute>} />
 
       {/* Rotas de Administração */}
       <Route path="/admin" element={<PrivateRoute requireAdmin><AdminDashboard /></PrivateRoute>} />

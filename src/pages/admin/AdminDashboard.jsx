@@ -29,6 +29,10 @@ function isVacationDay(vacations, employeeId, date) {
     && vacation.data_inicio <= date && (vacation.data_retorno || vacation.data_fim) > date);
 }
 
+function isCltEmployee(employee) {
+  return employee.tipo_contrato === 'clt' && employee.role !== 'admin';
+}
+
 function AttendanceChart({ title, total, unit, values, color, formatValue = (value) => String(value) }) {
   const maximum = Math.max(1, ...values.map((item) => item.value));
   return (
@@ -82,8 +86,10 @@ export default function AdminDashboard() {
     fetchOverview();
   }, [today]);
 
-  const activeEmployees = employees.filter((employee) => employee.ativo).length;
-  const todayRecords = records.filter((record) => record.data === today).length;
+  const cltEmployees = employees.filter(isCltEmployee);
+  const activeCltEmployees = cltEmployees.filter((employee) => employee.ativo);
+  const activeCltEmployeeIds = new Set(activeCltEmployees.map((employee) => employee.id));
+  const todayRecords = records.filter((record) => record.data === today && activeCltEmployeeIds.has(record.funcionario_id)).length;
   const chartData = useMemo(() => {
     const [year, month] = today.split('-').map(Number);
     const monthIndex = month - 1;
@@ -94,7 +100,7 @@ export default function AdminDashboard() {
       delays: 0,
       overtimeMinutes: 0,
     }));
-    const scheduledEmployees = employees.filter((employee) => employee.ativo && employee.role !== 'admin' && employee.tipo_contrato !== 'pj' && getAssignedShiftId(employee.escala_trabalho));
+    const scheduledEmployees = employees.filter((employee) => isCltEmployee(employee) && employee.ativo && getAssignedShiftId(employee.escala_trabalho));
     const recordByEmployeeDay = new Map(records.map((record) => [`${record.funcionario_id}:${record.data}`, record]));
     const employeeById = new Map(scheduledEmployees.map((employee) => [employee.id, employee]));
 
@@ -147,13 +153,13 @@ export default function AdminDashboard() {
       </div>
 
       <div className="admin-summary-grid">
-        <Link className="admin-summary-card" to="/admin/funcionarios"><span className="admin-summary-icon"><UsersIcon /></span><span className="admin-summary-content"><span>Funcionários ativos</span><strong>{activeEmployees}<small> de {employees.length}</small></strong></span><ArrowIcon /></Link>
-        <div className="admin-summary-card"><span className="admin-summary-icon"><ClockIcon /></span><span className="admin-summary-content"><span>Registros hoje</span><strong>{todayRecords}<small> marcações</small></strong></span></div>
+        <Link className="admin-summary-card" to="/admin/funcionarios"><span className="admin-summary-icon"><UsersIcon /></span><span className="admin-summary-content"><span>Funcionários CLT ativos</span><strong>{activeCltEmployees.length}<small> de {cltEmployees.length}</small></strong></span><ArrowIcon /></Link>
+        <div className="admin-summary-card"><span className="admin-summary-icon"><ClockIcon /></span><span className="admin-summary-content"><span>Registros CLT hoje</span><strong>{todayRecords}<small> marcações</small></strong></span></div>
         <div className="admin-summary-card"><span className="admin-summary-icon"><FileIcon /></span><span className="admin-summary-content"><span>Documentos enviados</span><strong>{documents.length}<small> arquivos</small></strong></span></div>
       </div>
 
       <section className="admin-people-section attendance-insights-section">
-        <div className="section-heading"><div><h3>Absenteísmo e jornada</h3><p>Mês atual · faltas contabilizadas até ontem · férias aprovadas são desconsideradas.</p></div><Link to="/admin/funcionarios">Gerenciar funcionários <ArrowIcon /></Link></div>
+        <div className="section-heading"><div><h3>Absenteísmo e jornada</h3><p>Mês atual · somente CLT ativos com turno cadastrado · faltas até ontem, sem férias aprovadas.</p></div><Link to="/admin/funcionarios">Gerenciar funcionários <ArrowIcon /></Link></div>
         <div className="attendance-insights-grid">
           <AttendanceChart title="Faltas" total={absenceTotal} unit="dias" values={chartData.map(({ label, absences }) => ({ label, value: absences }))} color="var(--danger-500, #d95d5d)" />
           <AttendanceChart title="Atrasos" total={delayTotal} unit="registros" values={chartData.map(({ label, delays }) => ({ label, value: delays }))} color="var(--warning-500, #d99a35)" />

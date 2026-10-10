@@ -10,6 +10,7 @@ import HistoryPage from './pages/HistoryPage';
 import DocumentsPage from './pages/DocumentsPage';
 import ProfilePage from './pages/ProfilePage';
 import VacationsPage from './pages/VacationsPage';
+import RecoverPasswordPage from './pages/RecoverPasswordPage';
 import SetPasswordPage from './pages/SetPasswordPage';
 
 // Admin Pages
@@ -50,9 +51,17 @@ function PublicRoute({ children }) {
 }
 
 export default function App() {
+  const { passwordRecoveryPending } = useAuth();
+  const location = useLocation();
+
+  if (passwordRecoveryPending && location.pathname !== '/definir-senha') {
+    return <Navigate to="/definir-senha" replace />;
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+      <Route path="/recuperar-senha" element={<RecoverPasswordPage />} />
       <Route path="/definir-senha" element={<SetPasswordPage />} />
 
       {/* Rotas de Funcionário */}

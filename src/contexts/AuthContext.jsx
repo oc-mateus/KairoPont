@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(false);
 
   useEffect(() => {
     // Obtém sessão inicial
@@ -21,7 +22,9 @@ export function AuthProvider({ children }) {
 
     // Escuta mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') setPasswordRecoveryPending(true);
+        if (event === 'SIGNED_OUT') setPasswordRecoveryPending(false);
         setSession(session);
         if (session?.user) {
           await fetchProfile(session.user.id);
@@ -78,6 +81,11 @@ export function AuthProvider({ children }) {
     if (error) throw error;
     setSession(null);
     setProfile(null);
+    setPasswordRecoveryPending(false);
+  }
+
+  function clearPasswordRecovery() {
+    setPasswordRecoveryPending(false);
   }
 
   async function refreshProfile() {
@@ -93,6 +101,8 @@ export function AuthProvider({ children }) {
     loading,
     isAdmin: profile?.role === 'admin',
     isActive: profile?.ativo === true,
+    passwordRecoveryPending,
+    clearPasswordRecovery,
     signInWithEmail,
     signOut,
     refreshProfile,

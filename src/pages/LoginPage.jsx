@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import { Spinner } from '../components/ui';
 import InstallAppButton from '../components/InstallAppButton';
 import { supabase } from '../lib/supabase';
+import { Link } from 'react-router-dom';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -78,6 +79,7 @@ export default function LoginPage() {
             <div className="form-group">
               <label className="form-label" htmlFor="login-password">Senha</label>
               <input id="login-password" type="password" className="form-input" placeholder="Sua senha" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} disabled={loading} autoComplete="current-password" />
+              <Link className="password-recovery-link" to="/recuperar-senha">Esqueci minha senha</Link>
             </div>
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>{loading ? <Spinner /> : 'Entrar'}</button>
           </form>

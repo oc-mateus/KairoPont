@@ -1257,6 +1257,22 @@ select.form-input {
 .login-contract-options button:focus-visible { outline: 2px solid var(--kairo-green-400); outline-offset: 2px; }
 .login-contract-options button:disabled { cursor: not-allowed; opacity: .65; }
 
+.password-recovery-link,
+.password-recovery-back {
+  display: inline-flex;
+  margin-top: var(--space-3);
+  color: var(--kairo-green-300);
+  font-size: var(--font-sm);
+  font-weight: 650;
+  text-decoration: none;
+  transition: color .18s ease;
+}
+.password-recovery-link:hover,
+.password-recovery-back:hover { color: var(--kairo-green-200); text-decoration: underline; }
+.password-recovery-link:focus-visible,
+.password-recovery-back:focus-visible { outline: 2px solid var(--kairo-green-400); outline-offset: 3px; border-radius: 4px; }
+.password-recovery-back.btn { justify-content: center; color: var(--text-primary); }
+
 .login-divider {
   display: flex;
   align-items: center;

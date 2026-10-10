@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 import { Spinner } from '../components/ui';
 
 export default function SetPasswordPage() {
-  const { session, loading: authLoading } = useAuth();
+  const { session, loading: authLoading, clearPasswordRecovery } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -21,10 +21,11 @@ export default function SetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      toast.success('Senha definida. Bem-vindo ao KairoPont!');
+      clearPasswordRecovery();
+      toast.success('Senha atualizada com sucesso.');
       navigate('/ponto', { replace: true });
     } catch (error) {
-      toast.error(error.message || 'Não foi possível definir sua senha. Abra novamente o link do convite.');
+      toast.error(error.message || 'Não foi possível atualizar sua senha. Solicite um novo link de recuperação.');
     } finally { setSaving(false); }
   };
 
@@ -33,13 +34,16 @@ export default function SetPasswordPage() {
     <div className="login-form-container"><div className="login-form">
       <h1>Definir senha</h1>
       {authLoading ? <div className="flex flex-center" style={{ minHeight: 120 }}><Spinner size="lg" /></div> : session ? <>
-        <p className="login-subtitle">Crie uma senha pessoal para acessar sua conta de funcionário.</p>
+        <p className="login-subtitle">Crie uma nova senha para acessar sua conta do KairoPont.</p>
         <form onSubmit={setNewPassword}>
           <div className="form-group"><label className="form-label" htmlFor="new-password">Nova senha</label><input id="new-password" className="form-input" type="password" minLength={8} required autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} disabled={saving} /></div>
           <div className="form-group"><label className="form-label" htmlFor="confirm-password">Confirmar senha</label><input id="confirm-password" className="form-input" type="password" minLength={8} required autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={saving} /></div>
           <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={saving}>{saving ? <Spinner /> : 'Salvar senha'}</button>
         </form>
-      </> : <p className="login-subtitle">Este link de convite expirou ou já foi usado. Peça ao administrador para enviar um novo convite.</p>}
+      </> : <>
+        <p className="login-subtitle">Este link expirou, já foi usado ou não foi aberto no mesmo navegador. Solicite um novo link para redefinir a senha.</p>
+        <button className="btn btn-primary btn-block btn-lg" type="button" onClick={() => navigate('/recuperar-senha')}>Solicitar novo link</button>
+      </>}
     </div></div>
   </div>;
 }

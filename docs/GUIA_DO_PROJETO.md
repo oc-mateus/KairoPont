@@ -21,6 +21,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 
 - Entrar com e-mail e senha e escolher CLT ou PJ na tela de login; se o vínculo selecionado não corresponder ao cadastro, a sessão é encerrada e o funcionário recebe uma orientação. Administradores podem entrar pelas duas opções.
 - Receber convite do administrador e definir a própria senha.
+- Solicitar redefinição de senha pela tela de login; o link funciona para administradores, CLT e PJ e abre a página de nova senha.
 - CLT registra entrada e saída. O intervalo é descontado pelo horário fixo do turno, sem precisar marcar saída e retorno do almoço.
 - PJ registra entrada e saída, sem turno ou almoço programado; o sistema soma o tempo entre as duas marcações para o acompanhamento das horas do período.
 - Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
@@ -165,7 +166,7 @@ O projeto KairoPont registra as migrações listadas, com os buckets documentos 
 
 As solicitações guardam separadamente o último dia de férias e a data de retorno ao trabalho. Os registros anteriores foram preservados convertendo o antigo último dia em retorno no dia seguinte; pedidos novos usam saída e retorno explícitos.
 
-A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` (endereço verificado no Resend). Sem eles, a decisão é gravada, mas o envio falha e pode ser tentado novamente na fila administrativa. O envio do convite depende do SMTP configurado no Supabase Auth e da URL permitida `https://oc-mateus.github.io/KairoPont/definir-senha`, onde o funcionário define sua senha.
+A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` (endereço verificado no Resend). Sem eles, a decisão é gravada, mas o envio falha e pode ser tentado novamente na fila administrativa. Convites e redefinições dependem do SMTP do Supabase Auth e da URL permitida `https://oc-mateus.github.io/KairoPont/definir-senha`. O formulário de recuperação envia o retorno para essa rota; se o evento `PASSWORD_RECOVERY` chega pelo endereço padrão do Site URL, o app também encaminha a sessão para a página de nova senha.
 
 Para perfis CLT existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível. Perfis PJ não usam escala de turno nem comparativo CLT.
 
@@ -188,7 +189,7 @@ A URL pública da aplicação é https://oc-mateus.github.io/KairoPont/. O READM
 
 As verificações abaixo foram feitas em 6 de outubro de 2026. Reconfirme o estado antes de usar a aplicação com funcionários.
 
-1. **Configurar Auth:** definir a URL do site no Supabase Auth como https://oc-mateus.github.io/KairoPont/ e adicionar o retorno exato à lista permitida. A configuração não foi confirmada no painel.
+1. **Auth configurado:** a URL padrão do Supabase Auth é https://oc-mateus.github.io/KairoPont/ e a lista permitida inclui https://oc-mateus.github.io/KairoPont/definir-senha. Confira essas URLs se mudar o domínio ou o caminho de publicação.
 2. **Revisar a administração de teste:** uma conta administrativa de teste foi provisionada em 7 de outubro de 2026. Troque ou remova suas credenciais antes de usar a aplicação com dados reais.
 3. **Configurar convites e e-mail:** verificar SMTP/URLs do Supabase Auth e cadastrar `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` como secrets da Edge Function.
 4. **Impor validação no Storage:** configurar no bucket privado o limite máximo e os MIME types adequados no servidor, além da validação existente no frontend.

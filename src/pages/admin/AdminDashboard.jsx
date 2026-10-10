@@ -5,6 +5,8 @@ import { formatMinutesAsHours, getOvertimeMinutes, getTodayInSP } from '../../li
 import { Spinner } from '../../components/ui';
 import { getAssignedShiftId, inferShiftFromEntry, makeEmployeeSchedule } from '../../lib/workShifts';
 
+const ATTENDANCE_TRACKING_START = '2026-10-06';
+
 function Icon({ children, size = 20 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>;
 }
@@ -175,7 +177,7 @@ export default function AdminDashboard() {
       const bucket = buckets[bucketIndex];
       if (!bucket) continue;
       const weekday = new Date(`${date}T12:00:00`).getDay() || 7;
-      if (date < today) {
+      if (date < today && date >= ATTENDANCE_TRACKING_START) {
         scheduledEmployees.forEach((employee) => {
           if (employee.data_admissao && employee.data_admissao > date) return;
           const schedule = employee.escala_trabalho;
@@ -228,7 +230,7 @@ export default function AdminDashboard() {
 
       <section className="admin-people-section attendance-insights-section">
         <div className="section-heading attendance-section-heading">
-          <div><h3>Absenteísmo e jornada</h3><p>Somente CLT ativos com turno cadastrado · faltas até ontem, sem férias aprovadas.</p></div>
+          <div><h3>Absenteísmo e jornada</h3><p>Somente CLT ativos com turno cadastrado · faltas desde 06/10/2026, sem férias aprovadas.</p></div>
           <div className="attendance-heading-actions">
             <label className="attendance-period-control"><span>Período</span><select className="form-input" value={period} onChange={(event) => setPeriod(event.target.value)}><option value="current">Mês atual</option><option value="specific">Mês específico</option><option value="6m">Últimos 6 meses</option><option value="12m">Último ano</option></select></label>
             {period === 'specific' && <label className="attendance-period-control"><span>Mês</span><input className="form-input" type="month" max={today.slice(0, 7)} value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></label>}

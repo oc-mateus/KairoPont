@@ -86,8 +86,14 @@ export default function AdminDashboard() {
   const [period, setPeriod] = useState('current');
   const [selectedMonth, setSelectedMonth] = useState(() => getTodayInSP().slice(0, 7));
   const periodMonthCount = period === '6m' ? 6 : period === '12m' ? 12 : 1;
-  const periodStartMonth = period === 'specific' && selectedMonth ? selectedMonth : monthOffset(today.slice(0, 7), -(periodMonthCount - 1));
-  const periodStart = `${periodStartMonth}-01`;
+  const periodStartMonth = period === 'specific' ? selectedMonth : monthOffset(today.slice(0, 7), -(periodMonthCount - 1));
+  const periodStart = periodStartMonth ? `${periodStartMonth}-01` : '';
+  const selectedMonthEnd = selectedMonth
+    ? `${selectedMonth}-${String(new Date(Date.UTC(Number(selectedMonth.slice(0, 4)), Number(selectedMonth.slice(5, 7)), 0)).getUTCDate()).padStart(2, '0')}`
+    : '';
+  const periodEnd = period === 'specific' && selectedMonthEnd
+    ? (selectedMonthEnd < today ? selectedMonthEnd : today)
+    : today;
   const monthlyBuckets = period === '6m' || period === '12m';
 
   useEffect(() => {
@@ -115,9 +121,16 @@ export default function AdminDashboard() {
     let cancelled = false;
     async function fetchAttendance() {
       setAttendanceLoading(true);
+      if (!periodStart) {
+        setRecords([]);
+        setVacations([]);
+        setTodayPunches([]);
+        setAttendanceLoading(false);
+        return;
+      }
       try {
         const [periodRecords, vacationsResult, todayRows] = await Promise.all([
-          fetchAllRows(() => supabase.from('registros_ponto').select('*').gte('data', periodStart).lte('data', today).order('data', { ascending: false }).order('funcionario_id')),
+          fetchAllRows(() => supabase.from('registros_ponto').select('*').gte('data', periodStart).lte('data', periodEnd).order('data', { ascending: false }).order('funcionario_id')),
           supabase.from('solicitacoes_ferias').select('funcionario_id,data_inicio,data_retorno,data_fim,status').eq('status', 'aprovada').lt('data_inicio', today).gte('data_retorno', periodStart),
           fetchAllRows(() => supabase.from('registros_ponto').select('funcionario_id').eq('data', today).order('funcionario_id')),
         ]);
@@ -139,13 +152,14 @@ export default function AdminDashboard() {
     }
     fetchAttendance();
     return () => { cancelled = true; };
-  }, [periodStart, today]);
+  }, [periodStart, periodEnd, today]);
 
   const cltEmployees = employees.filter(isCltEmployee);
   const activeCltEmployees = cltEmployees.filter((employee) => employee.ativo);
   const activeCltEmployeeIds = new Set(activeCltEmployees.map((employee) => employee.id));
   const todayRecords = todayPunches.filter((record) => activeCltEmployeeIds.has(record.funcionario_id)).length;
   const chartData = useMemo(() => {
+    if (!periodStartMonth) return [];
     const [startYear, startMonth] = periodStartMonth.split('-').map(Number);
     const startMonthIndex = startYear * 12 + startMonth - 1;
     const bucketCount = monthlyBuckets ? periodMonthCount : Math.ceil(new Date(startYear, startMonth, 0).getDate() / 7);
@@ -212,6 +226,7 @@ export default function AdminDashboard() {
   const absenceTotal = chartData.reduce((total, item) => total + item.absences, 0);
   const delayTotal = chartData.reduce((total, item) => total + item.delays, 0);
   const overtimeTotal = chartData.reduce((total, item) => total + item.overtimeMinutes, 0);
+  const hasSpecificCltRecords = records.some((record) => activeCltEmployeeIds.has(record.funcionario_id));
 
   if (loading) return <div className="flex flex-center" style={{ minHeight: '60vh' }}><Spinner size="lg" /></div>;
 
@@ -245,7 +260,7 @@ export default function AdminDashboard() {
             <Link to="/admin/funcionarios">Gerenciar funcionários <ArrowIcon /></Link>
           </div>
         </div>
-        {attendanceLoading ? <p className="attendance-loading">Carregando indicadores…</p> : <div className="attendance-insights-grid">
+        {attendanceLoading ? <p className="attendance-loading">Carregando indicadores…</p> : period === 'specific' && !selectedMonth ? <p className="attendance-loading">Selecione um mês para consultar os indicadores.</p> : period === 'specific' && !hasSpecificCltRecords ? <p className="attendance-loading">Não há registros de ponto de funcionários CLT para este mês.</p> : <div className="attendance-insights-grid">
           <AttendanceChart title="Faltas" total={absenceTotal} unit="dias" values={chartData.map(({ label, fullLabel, absences }) => ({ label, fullLabel, value: absences }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--danger-500, #d95d5d)" />
           <AttendanceChart title="Atrasos" total={delayTotal} unit="registros" values={chartData.map(({ label, fullLabel, delays }) => ({ label, fullLabel, value: delays }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--warning-500, #d99a35)" />
           <AttendanceChart title="Horas extras" total={formatMinutesAsHours(overtimeTotal)} unit="total" values={chartData.map(({ label, fullLabel, overtimeMinutes }) => ({ label, fullLabel, value: overtimeMinutes }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--kairo-green-400, #35b76a)" formatValue={formatMinutesAsHours} />

@@ -1492,6 +1492,16 @@ select.form-input {
 
 .admin-people-section { padding-top: var(--space-2); }
 .attendance-insights-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.attendance-employee-section { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--border-default); }
+.attendance-employee-control { display: grid; min-width: min(300px, 100%); gap: 5px; color: var(--text-muted); font-size: var(--font-xs); }
+.attendance-employee-control select { width: 100%; min-height: 44px; padding: 0 38px 0 13px; border: 1px solid var(--border-default); border-radius: 11px; background: var(--bg-card); color: var(--text-primary); font: inherit; font-size: var(--font-sm); cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease; }
+.attendance-employee-control select:focus-visible { border-color: var(--kairo-green-400); outline: none; box-shadow: 0 0 0 3px rgba(53,183,106,.11); }
+.attendance-selected-employee { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: linear-gradient(110deg, rgba(53,183,106,.09), rgba(255,255,255,.015)); animation: attendance-control-enter .18s ease-out both; }
+.attendance-selected-avatar { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border: 1px solid rgba(53,183,106,.22); border-radius: 50%; background: rgba(53,183,106,.16); color: var(--kairo-green-300); font-size: var(--font-xs); font-weight: 750; }
+.attendance-selected-employee > div { display: grid; min-width: 0; gap: 2px; }
+.attendance-selected-employee > div span { color: var(--text-muted); font-size: var(--font-xs); }
+.attendance-selected-employee > div strong { overflow: hidden; color: var(--text-primary); font-size: var(--font-sm); text-overflow: ellipsis; white-space: nowrap; }
+.attendance-contract-badge { margin-left: auto; padding: 5px 10px; border: 1px solid rgba(53,183,106,.25); border-radius: 999px; background: rgba(53,183,106,.1); color: var(--kairo-green-300); font-size: var(--font-xs); font-weight: 700; }
 .attendance-chart-card { min-width: 0; padding: var(--space-4); border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--bg-card); }
 .attendance-chart-card > header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
 .attendance-chart-card h4 { color: var(--text-primary); font-size: var(--font-md); }
@@ -1780,6 +1790,7 @@ select.form-input {
 
 @media (max-width: 640px) {
   .attendance-heading-actions { width: 100%; align-items: stretch; flex-direction: column; }
+  .attendance-employee-control { width: 100%; }
   .attendance-period-control { width: 100%; }
   .attendance-period-switch { width: 100%; }
   .attendance-period-switch button { flex: 1; padding: 0 6px; font-size: 11px; }

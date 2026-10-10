@@ -34,7 +34,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 ### Para administradores
 
 - Consultar indicadores e registros da equipe.
-- No painel, acompanhar faltas, atrasos e horas extras de funcionários CLT ativos, sem incluir administradores. O período pode ser o mês atual, um mês/ano escolhido, os últimos seis meses ou o último ano; meses específicos sem registros apresentam uma mensagem de estado vazio.
+- No painel, acompanhar faltas, atrasos e horas extras de funcionários CLT ativos, sem incluir administradores. Os gráficos gerais aparecem primeiro; abaixo, o administrador seleciona um funcionário CLT para ver os indicadores individuais usando o mesmo filtro de período. O período pode ser o mês atual, um mês/ano escolhido, os últimos seis meses ou o último ano; meses específicos sem registros apresentam uma mensagem de estado vazio.
 - Gerenciar perfis e status de funcionários.
 - Pesquisar funcionários por nome, CPF ou cargo e ordenar a lista alfabeticamente crescente ou decrescente. A lista e a ficha identificam o vínculo CLT/PJ.
 - Selecionar um funcionário para consultar nome completo, CPF, cargo, registros de ponto e documentos enviados, incluindo data e tipo. Na ficha, o vínculo aparece como informação e o seletor só é aberto quando o administrador escolhe editar; o formulário de convite permite selecionar o vínculo ao cadastrar.

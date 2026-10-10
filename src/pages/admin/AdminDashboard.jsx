@@ -230,7 +230,7 @@ export default function AdminDashboard() {
 
       <section className="admin-people-section attendance-insights-section">
         <div className="section-heading attendance-section-heading">
-          <div><h3>Absenteísmo e jornada</h3><p>Somente CLT ativos com turno cadastrado · faltas desde 06/10/2026, sem férias aprovadas.</p></div>
+          <div><h3>Absenteísmo e jornada</h3></div>
           <div className="attendance-heading-actions">
             <div className="attendance-period-control">
               <span>Período</span>

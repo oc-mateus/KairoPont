@@ -133,6 +133,7 @@ export default function AdminEmployees() {
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [editingAdmission, setEditingAdmission] = useState(false);
+  const [editingContract, setEditingContract] = useState(false);
   const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', tipo_contrato: 'clt', data_admissao: getTodayInSP(), turno_id: 'turno1', ...makeEmployeeSchedule('turno1') });
 
   const hasSavedSchedule = Boolean(selectedEmp?.escala_trabalho?.dias_semana?.length || (selectedEmp?.escala_trabalho?.entrada && selectedEmp?.escala_trabalho?.saida));
@@ -158,6 +159,7 @@ export default function AdminEmployees() {
   useEffect(() => {
     if (selectedEmp) {
       setEmployeeForm(formFromEmployee(selectedEmp));
+      setEditingContract(false);
       const savedSchedule = selectedEmp.escala_trabalho;
       setEditingSchedule(!(savedSchedule?.dias_semana?.length || (savedSchedule?.entrada && savedSchedule?.saida)));
       setEditingAdmission(!selectedEmp.data_admissao);
@@ -234,12 +236,13 @@ export default function AdminEmployees() {
         p_tipo_contrato: employeeForm.tipo_contrato,
       });
       if (error) throw error;
-      toast.success('Data de admissão e turno habitual atualizados.');
+      toast.success(contractChanged && !editingAdmission && !editingSchedule ? 'Tipo de vínculo atualizado.' : 'Dados trabalhistas atualizados.');
       await fetchEmployees();
       const { data } = await supabase.from('funcionarios').select('*').eq('id', selectedEmp.id).maybeSingle();
       if (data) setSelectedEmp(data);
       setEditingSchedule(false);
       setEditingAdmission(false);
+      setEditingContract(false);
     } catch (error) {
       toast.error('Não foi possível salvar: ' + error.message);
     } finally {
@@ -251,7 +254,9 @@ export default function AdminEmployees() {
     <form className="vacation-form employee-employment-form" onSubmit={onSubmit}>
       {showInviteForm && <div className="form-row"><label className="form-group">Nome completo<input className="form-input" required minLength={3} value={employeeForm.nome} onChange={(event) => setFormField('nome', event.target.value)} /></label><label className="form-group">E-mail corporativo<input className="form-input" required type="email" value={employeeForm.email} onChange={(event) => setFormField('email', event.target.value)} /></label></div>}
       {showInviteForm && <div className="form-row"><label className="form-group">CPF<input className="form-input" required inputMode="numeric" value={employeeForm.cpf} onChange={(event) => setFormField('cpf', maskCPF(event.target.value))} /></label><label className="form-group">Cargo<input className="form-input" required value={employeeForm.cargo} onChange={(event) => setFormField('cargo', event.target.value)} /></label></div>}
-      {(showInviteForm || selectedEmp) && <label className="form-group">Tipo de vínculo<select className="form-input" value={employeeForm.tipo_contrato} onChange={(event) => setFormField('tipo_contrato', event.target.value)}><option value="clt">CLT</option><option value="pj">PJ</option></select></label>}
+      {showInviteForm && <label className="form-group">Tipo de vínculo<select className="form-input" value={employeeForm.tipo_contrato} onChange={(event) => setFormField('tipo_contrato', event.target.value)}><option value="clt">CLT</option><option value="pj">PJ</option></select></label>}
+      {selectedEmp && editingContract && <label className="form-group">Tipo de vínculo<select className="form-input" value={employeeForm.tipo_contrato} onChange={(event) => setFormField('tipo_contrato', event.target.value)}><option value="clt">CLT</option><option value="pj">PJ</option></select></label>}
+      {selectedEmp && editingContract && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setFormField('tipo_contrato', selectedEmp.tipo_contrato || 'clt'); setEditingContract(false); }}>Cancelar edição do vínculo</button>}
       {(!editingAdmission && !showInviteForm && selectedEmp?.data_admissao) && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingAdmission(true)}>Editar data de admissão</button>}
       {(editingAdmission || showInviteForm || !selectedEmp?.data_admissao) && <label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>}
       {employeeForm.tipo_contrato === 'clt' && (!hasSavedSchedule || editingSchedule || showInviteForm) && <label className="form-group">Turno habitual<select className="form-input" value={employeeForm.turno_id} onChange={(event) => setScheduleType(event.target.value)}><option value="turno1">1º turno — 08:00 às 17:00</option><option value="turno2">2º turno — 14:00 às 22:52</option><option value="turno3">3º turno — 22:45 às 06:15 (dia seguinte)</option></select></label>}
@@ -558,7 +563,7 @@ export default function AdminEmployees() {
               <div><span>CPF</span><strong>{formatCPF(selectedEmp.cpf)}</strong></div>
               <div><span>Cargo</span><strong>{selectedEmp.cargo || 'Não informado'}</strong></div>
               <div><span>Perfil de acesso</span><strong>{selectedEmp.role === 'admin' ? 'Administrador' : 'Funcionário'}</strong></div>
-              <div><span>Tipo de vínculo</span><strong>{selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</strong></div>
+              <div><span>Tipo de vínculo</span><div className="employee-contract-value"><strong>{selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</strong><button type="button" className="btn btn-secondary btn-sm" onClick={() => { setFormField('tipo_contrato', selectedEmp.tipo_contrato || 'clt'); setEditingContract(true); }}>Editar vínculo</button></div></div>
               <div><span>Data de admissão</span><strong>{selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</strong></div>
               {selectedEmp.tipo_contrato !== 'pj' && <div><span>Turno habitual</span><strong>{selectedEmp.escala_trabalho ? getShiftLabel(getAssignedShiftId(selectedEmp.escala_trabalho)) : 'Não informado'}</strong></div>}
             </div>

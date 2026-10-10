@@ -1556,6 +1556,7 @@ select.form-input {
 .employee-profile-fields > div { display: grid; gap: 2px; min-width: 0; }
 .employee-profile-fields span { color: var(--text-muted); font-size: var(--font-xs); }
 .employee-profile-fields strong { color: var(--text-primary); font-size: var(--font-sm); overflow-wrap: anywhere; }
+.employee-contract-value { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .employee-records-section, .employee-documents-section { margin-bottom: var(--space-6); }
 .employee-section-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); margin-bottom: var(--space-4); }
 .employee-export-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }

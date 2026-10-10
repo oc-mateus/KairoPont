@@ -1502,10 +1502,21 @@ select.form-input {
 .section-heading > a, .detail-link { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--kairo-green-300); font-size: var(--font-sm); font-weight: 600; white-space: nowrap; }
 .attendance-section-heading { align-items: flex-end; }
 .attendance-heading-actions { display: flex; align-items: flex-end; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-3); }
-.attendance-period-control { display: grid; min-width: 142px; gap: 4px; color: var(--text-muted); font-size: var(--font-xs); }
-.attendance-period-control .form-input { min-height: 38px; }
-.attendance-heading-actions > a { display: inline-flex; align-items: center; gap: var(--space-1); padding-bottom: 9px; color: var(--kairo-green-300); font-size: var(--font-sm); font-weight: 600; white-space: nowrap; }
+.attendance-period-control { display: grid; gap: 5px; color: var(--text-muted); font-size: var(--font-xs); }
+.attendance-period-switch { display: inline-flex; align-items: center; gap: 3px; padding: 4px; border: 1px solid var(--border-default); border-radius: 13px; background: rgba(11, 25, 19, .88); box-shadow: inset 0 1px rgba(255,255,255,.025); }
+.attendance-period-switch button { position: relative; min-height: 36px; padding: 0 11px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; transition: color .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.attendance-period-switch button:hover { color: var(--text-primary); background: rgba(255,255,255,.045); }
+.attendance-period-switch button:active { transform: scale(.97); }
+.attendance-period-switch button.active { border-color: rgba(53,183,106,.33); background: linear-gradient(135deg, rgba(53,183,106,.2), rgba(29,110,67,.23)); color: var(--kairo-green-300); box-shadow: 0 3px 12px rgba(15,120,65,.13), inset 0 1px rgba(255,255,255,.04); }
+.attendance-period-switch button:focus-visible { outline: 2px solid var(--kairo-green-400); outline-offset: 2px; }
+.attendance-month-control { display: inline-flex; min-height: 44px; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: 11px; background: var(--bg-card); color: var(--kairo-green-300); animation: attendance-control-enter .18s ease-out both; }
+.attendance-month-control svg { width: 17px; height: 17px; flex: 0 0 auto; }
+.attendance-month-control input { width: 130px; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text-primary); color-scheme: dark; font: inherit; font-size: var(--font-sm); }
+.attendance-month-control:focus-within { border-color: var(--kairo-green-400); box-shadow: 0 0 0 3px rgba(53,183,106,.11); }
+.attendance-heading-actions > a { display: inline-flex; align-items: center; gap: var(--space-1); padding-bottom: 9px; color: var(--kairo-green-300); font-size: var(--font-sm); font-weight: 600; white-space: nowrap; transition: color .18s ease, transform .18s ease; }
+.attendance-heading-actions > a:hover { color: var(--kairo-green-400); transform: translateX(2px); }
 .attendance-loading { padding: var(--space-6); color: var(--text-muted); text-align: center; }
+@keyframes attendance-control-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
 .employee-overview-list { display: grid; gap: var(--space-4); }
 .employee-overview-card { background: var(--gradient-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; }
@@ -1756,6 +1767,15 @@ select.form-input {
   .menu-toggle {
     display: flex;
   }
+}
+
+@media (max-width: 640px) {
+  .attendance-heading-actions { width: 100%; align-items: stretch; flex-direction: column; }
+  .attendance-period-control { width: 100%; }
+  .attendance-period-switch { width: 100%; }
+  .attendance-period-switch button { flex: 1; padding: 0 6px; font-size: 11px; }
+  .attendance-month-control { width: 100%; }
+  .attendance-heading-actions > a { align-self: flex-start; padding-bottom: 0; }
 }
 
 @media (max-width: 768px) {

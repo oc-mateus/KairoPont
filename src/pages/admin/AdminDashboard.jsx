@@ -232,8 +232,16 @@ export default function AdminDashboard() {
         <div className="section-heading attendance-section-heading">
           <div><h3>Absenteísmo e jornada</h3><p>Somente CLT ativos com turno cadastrado · faltas desde 06/10/2026, sem férias aprovadas.</p></div>
           <div className="attendance-heading-actions">
-            <label className="attendance-period-control"><span>Período</span><select className="form-input" value={period} onChange={(event) => setPeriod(event.target.value)}><option value="current">Mês atual</option><option value="specific">Mês específico</option><option value="6m">Últimos 6 meses</option><option value="12m">Último ano</option></select></label>
-            {period === 'specific' && <label className="attendance-period-control"><span>Mês</span><input className="form-input" type="month" max={today.slice(0, 7)} value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></label>}
+            <div className="attendance-period-control">
+              <span>Período</span>
+              <div className="attendance-period-switch" role="group" aria-label="Período dos gráficos">
+                <button type="button" className={period === 'current' ? 'active' : ''} aria-pressed={period === 'current'} onClick={() => setPeriod('current')}>Este mês</button>
+                <button type="button" className={period === 'specific' ? 'active' : ''} aria-pressed={period === 'specific'} onClick={() => setPeriod('specific')}>Escolher mês</button>
+                <button type="button" className={period === '6m' ? 'active' : ''} aria-pressed={period === '6m'} onClick={() => setPeriod('6m')}>6 meses</button>
+                <button type="button" className={period === '12m' ? 'active' : ''} aria-pressed={period === '12m'} onClick={() => setPeriod('12m')}>1 ano</button>
+              </div>
+            </div>
+            {period === 'specific' && <label className="attendance-month-control" title="Selecionar mês"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><input type="month" aria-label="Mês específico" max={today.slice(0, 7)} value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></label>}
             <Link to="/admin/funcionarios">Gerenciar funcionários <ArrowIcon /></Link>
           </div>
         </div>

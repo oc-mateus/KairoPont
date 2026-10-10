@@ -1500,6 +1500,12 @@ select.form-input {
 .section-heading h3 { font-size: var(--font-xl); color: var(--text-primary); }
 .section-heading p { color: var(--text-muted); font-size: var(--font-sm); margin-top: 2px; }
 .section-heading > a, .detail-link { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--kairo-green-300); font-size: var(--font-sm); font-weight: 600; white-space: nowrap; }
+.attendance-section-heading { align-items: flex-end; }
+.attendance-heading-actions { display: flex; align-items: flex-end; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-3); }
+.attendance-period-control { display: grid; min-width: 142px; gap: 4px; color: var(--text-muted); font-size: var(--font-xs); }
+.attendance-period-control .form-input { min-height: 38px; }
+.attendance-heading-actions > a { display: inline-flex; align-items: center; gap: var(--space-1); padding-bottom: 9px; color: var(--kairo-green-300); font-size: var(--font-sm); font-weight: 600; white-space: nowrap; }
+.attendance-loading { padding: var(--space-6); color: var(--text-muted); text-align: center; }
 
 .employee-overview-list { display: grid; gap: var(--space-4); }
 .employee-overview-card { background: var(--gradient-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; }
@@ -1729,6 +1735,8 @@ select.form-input {
 
 @media (max-width: 1024px) {
   .attendance-insights-grid { grid-template-columns: 1fr; }
+  .attendance-section-heading { align-items: flex-start; flex-direction: column; }
+  .attendance-heading-actions { justify-content: flex-start; }
   .app-sidebar {
     transform: translateX(-100%);
   }

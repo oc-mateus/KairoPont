@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import { calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, calcNightAdjustedMilliseconds, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
+import { calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, getCreditedDailyMinutes, getExpectedShiftMinutes, getOvertimeMinutes, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
 import WorkScheduleCard from '../../components/WorkScheduleCard';
-import { getAssignedShiftId, getShiftLabel, inferShiftFromEntry, makeEmployeeSchedule, summarizeWorkedShifts, WORK_SHIFTS } from '../../lib/workShifts';
+import { getAssignedShiftId, getFixedLunchLabel, getShiftLabel, inferShiftFromEntry, makeEmployeeSchedule, summarizeWorkedShifts, WORK_SHIFTS } from '../../lib/workShifts';
 
 const FILTERS = [
   { id: 'day', label: 'Dia' },
@@ -75,12 +75,6 @@ function safeFilename(name) {
   return (name || 'funcionario').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9-_]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
 }
 
-function timeMinutes(value) {
-  if (!value) return null;
-  const [hours, minutes] = String(value).slice(0, 5).split(':').map(Number);
-  return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : null;
-}
-
 function durationLabel(minutes) {
   if (minutes == null) return '—';
   const roundedMinutes = Math.round(Math.abs(minutes));
@@ -97,31 +91,15 @@ function getScheduleComparison(record, schedule) {
   const actualShiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada);
   const shiftDay = actualShiftId ? makeEmployeeSchedule(actualShiftId).horarios_por_dia[String(weekday)] : null;
   const daily = shiftDay || schedule.horarios_por_dia?.[String(weekday)] || schedule;
-  const entry = timeMinutes(daily.entrada);
-  const lunchOut = timeMinutes(daily.saida_almoco);
-  const lunchIn = timeMinutes(daily.retorno_almoco);
-  const exit = timeMinutes(daily.saida);
-  const expectedExitDate = entry != null && exit != null && exit <= entry ? addIsoDays(record.data, 1) : record.data;
-  let expectedMs = null;
-  if (entry != null && exit != null) {
-    expectedMs = 0;
-    if (lunchOut != null) expectedMs += calcNightAdjustedMilliseconds(record.data, daily.entrada, record.data, daily.saida_almoco);
-    if (lunchOut == null) expectedMs += calcNightAdjustedMilliseconds(record.data, daily.entrada, expectedExitDate, daily.saida);
-    if (lunchIn != null) expectedMs += calcNightAdjustedMilliseconds(record.data, daily.retorno_almoco, expectedExitDate, daily.saida);
-  }
-  const expectedMinutes = expectedMs == null ? null : expectedMs / 60000;
-  const actualEntry = timeMinutes(record.entrada);
-  const actualExit = timeMinutes(record.saida);
-  let actualMs = 0;
-  if (record.entrada && record.saida && !record.saida_almoco && !record.retorno_almoco) {
-    actualMs += calcNightAdjustedMilliseconds(record.data, record.entrada, record.saida_data || record.data, record.saida);
-  } else {
-    if (record.entrada && record.saida_almoco) actualMs += calcNightAdjustedMilliseconds(record.data, record.entrada, record.data, record.saida_almoco);
-    if (record.retorno_almoco && record.saida) actualMs += calcNightAdjustedMilliseconds(record.data, record.retorno_almoco, record.saida_data || record.data, record.saida);
-  }
-  const actualMinutes = actualEntry != null && actualExit != null ? actualMs / 60000 : null;
+  const actualMinutes = record.entrada && record.saida ? getCreditedDailyMinutes(record, actualShiftId) : null;
+  const expectedMinutes = getExpectedShiftMinutes(record, actualShiftId || getAssignedShiftId(schedule));
   const expected = expectedMinutes == null ? '—' : formatMinutesAsHours(expectedMinutes);
-  return { expected, balance: durationLabel(actualMinutes == null || expectedMinutes == null ? null : actualMinutes - expectedMinutes) };
+  const balanceMinutes = actualMinutes == null || expectedMinutes == null ? null : actualMinutes - expectedMinutes;
+  return {
+    expected,
+    balance: durationLabel(balanceMinutes),
+    overtimeMinutes: record.saida && balanceMinutes != null ? Math.max(0, balanceMinutes) : 0,
+  };
 }
 
 export default function AdminEmployees() {
@@ -234,7 +212,12 @@ export default function AdminEmployees() {
       setEmployeeForm({ nome: '', email: '', cpf: '', cargo: '', tipo_contrato: 'clt', data_admissao: getTodayInSP(), turno_id: 'turno1', ...makeEmployeeSchedule('turno1') });
       await fetchEmployees();
     } catch (error) {
-      toast.error(error.message || 'Não foi possível enviar o convite.');
+      let message = error.message || 'Não foi possível enviar o convite.';
+      if (error?.context?.json) {
+        const responseBody = await error.context.json().catch(() => null);
+        if (responseBody?.error) message = responseBody.error;
+      }
+      toast.error(message);
     } finally {
       setSavingEmployment(false);
     }
@@ -398,6 +381,7 @@ export default function AdminEmployees() {
         period: `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
         filename: `ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.xlsx`,
         calcDailyTotal: employeeDailyTotal,
+        lunchLabel: selectedEmp.tipo_contrato === 'pj' ? null : (record) => getFixedLunchLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada), record.data),
         summary: selectedEmp.tipo_contrato === 'pj' ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(employeePeriodMinutes) } : null,
         extraColumns: [
           { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT' },
@@ -424,6 +408,8 @@ export default function AdminEmployees() {
       const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
       const pdf = new jsPDF({ orientation: 'landscape' });
       const shiftSummary = summarizeWorkedShifts(records);
+      const overtimeMinutes = selectedEmp.tipo_contrato === 'pj' ? 0 : records.reduce((total, record) => total + getOvertimeMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)), 0);
+      const overtimeDays = selectedEmp.tipo_contrato === 'pj' ? 0 : records.filter((record) => getOvertimeMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)) > 0).length;
       const tableStartY = await addKairoPdfHeader(pdf, {
         title: `Relatório de ponto - ${selectedEmp.nome}`,
         details: [
@@ -450,13 +436,24 @@ export default function AdminEmployees() {
           styles: { cellPadding: 2.5 },
         });
         reportStart = pdf.lastAutoTable.finalY + 5;
+        pdf.text('Resumo de horas extras', 14, reportStart + 2);
+        autoTable(pdf, {
+          startY: reportStart + 4,
+          head: [['Total de horas extras', 'Dias com horas extras']],
+          body: [[formatMinutesAsHours(overtimeMinutes), String(overtimeDays)]],
+          theme: 'grid',
+          headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          bodyStyles: { fontSize: 9, halign: 'center' },
+          styles: { cellPadding: 2.5 },
+        });
+        reportStart = pdf.lastAutoTable.finalY + 5;
       }
       autoTable(pdf, {
         startY: reportStart,
-        head: [[...(selectedEmp.tipo_contrato === 'pj' ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Turno', 'Saída almoço', 'Retorno']), 'Saída', 'Saída em', 'Horas computadas', ...(selectedEmp.tipo_contrato === 'pj' ? [] : ['Previsto', 'Saldo']), 'Status']],
+        head: [[...(selectedEmp.tipo_contrato === 'pj' ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Turno', 'Almoço fixo']), 'Saída', 'Saída em', 'Horas computadas', ...(selectedEmp.tipo_contrato === 'pj' ? [] : ['Previsto', 'Saldo']), 'Status']],
         body: records.map((record) => [
           formatDate(`${record.data}T12:00:00`), formatTime(record.entrada),
-          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), formatTime(record.saida_almoco), formatTime(record.retorno_almoco)]),
+          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), getFixedLunchLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada), record.data)]),
           formatTime(record.saida), record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia', employeeDailyTotal(record),
           ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getScheduleComparison(record, selectedEmp.escala_trabalho).expected, getScheduleComparison(record, selectedEmp.escala_trabalho).balance]),
           record.saida ? 'Completo' : 'Incompleto',
@@ -612,7 +609,7 @@ export default function AdminEmployees() {
                   </div>
                   <div className="employee-punch-edit-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingPunchId(null)} disabled={savingPunch}>Cancelar</button><button className="btn btn-primary btn-sm" disabled={savingPunch}>{savingPunch ? 'Salvando…' : 'Salvar horários'}</button></div>
                 </form>}
-                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Turno do dia</th><th>Saída almoço</th><th>Retorno almoço</th></>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ajuste</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho); const editable = canEditPunch(record); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada))}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td></>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td>{editable ? <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Editar horários</button> : <span className="employee-punch-locked" title="Prazo de 96 horas após a criação encerrado">Prazo encerrado</span>}</td></tr>; })}</tbody></table></div>
+                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Turno do dia</th><th>Almoço fixo</th></>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ajuste</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); const editable = canEditPunch(record); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{getShiftLabel(shiftId)}</td><td>{getFixedLunchLabel(shiftId, record.data)}</td></>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td>{editable ? <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Editar horários</button> : <span className="employee-punch-locked" title="Prazo de 96 horas após a criação encerrado">Prazo encerrado</span>}</td></tr>; })}</tbody></table></div>
               </>
             ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
           </section>

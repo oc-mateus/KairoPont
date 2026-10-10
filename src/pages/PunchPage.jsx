@@ -4,7 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { formatTime, getTodayInSP, formatDate } from '../lib/utils';
 import { Spinner, Badge } from '../components/ui';
-import { getAssignedShiftId, getShiftLabel, inferShiftForRecord } from '../lib/workShifts';
+import { getAssignedShiftId, getShiftLabel } from '../lib/workShifts';
 
 export const PunchInIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>;
 export const LunchOutIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>;
@@ -15,20 +15,8 @@ export const BlockIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="n
 
 const PUNCH_STEPS = [
   { field: 'entrada', label: 'Entrada', icon: PunchInIcon, description: 'Registrar entrada na empresa' },
-  { field: 'saida_almoco', label: 'Saída Almoço', icon: LunchOutIcon, description: 'Registrar saída para almoço' },
-  { field: 'retorno_almoco', label: 'Retorno Almoço', icon: LunchInIcon, description: 'Registrar retorno do almoço' },
   { field: 'saida', label: 'Saída', icon: PunchOutIcon, description: 'Registrar saída da empresa' },
 ];
-
-function getDailyPunchSteps(schedule, record) {
-  if (!schedule) return PUNCH_STEPS;
-  const date = record?.data || getTodayInSP();
-  const day = new Date(`${date}T12:00:00`).getDay() || 7;
-  const shiftId = inferShiftForRecord(record, schedule.turno_id || schedule.tipo);
-  return ['turno1', 'turno2'].includes(shiftId) && day >= 1 && day <= 5
-    ? PUNCH_STEPS
-    : PUNCH_STEPS.filter((step) => !['saida_almoco', 'retorno_almoco'].includes(step.field));
-}
 
 function previousIsoDate(date) {
   const value = new Date(`${date}T12:00:00`);
@@ -91,9 +79,7 @@ export default function PunchPage() {
   }, [fetchTodayRecord]);
 
   // Determina o próximo passo
-  const punchSteps = profile?.tipo_contrato === 'pj'
-    ? PUNCH_STEPS.filter((step) => ['entrada', 'saida'].includes(step.field))
-    : getDailyPunchSteps(profile?.escala_trabalho, todayRecord);
+  const punchSteps = PUNCH_STEPS;
   const getNextStep = () => {
     if (!todayRecord) return 0; // entrada
     for (let i = 0; i < punchSteps.length; i++) {

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import { formatDate, formatTime, calcDailyTotal } from '../../lib/utils';
+import { formatDate, formatTime, calcDailyTotal, calcElapsedDailyTotal } from '../../lib/utils';
 import { Spinner, Badge } from '../../components/ui';
+import { getFixedLunchLabel, getShiftLabel, inferShiftFromEntry } from '../../lib/workShifts';
 
 export default function AdminRecords() {
   const toast = useToast();
@@ -14,7 +15,7 @@ export default function AdminRecords() {
     try {
       const { data, error } = await supabase
         .from('registros_ponto')
-        .select('*, funcionarios(nome, cpf)')
+        .select('*, funcionarios(nome, cpf, tipo_contrato)')
         .order('data', { ascending: false })
         .limit(100);
 
@@ -46,10 +47,10 @@ export default function AdminRecords() {
             <thead>
               <tr>
                 <th>Funcionário</th>
+                <th>Vínculo</th>
                 <th>Data</th>
                 <th>Entrada</th>
-                <th>Saída Almoço</th>
-                <th>Retorno Almoço</th>
+                <th>Turno / almoço fixo</th>
                 <th>Saída</th>
                 <th>Horas computadas</th>
                 <th>Status</th>
@@ -59,12 +60,12 @@ export default function AdminRecords() {
               {records.map(r => (
                 <tr key={r.id}>
                   <td style={{ fontWeight: 500 }}>{r.funcionarios?.nome}</td>
+                  <td><Badge variant={r.funcionarios?.tipo_contrato === 'pj' ? 'info' : 'neutral'}>{r.funcionarios?.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</Badge></td>
                   <td>{formatDate(r.data + 'T00:00:00')}</td>
                   <td>{formatTime(r.entrada)}</td>
-                  <td>{formatTime(r.saida_almoco)}</td>
-                  <td>{formatTime(r.retorno_almoco)}</td>
+                  <td>{r.funcionarios?.tipo_contrato === 'pj' ? '—' : `${getShiftLabel(r.turno_trabalhado || inferShiftFromEntry(r.entrada))} · ${getFixedLunchLabel(r.turno_trabalhado || inferShiftFromEntry(r.entrada), r.data)}`}</td>
                   <td>{formatTime(r.saida)}</td>
-                  <td><strong>{calcDailyTotal(r)}</strong></td>
+                  <td><strong>{r.funcionarios?.tipo_contrato === 'pj' ? calcElapsedDailyTotal(r) : calcDailyTotal(r)}</strong></td>
                   <td>
                     <Badge variant={r.saida ? 'success' : 'warning'}>
                       {r.saida ? 'Completo' : 'Incompleto'}

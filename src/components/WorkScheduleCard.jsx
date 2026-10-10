@@ -11,14 +11,15 @@ export function WorkScheduleSummary({ schedule }) {
   return <>
     <div className="work-schedule-days" aria-label="Dias de trabalho">{WEEKDAYS.map((day, index) => <span className={days.has(index + 1) ? 'scheduled' : ''} key={day}>{day}</span>)}</div>
     <div className="work-schedule-table">
-      <div className="work-schedule-row work-schedule-header"><span>Dia</span><span>Entrada</span><span>Intervalo</span><span>Retorno</span><span>Saída</span></div>
+      <div className="work-schedule-row work-schedule-header"><span>Dia</span><span>Entrada</span><span>Almoço fixo</span><span>Até</span><span>Saída</span></div>
       {WEEKDAYS.map((day, index) => {
         const weekday = index + 1;
         const works = days.has(weekday);
         const hours = visibleSchedule.horarios_por_dia?.[String(weekday)] || visibleSchedule;
         const hasLunch = hours.saida_almoco && hours.retorno_almoco;
+        const nextDayLunch = shiftId === 'turno3' && weekday <= 5;
         return <div className={`work-schedule-row ${works ? 'scheduled' : 'day-off'}`} key={day}>
-          <strong>{day}</strong><span>{works ? hours.entrada || '—' : 'Folga'}</span><span>{works ? hasLunch ? hours.saida_almoco : 'Sem intervalo' : '—'}</span><span>{works && hasLunch ? hours.retorno_almoco : '—'}</span><span>{works ? hours.saida || '—' : '—'}{works && shiftId === 'turno3' && weekday <= 6 ? ' (dia seguinte)' : ''}</span>
+          <strong>{day}</strong><span>{works ? hours.entrada || '—' : 'Folga'}</span><span>{works ? hasLunch ? `${hours.saida_almoco}${nextDayLunch ? ' (dia seguinte)' : ''}` : 'Sem intervalo' : '—'}</span><span>{works && hasLunch ? `${hours.retorno_almoco}${nextDayLunch ? ' (dia seguinte)' : ''}` : '—'}</span><span>{works ? hours.saida || '—' : '—'}{works && shiftId === 'turno3' && weekday <= 6 ? ' (dia seguinte)' : ''}</span>
         </div>;
       })}
     </div>

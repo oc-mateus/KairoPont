@@ -31,8 +31,8 @@ function makeSchedule(value: unknown) {
   const id = String(submitted.turno_id || "");
   const shifts: Record<string, { start: string; end: string; lunchOut?: string; lunchReturn?: string }> = {
     turno1: { start: "08:00", end: "17:00", lunchOut: "12:00", lunchReturn: "13:00" },
-    turno2: { start: "14:00", end: "22:52", lunchOut: "19:30", lunchReturn: "20:30" },
-    turno3: { start: "22:45", end: "06:15" },
+    turno2: { start: "14:00", end: "22:52", lunchOut: "19:00", lunchReturn: "20:00" },
+    turno3: { start: "22:45", end: "06:15", lunchOut: "02:00", lunchReturn: "03:00" },
   };
   const shift = shifts[id];
   if (!shift) return null;
@@ -84,7 +84,11 @@ Deno.serve(async (req) => {
     const tipoContrato = String(input.tipo_contrato || "clt");
     const dataAdmissao = String(input.data_admissao || "");
     const escala = makeSchedule(input.escala_trabalho);
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const todayParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date());
+    const todayValues = Object.fromEntries(todayParts.map((part) => [part.type, part.value]));
+    const today = todayValues.year + "-" + todayValues.month + "-" + todayValues.day;
 
     if (!/^\S+@\S+\.\S+$/.test(email) || nome.length < 3 || cargo.length < 2 || !validCPF(cpf) || !["clt", "pj"].includes(tipoContrato)) {
       return response({ error: "Confira o nome, e-mail, CPF e cargo informados." }, 400);

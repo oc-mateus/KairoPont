@@ -1,8 +1,24 @@
 export const WORK_SHIFTS = {
   turno1: { id: 'turno1', label: '1º turno', start: '08:00', end: '17:00', lunchOut: '12:00', lunchReturn: '13:00' },
-  turno2: { id: 'turno2', label: '2º turno', start: '14:00', end: '22:52', lunchOut: '19:30', lunchReturn: '20:30' },
-  turno3: { id: 'turno3', label: '3º turno', start: '22:45', end: '06:15', overnight: true },
+  turno2: { id: 'turno2', label: '2º turno', start: '14:00', end: '22:52', lunchOut: '19:00', lunchReturn: '20:00' },
+  turno3: { id: 'turno3', label: '3º turno', start: '22:45', end: '06:15', lunchOut: '02:00', lunchReturn: '03:00', lunchNextDay: true, overnight: true },
 };
+
+export function getFixedLunchSchedule(shiftId) {
+  const shift = WORK_SHIFTS[shiftId];
+  if (!shift?.lunchOut || !shift?.lunchReturn) return null;
+  return { start: shift.lunchOut, end: shift.lunchReturn, nextDay: Boolean(shift.lunchNextDay) };
+}
+
+export function getFixedLunchLabel(shiftId, workDate = null) {
+  if (workDate) {
+    const weekday = new Date(`${workDate}T12:00:00`).getDay() || 7;
+    if (weekday === 6 || weekday === 7) return 'Sem intervalo';
+  }
+  const lunch = getFixedLunchSchedule(shiftId);
+  if (!lunch) return 'Sem intervalo';
+  return `${lunch.start}–${lunch.end}${lunch.nextDay ? ' (dia seguinte)' : ''}`;
+}
 
 export function getShiftLabel(id) {
   return WORK_SHIFTS[id]?.label || 'Turno não identificado';

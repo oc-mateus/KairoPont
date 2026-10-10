@@ -2,6 +2,8 @@
  * Utilitários de data/hora para o fuso America/Sao_Paulo
  */
 
+import { getFixedLunchSchedule, inferShiftForRecord, makeEmployeeSchedule } from './workShifts';
+
 const TIMEZONE = 'America/Sao_Paulo';
 
 /**
@@ -140,6 +142,86 @@ export function calcNightAdjustedMilliseconds(startDate, startTime, endDate, end
   return (end - start - reducedNightMs) + (reducedNightMs * 8 / 7);
 }
 
+function nextIsoDate(dateValue) {
+  const [year, month, day] = String(dateValue).slice(0, 10).split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + 1));
+  return date.toISOString().slice(0, 10);
+}
+
+function dateAndTimeFromTimestamp(timestamp) {
+  const value = new Date(timestamp).toISOString();
+  return { date: value.slice(0, 10), time: value.slice(11, 19) };
+}
+
+/** CLT credit calculation, applying the fixed meal window when no legacy meal punches exist. */
+export function calcCreditedDailyMilliseconds(record, shiftId = null) {
+  if (!record?.entrada || !record?.saida) return 0;
+  const shift = shiftId || inferShiftForRecord(record);
+  let endDate = record.saida_data || record.data;
+  if (!record.saida_data && clockMinutes(record.saida) <= clockMinutes(record.entrada)) endDate = nextIsoDate(record.data);
+
+  if (record.saida_almoco || record.retorno_almoco) {
+    let total = 0;
+    if (record.entrada && record.saida_almoco) {
+      total += calcNightAdjustedMilliseconds(record.data, record.entrada, record.data, record.saida_almoco);
+    }
+    if (record.retorno_almoco && record.saida) {
+      total += calcNightAdjustedMilliseconds(record.data, record.retorno_almoco, endDate, record.saida);
+    }
+    return total;
+  }
+
+  const total = calcNightAdjustedMilliseconds(record.data, record.entrada, endDate, record.saida);
+  const lunch = getFixedLunchSchedule(shift);
+  if (!lunch) return total;
+
+  const start = toUtcTimestamp(record.data, record.entrada);
+  const end = toUtcTimestamp(endDate, record.saida);
+  const lunchDate = lunch.nextDay ? nextIsoDate(record.data) : record.data;
+  const lunchStart = toUtcTimestamp(lunchDate, lunch.start);
+  const lunchEnd = toUtcTimestamp(lunchDate, lunch.end);
+  const overlapStart = Math.max(start, lunchStart);
+  const overlapEnd = Math.min(end, lunchEnd);
+  if (overlapEnd <= overlapStart) return total;
+
+  const overlapStartParts = dateAndTimeFromTimestamp(overlapStart);
+  const overlapEndParts = dateAndTimeFromTimestamp(overlapEnd);
+  const lunchCredit = calcNightAdjustedMilliseconds(
+    overlapStartParts.date, overlapStartParts.time, overlapEndParts.date, overlapEndParts.time,
+  );
+  return Math.max(0, total - lunchCredit);
+}
+
+export function getCreditedDailyMinutes(record, shiftId = null) {
+  return calcCreditedDailyMilliseconds(record, shiftId) / 60000;
+}
+
+export function getExpectedShiftMinutes(record, shiftId = null) {
+  const shift = shiftId || inferShiftForRecord(record);
+  if (!shift || !record?.data) return null;
+  const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
+  const daily = makeEmployeeSchedule(shift)?.horarios_por_dia?.[String(weekday)];
+  if (!daily?.entrada || !daily?.saida) return null;
+  const expectedExitDate = clockMinutes(daily.saida) <= clockMinutes(daily.entrada)
+    ? nextIsoDate(record.data)
+    : record.data;
+  return getCreditedDailyMinutes({
+    data: record.data,
+    entrada: daily.entrada,
+    saida: daily.saida,
+    saida_data: expectedExitDate,
+    turno_trabalhado: shift,
+  }, shift);
+}
+
+export function getOvertimeMinutes(record, shiftId = null) {
+  if (!record?.entrada || !record?.saida) return 0;
+  const shift = shiftId || inferShiftForRecord(record);
+  const expected = getExpectedShiftMinutes(record, shift);
+  if (expected == null) return 0;
+  return Math.max(0, getCreditedDailyMinutes(record, shift) - expected);
+}
+
 export function formatMinutesAsHours(totalMinutes) {
   if (!Number.isFinite(totalMinutes)) return '—';
   const roundedMinutes = Math.round(Math.abs(totalMinutes));
@@ -154,24 +236,8 @@ export function formatMinutesAsHours(totalMinutes) {
  * Calcula o total trabalhado no dia (entrada-almoço + retorno-saída)
  */
 export function calcDailyTotal(record) {
-  if (!record) return '—';
-  let totalMs = 0;
-
-  const endDate = record.saida_data || record.data;
-  if (record.entrada && record.saida && !record.saida_almoco && !record.retorno_almoco) {
-    totalMs += calcNightAdjustedMilliseconds(record.data, record.entrada, endDate, record.saida);
-  } else {
-    if (record.entrada && record.saida_almoco) {
-      totalMs += calcNightAdjustedMilliseconds(record.data, record.entrada, record.data, record.saida_almoco);
-    }
-    if (record.retorno_almoco && record.saida) {
-      totalMs += calcNightAdjustedMilliseconds(record.data, record.retorno_almoco, endDate, record.saida);
-    }
-  }
-  
-  if (totalMs === 0) return '—';
-
-  return formatMinutesAsHours(totalMs / 60000);
+  const totalMs = calcCreditedDailyMilliseconds(record);
+  return totalMs === 0 ? '—' : formatMinutesAsHours(totalMs / 60000);
 }
 
 function clockMinutes(value) {

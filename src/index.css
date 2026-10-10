@@ -1249,6 +1249,14 @@ select.form-input {
   margin-bottom: var(--space-8);
 }
 
+.login-contract-type { margin-bottom: var(--space-5); }
+.login-contract-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); padding: 4px; border: 1px solid var(--border-default); border-radius: 12px; background: rgba(11, 25, 19, .72); }
+.login-contract-options button { min-height: 42px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-muted); font: inherit; font-weight: 700; cursor: pointer; transition: color .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.login-contract-options button:hover { color: var(--text-primary); background: rgba(255, 255, 255, .045); }
+.login-contract-options button.active { border-color: rgba(53,183,106,.33); background: linear-gradient(135deg, rgba(53,183,106,.2), rgba(29,110,67,.23)); color: var(--kairo-green-300); box-shadow: 0 3px 12px rgba(15,120,65,.13), inset 0 1px rgba(255,255,255,.04); }
+.login-contract-options button:focus-visible { outline: 2px solid var(--kairo-green-400); outline-offset: 2px; }
+.login-contract-options button:disabled { cursor: not-allowed; opacity: .65; }
+
 .login-divider {
   display: flex;
   align-items: center;

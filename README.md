@@ -18,22 +18,27 @@ O KairoPont organiza o registro de jornada, a consulta de históricos e o envio 
 
 ```mermaid
 flowchart LR
-    A[Funcionário entra na conta] --> B[Registra entrada]
-    B --> C[Saída para almoço]
-    C --> D[Retorno do almoço]
+    A[Funcionário seleciona CLT ou PJ e entra] --> B{Tipo de vínculo}
+    B -->|CLT| C[Registra entrada]
+    C --> D[Intervalo fixo calculado automaticamente]
     D --> E[Registra saída]
-    E --> F[Consulta histórico]
+    B -->|PJ| F[Registra entrada e saída]
+    E --> G[Consulta histórico e folha de ponto]
+    F --> G
 ```
 
-O Supabase valida a sequência e grava os horários oficiais no servidor, no fuso de São Paulo. O funcionário consulta os próprios registros e pode exportar o histórico.
+O Supabase valida o tipo de vínculo e a sequência das marcações e grava os horários oficiais no servidor, no fuso de São Paulo. Funcionários PJ registram entrada e saída e acompanham o total de horas trabalhadas; funcionários CLT também registram somente entrada e saída, com almoço fixo calculado a partir do turno. O funcionário consulta os próprios registros e pode exportar o histórico.
 
 ### Recursos
 
 | Funcionário | Administrador |
 | --- | --- |
-| Registrar as quatro etapas da jornada | Acompanhar registros e indicadores da equipe |
+| Escolher CLT ou PJ no login e registrar o próprio ponto | Acompanhar faltas, atrasos e horas extras de CLT |
 | Consultar o próprio histórico | Gerenciar perfis e status de funcionários |
-| Enviar e consultar documentos autorizados | Consultar documentos e trilha de auditoria |
+| Exportar folha de ponto em PDF ou Excel | Pesquisar funcionários por nome, CPF e cargo e ordenar alfabeticamente |
+| Enviar e consultar documentos autorizados | Distinguir CLT/PJ e ver resumo de horas PJ e extras CLT |
+
+O painel de frequência filtra mês atual, mês/ano específico, últimos seis meses ou último ano. Quando um mês específico não tem registros CLT, o painel informa que não há dados para aquele período. A folha de ponto identifica o vínculo; CLT apresenta turno e almoço fixo, enquanto PJ apresenta apenas entrada, saída e horas computadas.
 
 O cadastro cria perfis de funcionário. A atribuição do papel de administrador é feita de forma controlada no banco, nunca pelo frontend.
 
@@ -42,7 +47,7 @@ O cadastro cria perfis de funcionário. A atribuição do papel de administrador
 - As políticas RLS limitam funcionários aos próprios dados; ações administrativas exigem perfil de administrador.
 - O bucket `documentos` é privado. O bucket de fotos de perfil é público para exibir avatares.
 - A tela valida formato e tamanho de arquivo, mas essas restrições ainda precisam ser configuradas no próprio Storage para serem impostas no servidor.
-- O acesso é feito com e-mail corporativo e senha. O CPF é solicitado no cadastro e usado para identificar o funcionário, não para entrar.
+- O acesso é feito com e-mail e senha, com seleção do vínculo CLT/PJ validada contra o cadastro do funcionário. Administradores podem usar qualquer opção. O CPF é solicitado no cadastro e usado para identificar o funcionário, não para entrar.
 
 O site está publicado. Antes do uso operacional, ainda é necessário concluir a configuração de redirecionamento do Auth, provisionar a conta administrativa e reforçar a validação de arquivos no Storage.
 

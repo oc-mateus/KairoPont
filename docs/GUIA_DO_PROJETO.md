@@ -1,6 +1,6 @@
 # KairoPont — guia do projeto
 
-Revisado em 7 de outubro de 2026
+Revisado em 10 de outubro de 2026
 
 **Aplicação:** [https://oc-mateus.github.io/KairoPont/](https://oc-mateus.github.io/KairoPont/)  
 **Código-fonte:** [https://github.com/oc-mateus/KairoPont](https://github.com/oc-mateus/KairoPont)
@@ -13,15 +13,16 @@ O site está publicado e o workflow automatizado de build e publicação está a
 
 A aplicação também pode ser instalada como PWA em navegadores compatíveis. No Android, abra o endereço HTTPS no Chrome e use **Instalar aplicativo** (no botão do sistema, quando disponível, ou no menu do navegador). O modo instalado abre em janela própria; recursos que dependem do Supabase ainda precisam de conexão. O Chrome para iOS não oferece o mesmo fluxo de instalação do Android; nesse sistema, use a opção de adicionar à tela inicial oferecida pelo navegador compatível.
 
-**O projeto ainda não está validado para operação real.** O acesso é feito com e-mail corporativo e senha. Contas comuns são criadas somente por convite do administrador; o funcionário define a própria senha pelo link enviado ao e-mail. O CPF permanece como dado de identificação, não como forma de login.
+**O projeto ainda não está validado para operação real.** O acesso é feito com e-mail e senha e inclui a seleção do vínculo CLT ou PJ; o sistema confere a opção com o cadastro do funcionário. Administradores continuam podendo entrar sem essa validação. Contas comuns são criadas somente por convite; o funcionário define a própria senha pelo link enviado ao e-mail. O CPF permanece como dado de identificação, não como forma de login.
 
 ## O que a aplicação oferece
 
 ### Para funcionários
 
-- Entrar com e-mail e senha.
+- Entrar com e-mail e senha e escolher CLT ou PJ na tela de login; se o vínculo selecionado não corresponder ao cadastro, a sessão é encerrada e o funcionário recebe uma orientação. Administradores podem entrar pelas duas opções.
 - Receber convite do administrador e definir a própria senha.
-- Registrar jornada conforme o turno efetivo do dia: entrada e saída; no 1º turno de segunda a sexta também registra saída e retorno do almoço.
+- CLT registra entrada e saída. O intervalo é descontado pelo horário fixo do turno, sem precisar marcar saída e retorno do almoço.
+- PJ registra entrada e saída, sem turno ou almoço programado; o sistema soma o tempo entre as duas marcações para o acompanhamento das horas do período.
 - Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
 - Enviar atestado médico ou declaração de horas e baixar documentos autorizados.
 - Atualizar dados básicos do perfil e a foto.
@@ -33,18 +34,20 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 ### Para administradores
 
 - Consultar indicadores e registros da equipe.
+- No painel, acompanhar faltas, atrasos e horas extras de funcionários CLT ativos, sem incluir administradores. O período pode ser o mês atual, um mês/ano escolhido, os últimos seis meses ou o último ano; meses específicos sem registros apresentam uma mensagem de estado vazio.
 - Gerenciar perfis e status de funcionários.
-- Selecionar um funcionário para consultar nome completo, CPF, cargo, registros de ponto e documentos enviados, incluindo data e tipo.
+- Pesquisar funcionários por nome, CPF ou cargo e ordenar a lista alfabeticamente crescente ou decrescente. A lista e a ficha identificam o vínculo CLT/PJ.
+- Selecionar um funcionário para consultar nome completo, CPF, cargo, registros de ponto e documentos enviados, incluindo data e tipo. Na ficha, o vínculo aparece como informação e o seletor só é aberto quando o administrador escolhe editar; o formulário de convite permite selecionar o vínculo ao cadastrar.
 - O menu de administradores mostra Painel Admin, Funcionários e Férias; Meu Perfil permanece na seção Conta. Registrar Ponto, Meu Histórico, Documentos e Minhas Férias não aparecem para administradores, pois ponto e documentos são acessados pela ficha individual e as férias pela gestão administrativa.
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
-- Criar funcionário por convite, informando admissão, cargo e escala semanal; editar admissão/escala dos perfis existentes.
-- Escolher entre três turnos fixos para cada funcionário: 1º (08h–17h, almoço 12h–13h), 2º (14h–22h45) e 3º (22h45–06h15 do dia seguinte). A escolha preenche os horários automaticamente; não há um editor separado de horários. Todos trabalham aos sábados das 08h às 12h sem intervalo e folgam aos domingos. Os intervalos do 2º e do 3º turno aguardam definição. O turno habitual permanece no perfil; a batida de entrada classifica o turno realmente feito para aquele registro, sem alterar o perfil. A saída do 3º turno é vinculada ao registro iniciado na véspera e traz data própria. Depois de salvar, a seleção recolhe; o administrador pode reabri-la em **Editar turno**. A data de admissão também permanece como informação depois do cadastro e só vira campo editável ao selecionar **Editar data de admissão**; ao salvar, o campo e o botão de salvamento recolhem novamente.
+- Criar funcionário por convite, informando admissão, cargo e vínculo. O turno é solicitado somente para CLT; editar um vínculo existente abre o seletor sob demanda. A escala e a data de admissão permanecem como informação depois do cadastro e só aparecem como campos quando o administrador escolhe editar. O resumo do turno pode ser recolhido ou expandido; a preferência fica salva neste navegador para cada perfil.
+- Para CLT, escolher entre três turnos fixos: 1º (08h–17h, almoço 12h–13h), 2º (14h–22h52, almoço 19h–20h) e 3º (22h45–06h15 do dia seguinte, almoço 02h–03h do dia seguinte). O sábado usa a jornada definida para cada turno; domingo é folga. A entrada classifica o turno feito no registro sem alterar o turno habitual do perfil. A saída noturna pode ser vinculada ao registro iniciado na véspera e recebe data própria.
 - Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
 - Na ficha do funcionário, consultar a data de admissão, quando o pedido será liberado e a primeira data possível de saída; na fila, revisar saída e retorno solicitados.
 - Comparar nas tabelas de ponto as horas registradas, a jornada planejada para cada dia e o saldo diário.
 
-Os relatórios PDF de ponto do funcionário e do administrador exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. Antes da folha detalhada, o PDF apresenta um resumo das quantidades de dias trabalhados em cada turno no período e os registros sem turno identificado. As folhas mostram o turno real do dia e a data de saída quando atravessa a meia-noite; a ficha administrativa, PDF e Excel também comparam a jornada prevista com o total marcado. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
+Os PDFs de ponto baixados pelo administrador na ficha do funcionário e pelo próprio funcionário no Histórico exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. Para CLT, o resumo contabiliza dias por turno, registros sem turno identificado e horas extras do período; para PJ, identifica o tipo de vínculo e totaliza as horas trabalhadas, sem exibir turno. A folha detalhada identifica o vínculo; CLT exibe o turno e o intervalo fixo, enquanto PJ exibe somente entrada, saída e horas computadas. A saída noturna CLT mostra a data correta quando atravessa a meia-noite. A ficha administrativa, PDF e Excel também comparam a jornada CLT prevista com o total marcado. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
 
 Operações administrativas dependem do papel armazenado no banco. Novos perfis comuns só podem ser convidados pelo administrador; cadastros sem convite são recusados pelo banco.
 
@@ -77,9 +80,9 @@ Operações administrativas dependem do papel armazenado no banco. Novos perfis 
 
 ## Registro de ponto
 
-A interface apresenta a próxima etapa válida e impede cliques repetidos enquanto a solicitação está em andamento. A função SQL registrar_ponto confere se o usuário ativo está registrando o próprio ponto, valida a sequência e usa a data e a hora do servidor Supabase no fuso America/Sao_Paulo.
+A interface apresenta a próxima etapa válida e impede cliques repetidos enquanto a solicitação está em andamento. A função SQL registrar_ponto confere se o usuário ativo está registrando o próprio ponto, valida a sequência e usa a data e a hora do servidor Supabase no fuso America/Sao_Paulo. O fluxo PJ aceita apenas entrada e saída, não atribui turno e calcula o tempo decorrido para o pagamento. No fluxo CLT, são registradas entrada e saída; o almoço é fixo e calculado no relatório sem marcações extras: 12h–13h no 1º turno, 19h–20h no 2º e 02h–03h no 3º (dia seguinte). Sábados não têm intervalo.
 
-Cada funcionário pode ter um registro por dia. As colunas guardam entrada, saída para almoço, retorno do almoço e saída final.
+Cada funcionário pode ter um registro por dia. O esquema preserva as colunas de almoço para compatibilidade, mas a interface atual só solicita entrada e saída; o intervalo CLT é calculado conforme o turno efetivamente classificado. Registros PJ não guardam turno.
 
 ## Dados e estrutura
 
@@ -149,8 +152,14 @@ As migrações devem ser aplicadas nesta ordem:
 4. supabase/migrations/20261007162427_vacation_requests_employee_schedule.sql
 5. supabase/migrations/20261007164037_custom_daily_work_schedules.sql
 6. supabase/migrations/20261007171841_vacation_request_return_date.sql
-7. supabase/migrations/20261007185959_admin_punch_edit_window.sql
-8. supabase/migrations/20261007190207_correct_punch_created_at_clock.sql
+7. supabase/migrations/20261007184409_fixed_work_shifts_and_overnight_punches.sql
+8. supabase/migrations/20261007185959_admin_punch_edit_window.sql
+9. supabase/migrations/20261007190207_correct_punch_created_at_clock.sql
+10. supabase/migrations/20261008234619_turno2_lunch_schedule.sql
+11. supabase/migrations/20261009193153_second_shift_ends_at_2252.sql
+12. supabase/migrations/20261009203030_saturday_shift_weekly_44h.sql
+13. supabase/migrations/20261010174106_pj_punch_and_employee_preferences.sql
+14. supabase/migrations/20261010180000_fixed_lunch_and_entry_exit_only.sql
 
 O projeto KairoPont registra as migrações listadas, com os buckets documentos (privado) e fotos-funcionarios (público). Não reaplique nem resete o banco de produção para seguir este guia.
 
@@ -158,9 +167,9 @@ As solicitações guardam separadamente o último dia de férias e a data de ret
 
 A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` (endereço verificado no Resend). Sem eles, a decisão é gravada, mas o envio falha e pode ser tentado novamente na fila administrativa. O envio do convite depende do SMTP configurado no Supabase Auth e da URL permitida `https://oc-mateus.github.io/KairoPont/definir-senha`, onde o funcionário define sua senha.
 
-Para perfis existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível.
+Para perfis CLT existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível. Perfis PJ não usam escala de turno nem comparativo CLT.
 
-Existem três escalas fixas. O turno efetivo é classificado pela entrada mais próxima do horário de início e salvo no registro diário. O turno 3 cruza a meia-noite; a data de saída fica separada da data da entrada, e o cálculo considera a virada do dia. Sábado é jornada contínua comum a todos (08h–12h, sem intervalo). Até que sejam informados, o 2º e o 3º turno não têm marcações de almoço configuradas.
+Existem três escalas fixas para CLT. O turno efetivo é classificado pela entrada mais próxima do horário de início e salvo no registro diário. Os intervalos em dias úteis são 12h–13h no turno 1, 19h–20h no turno 2 e 02h–03h no turno 3. O turno 3 cruza a meia-noite; a data de saída fica separada da data da entrada, e o cálculo considera a virada do dia. A jornada de sábado varia por turno e não inclui intervalo.
 
 Na ficha do funcionário, administradores podem corrigir os horários do registro de ponto individual até 96 horas após sua criação. O limite é contado e validado no banco, não apenas na interface. Depois do prazo, um gatilho bloqueia alterações e exclusões, inclusive por chamadas diretas; data-base e identificadores também não podem ser alterados. Cada correção gera um item na tabela `auditoria`. A tela apresenta “Editar horários” dentro do prazo e “Prazo encerrado” após o vencimento.
 

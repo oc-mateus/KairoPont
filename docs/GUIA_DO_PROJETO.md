@@ -26,12 +26,12 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - PJ registra entrada e saída, sem turno ou almoço programado; o sistema soma o tempo entre as duas marcações para o acompanhamento das horas do período.
 - Contas PJ não exibem Documentos nem Minhas Férias e são redirecionadas caso tentem abrir essas rotas diretamente. Na ficha administrativa, a seção de férias também aparece somente para CLT.
 - Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
-- Enviar atestado médico ou declaração de horas e baixar documentos autorizados.
+- CLT pode enviar atestado médico ou declaração de horas e baixar documentos autorizados. Essas opções não fazem parte da área do funcionário PJ.
 - Atualizar dados básicos do perfil e a foto.
-- Consultar períodos aquisitivos; a tela mostra a data de admissão e separa a data de liberação para solicitar da primeira data possível de saída. Antes de completar um ano, informa claramente a inelegibilidade.
-- Registrar se pretende vender férias e quantos dias (até 10) dentro do prazo; no pedido de gozo, informar data de saída e data de retorno ao trabalho.
-- Enviar a solicitação de gozo para a fila administrativa e acompanhar o envio do pedido; o resultado é comunicado exclusivamente por e-mail.
-- Receber exclusivamente por e-mail a decisão de aprovação ou recusa; recusas incluem a justificativa. A tela não revela o resultado da decisão.
+- CLT pode consultar períodos aquisitivos; a tela mostra a data de admissão e separa a data de liberação para solicitar da primeira data possível de saída. Antes de completar um ano, informa claramente a inelegibilidade.
+- CLT pode registrar se pretende vender férias e quantos dias (até 10) dentro do prazo; no pedido de gozo, informar data de saída e data de retorno ao trabalho.
+- A solicitação de gozo de férias CLT vai para a fila administrativa; o resultado é comunicado exclusivamente por e-mail.
+- A decisão de aprovação ou recusa de férias CLT chega exclusivamente por e-mail; recusas incluem a justificativa. A tela não revela o resultado da decisão.
 
 ### Para administradores
 

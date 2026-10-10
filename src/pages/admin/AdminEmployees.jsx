@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import { calcDailyTotal, calcNightAdjustedMilliseconds, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
+import { calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, calcNightAdjustedMilliseconds, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
@@ -150,12 +150,17 @@ export default function AdminEmployees() {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [nameSort, setNameSort] = useState('asc');
   const [savingEmployment, setSavingEmployment] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [editingAdmission, setEditingAdmission] = useState(false);
-  const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), turno_id: 'turno1', ...makeEmployeeSchedule('turno1') });
+  const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', tipo_contrato: 'clt', data_admissao: getTodayInSP(), turno_id: 'turno1', ...makeEmployeeSchedule('turno1') });
 
   const hasSavedSchedule = Boolean(selectedEmp?.escala_trabalho?.dias_semana?.length || (selectedEmp?.escala_trabalho?.entrada && selectedEmp?.escala_trabalho?.saida));
+  const contractChanged = selectedEmp && employeeForm.tipo_contrato !== (selectedEmp.tipo_contrato || 'clt');
+  const employeeDailyTotal = (record) => selectedEmp?.tipo_contrato === 'pj' ? calcElapsedDailyTotal(record) : calcDailyTotal(record);
+  const employeePeriodMinutes = selectedEmp?.tipo_contrato === 'pj' ? records.reduce((total, record) => total + getElapsedWorkMinutes(record), 0) : 0;
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -211,7 +216,7 @@ export default function AdminEmployees() {
     const schedule = employee.escala_trabalho || {};
     const shiftId = WORK_SHIFTS[schedule.turno_id || schedule.tipo] ? (schedule.turno_id || schedule.tipo) : inferShiftFromEntry(schedule.horarios_por_dia?.['1']?.entrada || schedule.entrada) || 'turno1';
     return {
-      nome: employee.nome || '', email: employee.email || '', cpf: formatCPF(employee.cpf) || '', cargo: employee.cargo || '',
+      nome: employee.nome || '', email: employee.email || '', cpf: formatCPF(employee.cpf) || '', cargo: employee.cargo || '', tipo_contrato: employee.tipo_contrato || 'clt',
       data_admissao: employee.data_admissao || '', turno_id: shiftId, ...makeEmployeeSchedule(shiftId),
     };
   };
@@ -226,7 +231,7 @@ export default function AdminEmployees() {
       if (error) throw error;
       toast.success('Convite enviado. O funcionário receberá um e-mail para definir a senha.');
       setShowInviteForm(false);
-      setEmployeeForm({ nome: '', email: '', cpf: '', cargo: '', data_admissao: getTodayInSP(), turno_id: 'turno1', ...makeEmployeeSchedule('turno1') });
+      setEmployeeForm({ nome: '', email: '', cpf: '', cargo: '', tipo_contrato: 'clt', data_admissao: getTodayInSP(), turno_id: 'turno1', ...makeEmployeeSchedule('turno1') });
       await fetchEmployees();
     } catch (error) {
       toast.error(error.message || 'Não foi possível enviar o convite.');
@@ -243,6 +248,7 @@ export default function AdminEmployees() {
         p_funcionario_id: selectedEmp.id,
         p_data_admissao: employeeForm.data_admissao,
         p_escala_trabalho: scheduleFromForm(employeeForm),
+        p_tipo_contrato: employeeForm.tipo_contrato,
       });
       if (error) throw error;
       toast.success('Data de admissão e turno habitual atualizados.');
@@ -262,11 +268,12 @@ export default function AdminEmployees() {
     <form className="vacation-form employee-employment-form" onSubmit={onSubmit}>
       {showInviteForm && <div className="form-row"><label className="form-group">Nome completo<input className="form-input" required minLength={3} value={employeeForm.nome} onChange={(event) => setFormField('nome', event.target.value)} /></label><label className="form-group">E-mail corporativo<input className="form-input" required type="email" value={employeeForm.email} onChange={(event) => setFormField('email', event.target.value)} /></label></div>}
       {showInviteForm && <div className="form-row"><label className="form-group">CPF<input className="form-input" required inputMode="numeric" value={employeeForm.cpf} onChange={(event) => setFormField('cpf', maskCPF(event.target.value))} /></label><label className="form-group">Cargo<input className="form-input" required value={employeeForm.cargo} onChange={(event) => setFormField('cargo', event.target.value)} /></label></div>}
+      {(showInviteForm || selectedEmp) && <label className="form-group">Tipo de vínculo<select className="form-input" value={employeeForm.tipo_contrato} onChange={(event) => setFormField('tipo_contrato', event.target.value)}><option value="clt">CLT</option><option value="pj">PJ</option></select></label>}
       {(!editingAdmission && !showInviteForm && selectedEmp?.data_admissao) && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingAdmission(true)}>Editar data de admissão</button>}
       {(editingAdmission || showInviteForm || !selectedEmp?.data_admissao) && <label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>}
-      {(!hasSavedSchedule || editingSchedule || showInviteForm) && <label className="form-group">Turno habitual<select className="form-input" value={employeeForm.turno_id} onChange={(event) => setScheduleType(event.target.value)}><option value="turno1">1º turno — 08:00 às 17:00</option><option value="turno2">2º turno — 14:00 às 22:52</option><option value="turno3">3º turno — 22:45 às 06:15 (dia seguinte)</option></select></label>}
-      {hasSavedSchedule && !editingSchedule && !showInviteForm && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar turno</button>}
-      {(editingAdmission || editingSchedule || !hasSavedSchedule || !selectedEmp?.data_admissao || showInviteForm) && <button className="btn btn-primary" disabled={savingEmployment || ((editingSchedule || !hasSavedSchedule || showInviteForm) && employeeForm.dias_semana.length === 0)}>{savingEmployment ? 'Salvando…' : editingSchedule || !hasSavedSchedule || showInviteForm ? submitLabel : 'Salvar data de admissão'}</button>}
+      {employeeForm.tipo_contrato === 'clt' && (!hasSavedSchedule || editingSchedule || showInviteForm) && <label className="form-group">Turno habitual<select className="form-input" value={employeeForm.turno_id} onChange={(event) => setScheduleType(event.target.value)}><option value="turno1">1º turno — 08:00 às 17:00</option><option value="turno2">2º turno — 14:00 às 22:52</option><option value="turno3">3º turno — 22:45 às 06:15 (dia seguinte)</option></select></label>}
+      {employeeForm.tipo_contrato === 'clt' && hasSavedSchedule && !editingSchedule && !showInviteForm && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar turno</button>}
+      {(editingAdmission || editingSchedule || !hasSavedSchedule || !selectedEmp?.data_admissao || showInviteForm || contractChanged) && <button className="btn btn-primary" disabled={savingEmployment || ((editingSchedule || !hasSavedSchedule || showInviteForm) && employeeForm.dias_semana.length === 0)}>{savingEmployment ? 'Salvando…' : editingSchedule || !hasSavedSchedule || showInviteForm ? submitLabel : contractChanged ? 'Salvar tipo de vínculo' : 'Salvar data de admissão'}</button>}
     </form>
   );
 
@@ -390,12 +397,16 @@ export default function AdminEmployees() {
         title: `Registro de ponto - ${selectedEmp.nome}`,
         period: `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
         filename: `ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.xlsx`,
-        calcDailyTotal,
+        calcDailyTotal: employeeDailyTotal,
+        summary: selectedEmp.tipo_contrato === 'pj' ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(employeePeriodMinutes) } : null,
         extraColumns: [
-          { key: 'shift', header: 'Turno trabalhado', width: 20, value: (record) => getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)) },
+          { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT' },
+          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [{ key: 'shift', header: 'Turno trabalhado', width: 20, value: (record) => getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)) }]),
           { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
-          { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).expected },
-          { key: 'balance', header: 'Saldo diário', width: 17, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).balance },
+          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [
+            { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).expected },
+            { key: 'balance', header: 'Saldo diário', width: 17, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).balance },
+          ]),
         ],
       });
       toast.success('Planilha Excel baixada.');
@@ -417,6 +428,8 @@ export default function AdminEmployees() {
         title: `Relatório de ponto - ${selectedEmp.nome}`,
         details: [
           `CPF: ${formatCPF(selectedEmp.cpf)}`,
+          `Tipo de vínculo: ${selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}`,
+          ...(selectedEmp.tipo_contrato === 'pj' ? [`Total de horas trabalhadas: ${formatMinutesAsHours(employeePeriodMinutes)}`] : []),
           `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
           `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
         ],
@@ -424,23 +437,28 @@ export default function AdminEmployees() {
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(9);
       pdf.setTextColor(60, 60, 60);
-      pdf.text(`Turnos trabalhados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
+      let reportStart = tableStartY;
+      if (selectedEmp.tipo_contrato !== 'pj') {
+        pdf.text(`Turnos trabalhados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
+        autoTable(pdf, {
+          startY: tableStartY + 4,
+          head: [['1º turno', '2º turno', '3º turno', 'Sem turno identificado']],
+          body: [[shiftSummary.turno1, shiftSummary.turno2, shiftSummary.turno3, shiftSummary.unidentified].map((count) => `${count} dia${count === 1 ? '' : 's'}`)],
+          theme: 'grid',
+          headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          bodyStyles: { fontSize: 8, halign: 'center' },
+          styles: { cellPadding: 2.5 },
+        });
+        reportStart = pdf.lastAutoTable.finalY + 5;
+      }
       autoTable(pdf, {
-        startY: tableStartY + 4,
-        head: [['1º turno', '2º turno', '3º turno', 'Sem turno identificado']],
-        body: [[shiftSummary.turno1, shiftSummary.turno2, shiftSummary.turno3, shiftSummary.unidentified].map((count) => `${count} dia${count === 1 ? '' : 's'}`)],
-        theme: 'grid',
-        headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
-        bodyStyles: { fontSize: 8, halign: 'center' },
-        styles: { cellPadding: 2.5 },
-      });
-      autoTable(pdf, {
-        startY: pdf.lastAutoTable.finalY + 5,
-        head: [['Data', 'Entrada', 'Turno', 'Saída almoço', 'Retorno', 'Saída', 'Saída em', 'Horas computadas', 'Previsto', 'Saldo', 'Status']],
+        startY: reportStart,
+        head: [[...(selectedEmp.tipo_contrato === 'pj' ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Turno', 'Saída almoço', 'Retorno']), 'Saída', 'Saída em', 'Horas computadas', ...(selectedEmp.tipo_contrato === 'pj' ? [] : ['Previsto', 'Saldo']), 'Status']],
         body: records.map((record) => [
-          formatDate(`${record.data}T12:00:00`), formatTime(record.entrada), getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), formatTime(record.saida_almoco),
-          formatTime(record.retorno_almoco), formatTime(record.saida), record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia', calcDailyTotal(record), getScheduleComparison(record, selectedEmp.escala_trabalho).expected,
-          getScheduleComparison(record, selectedEmp.escala_trabalho).balance,
+          formatDate(`${record.data}T12:00:00`), formatTime(record.entrada),
+          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), formatTime(record.saida_almoco), formatTime(record.retorno_almoco)]),
+          formatTime(record.saida), record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia', employeeDailyTotal(record),
+          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getScheduleComparison(record, selectedEmp.escala_trabalho).expected, getScheduleComparison(record, selectedEmp.escala_trabalho).balance]),
           record.saida ? 'Completo' : 'Incompleto',
         ]),
         theme: 'grid',
@@ -496,15 +514,24 @@ export default function AdminEmployees() {
 
       {!selectedEmp ? (
         <>
-          <div className="flex justify-between gap-3 employee-list-toolbar"><button className="btn btn-primary" onClick={() => setShowInviteForm((value) => !value)}>{showInviteForm ? 'Cancelar' : 'Novo funcionário'}</button></div>
+          <div className="flex justify-between gap-3 employee-list-toolbar">
+            <label className="employee-search-label">Buscar funcionário<input className="form-input" type="search" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} placeholder="Nome, CPF ou cargo" /></label>
+            <div className="employee-list-actions"><button className="btn btn-secondary" onClick={() => setNameSort((value) => value === 'asc' ? 'desc' : 'asc')} aria-label={`Ordenar nome ${nameSort === 'asc' ? 'decrescente' : 'crescente'}`}>Nome {nameSort === 'asc' ? 'A–Z' : 'Z–A'}</button><button className="btn btn-primary" onClick={() => setShowInviteForm((value) => !value)}>{showInviteForm ? 'Cancelar' : 'Novo funcionário'}</button></div>
+          </div>
           {showInviteForm && <section className="employee-records-section"><h3>Convidar funcionário</h3><p className="page-subtitle">Enviaremos o convite para o e-mail informado, onde a pessoa poderá definir a própria senha.</p>{employmentForm(inviteEmployee, 'Enviar convite')}</section>}
         <div className="employee-select-list">
-          {employees.map((emp) => (
+          {employees.filter((emp) => {
+            const normalize = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            const query = normalize(employeeSearch.trim());
+            const digits = employeeSearch.replace(/\D/g, '');
+            return !query || normalize(`${emp.nome} ${emp.cargo}`).includes(query) || (digits.length > 0 && String(emp.cpf || '').replace(/\D/g, '').includes(digits));
+          }).sort((a, b) => nameSort === 'asc' ? a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) : b.nome.localeCompare(a.nome, 'pt-BR', { sensitivity: 'base' })).map((emp) => (
             <article className="employee-select-card" key={emp.id}>
               <button className="employee-select-main" onClick={() => openEmployee(emp)} aria-label={`Abrir informações de ${emp.nome}`}>
                 <Avatar src={emp.foto_url} name={emp.nome} />
                 <span className="employee-select-copy"><strong>{emp.nome}</strong><small>{emp.cargo} · {emp.email}</small></span>
                 <span className="employee-select-cpf">{formatCPF(emp.cpf)}</span>
+                <Badge variant="info">{emp.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</Badge>
                 <Badge variant={emp.ativo ? 'success' : 'neutral'}>{emp.ativo ? 'Ativo' : 'Inativo'}</Badge>
                 <span className="employee-select-arrow" aria-hidden="true">›</span>
               </button>
@@ -515,6 +542,12 @@ export default function AdminEmployees() {
             </article>
           ))}
           {!employees.length && <div className="empty-state"><h3 className="empty-state-title">Nenhum funcionário cadastrado</h3></div>}
+          {employees.length > 0 && !employees.some((emp) => {
+            const normalize = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            const query = normalize(employeeSearch.trim());
+            const digits = employeeSearch.replace(/\D/g, '');
+            return !query || normalize(`${emp.nome} ${emp.cargo}`).includes(query) || (digits.length > 0 && String(emp.cpf || '').replace(/\D/g, '').includes(digits));
+          }) && employeeSearch && <div className="empty-state"><h3 className="empty-state-title">Nenhum resultado para essa busca</h3></div>}
         </div>
         </>
       ) : (
@@ -528,13 +561,14 @@ export default function AdminEmployees() {
               <div><span>CPF</span><strong>{formatCPF(selectedEmp.cpf)}</strong></div>
               <div><span>Cargo</span><strong>{selectedEmp.cargo || 'Não informado'}</strong></div>
               <div><span>Perfil de acesso</span><strong>{selectedEmp.role === 'admin' ? 'Administrador' : 'Funcionário'}</strong></div>
+              <div><span>Tipo de vínculo</span><strong>{selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</strong></div>
               <div><span>Data de admissão</span><strong>{selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</strong></div>
-              <div><span>Turno habitual</span><strong>{selectedEmp.escala_trabalho ? getShiftLabel(getAssignedShiftId(selectedEmp.escala_trabalho)) : 'Não informado'}</strong></div>
+              {selectedEmp.tipo_contrato !== 'pj' && <div><span>Turno habitual</span><strong>{selectedEmp.escala_trabalho ? getShiftLabel(getAssignedShiftId(selectedEmp.escala_trabalho)) : 'Não informado'}</strong></div>}
             </div>
           </section>
 
-          <section className="employee-records-section"><h3>Data de admissão e turno habitual</h3><p className="page-subtitle">Os horários são preenchidos automaticamente pelo turno escolhido.</p>{employmentForm(saveEmployment, 'Salvar dados trabalhistas')}</section>
-          <WorkScheduleCard schedule={selectedEmp.escala_trabalho} admissionDate={selectedEmp.data_admissao} />
+          <section className="employee-records-section"><h3>{selectedEmp.tipo_contrato === 'pj' ? 'Dados de vínculo PJ' : 'Data de admissão e turno habitual'}</h3><p className="page-subtitle">{selectedEmp.tipo_contrato === 'pj' ? 'O registro de ponto PJ apura as horas trabalhadas entre a entrada e a saída.' : 'Os horários são preenchidos automaticamente pelo turno escolhido.'}</p>{employmentForm(saveEmployment, 'Salvar dados trabalhistas')}</section>
+          {selectedEmp.tipo_contrato !== 'pj' && <WorkScheduleCard schedule={selectedEmp.escala_trabalho} admissionDate={selectedEmp.data_admissao} preferenceKey={selectedEmp.id} />}
 
           <section className="employee-records-section employee-vacation-section">
             <div className="employee-section-heading"><div><h3>Férias deste funcionário</h3><p>{vacationPeriods.length} período(s) aquisitivo(s) · {vacationRequests.length} solicitação(ões)</p></div><Link className="btn btn-secondary btn-sm" to={`/ferias?funcionario=${selectedEmp.id}`}>Abrir gestão de férias</Link></div>
@@ -564,20 +598,21 @@ export default function AdminEmployees() {
               {(filter === 'week' || filter === 'month') && <label className="employee-date-filter">Referência<input className="form-input" type="date" value={referenceDate} onChange={(event) => setReferenceDate(event.target.value)} /></label>}
               {filter === 'custom' && <div className="employee-custom-range"><label className="employee-date-filter">De<input className="form-input" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label className="employee-date-filter">Até<input className="form-input" type="date" min={customStart} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
             </div>
+            {selectedEmp.tipo_contrato === 'pj' && <div className="pj-hours-summary"><span>Total de horas trabalhadas no período</span><strong>{formatMinutesAsHours(employeePeriodMinutes)}</strong></div>}
             {detailLoading ? <div className="flex flex-center" style={{ minHeight: '160px' }}><Spinner /></div> : records.length ? (
               <>
                 {editingPunchId && <form className="employee-punch-edit-form" onSubmit={savePunchEdit}>
                   <div><h4>Ajustar horários do ponto</h4><p>Este registro pode ser ajustado somente até 96 horas após sua criação. O prazo é validado pelo sistema.</p></div>
                   <div className="employee-punch-edit-fields">
                     <label className="form-group">Entrada<input className="form-input" required type="time" value={punchEditForm.entrada} onChange={(event) => setPunchEditForm((current) => ({ ...current, entrada: event.target.value }))} /></label>
-                    <label className="form-group">Saída para almoço<input className="form-input" type="time" value={punchEditForm.saida_almoco} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida_almoco: event.target.value }))} /></label>
-                    <label className="form-group">Retorno do almoço<input className="form-input" type="time" value={punchEditForm.retorno_almoco} onChange={(event) => setPunchEditForm((current) => ({ ...current, retorno_almoco: event.target.value }))} /></label>
+                    {selectedEmp.tipo_contrato !== 'pj' && <label className="form-group">Saída para almoço<input className="form-input" type="time" value={punchEditForm.saida_almoco} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida_almoco: event.target.value }))} /></label>}
+                    {selectedEmp.tipo_contrato !== 'pj' && <label className="form-group">Retorno do almoço<input className="form-input" type="time" value={punchEditForm.retorno_almoco} onChange={(event) => setPunchEditForm((current) => ({ ...current, retorno_almoco: event.target.value }))} /></label>}
                     <label className="form-group">Saída<input className="form-input" type="time" value={punchEditForm.saida} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida: event.target.value }))} /></label>
                     {punchEditForm.saida && <label className="form-group">Data da saída<input className="form-input" required type="date" min={records.find((record) => record.id === editingPunchId)?.data} max={addIsoDays(records.find((record) => record.id === editingPunchId)?.data || '', 1)} value={punchEditForm.saida_data} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida_data: event.target.value }))} /></label>}
                   </div>
                   <div className="employee-punch-edit-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingPunchId(null)} disabled={savingPunch}>Cancelar</button><button className="btn btn-primary btn-sm" disabled={savingPunch}>{savingPunch ? 'Salvando…' : 'Salvar horários'}</button></div>
                 </form>}
-                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th><th>Turno do dia</th><th>Saída almoço</th><th>Retorno almoço</th><th>Saída</th><th>Horas computadas</th><th>Previsto</th><th>Saldo</th><th>Status</th><th>Ajuste</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.escala_trabalho); const editable = canEditPunch(record); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td><td>{getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada))}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td><td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{calcDailyTotal(record)}</strong></td><td>{comparison.expected}</td><td>{comparison.balance}</td><td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td>{editable ? <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Editar horários</button> : <span className="employee-punch-locked" title="Prazo de 96 horas após a criação encerrado">Prazo encerrado</span>}</td></tr>; })}</tbody></table></div>
+                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Turno do dia</th><th>Saída almoço</th><th>Retorno almoço</th></>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ajuste</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho); const editable = canEditPunch(record); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada))}</td><td>{formatTime(record.saida_almoco)}</td><td>{formatTime(record.retorno_almoco)}</td></>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td>{editable ? <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Editar horários</button> : <span className="employee-punch-locked" title="Prazo de 96 horas após a criação encerrado">Prazo encerrado</span>}</td></tr>; })}</tbody></table></div>
               </>
             ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
           </section>

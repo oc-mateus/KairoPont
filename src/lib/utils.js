@@ -174,6 +174,44 @@ export function calcDailyTotal(record) {
   return formatMinutesAsHours(totalMs / 60000);
 }
 
+function clockMinutes(value) {
+  if (!value) return null;
+  const [hours, minutes, seconds = '0'] = String(value).split(':');
+  const parsed = [Number(hours), Number(minutes), Number(seconds)];
+  return parsed.every(Number.isFinite) ? parsed[0] * 60 + parsed[1] + parsed[2] / 60 : null;
+}
+
+function dateDayNumber(value) {
+  if (!value) return null;
+  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number);
+  return Date.UTC(year, month - 1, day) / 86400000;
+}
+
+function elapsedClockMinutes(startDate, startTime, endDate, endTime) {
+  const startMinute = clockMinutes(startTime);
+  const endMinute = clockMinutes(endTime);
+  const startDay = dateDayNumber(startDate);
+  const endDay = dateDayNumber(endDate || startDate);
+  if ([startMinute, endMinute, startDay, endDay].some((value) => value == null)) return 0;
+  return Math.max(0, (endDay - startDay) * 1440 + endMinute - startMinute);
+}
+
+// Horas corridas efetivamente registradas, sem conversão de adicional noturno CLT.
+export function getElapsedWorkMinutes(record) {
+  if (!record?.entrada || !record?.saida) return 0;
+  const endDate = record.saida_data || record.data;
+  let minutes = elapsedClockMinutes(record.data, record.entrada, endDate, record.saida);
+  if (record.saida_almoco && record.retorno_almoco) {
+    minutes -= elapsedClockMinutes(record.data, record.saida_almoco, record.data, record.retorno_almoco);
+  }
+  return Math.max(0, minutes);
+}
+
+export function calcElapsedDailyTotal(record) {
+  if (!record?.entrada || !record?.saida) return '—';
+  return formatMinutesAsHours(getElapsedWorkMinutes(record));
+}
+
 /**
  * Valida um CPF
  */

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { getAssignedShiftId, getShiftLabel, makeEmployeeSchedule } from '../lib/workShifts';
 
 const WEEKDAYS = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
@@ -24,12 +25,30 @@ export function WorkScheduleSummary({ schedule }) {
   </>;
 }
 
-export default function WorkScheduleCard({ schedule, admissionDate, compact = false }) {
-  return <section className={`work-schedule-card ${compact ? 'compact' : ''}`}>
+export default function WorkScheduleCard({ schedule, admissionDate, compact = false, preferenceKey = 'default' }) {
+  const storageKey = `kairopont-work-schedule-${preferenceKey}`;
+  const [expanded, setExpanded] = useState(() => {
+    try { return localStorage.getItem(storageKey) !== 'collapsed'; } catch { return true; }
+  });
+
+  useEffect(() => {
+    try { setExpanded(localStorage.getItem(storageKey) !== 'collapsed'); } catch { setExpanded(true); }
+  }, [storageKey]);
+
+  const toggleExpanded = () => setExpanded((current) => {
+    const next = !current;
+    try { localStorage.setItem(storageKey, next ? 'expanded' : 'collapsed'); } catch { /* preferência local opcional */ }
+    return next;
+  });
+
+  return <section className={`work-schedule-card ${compact ? 'compact' : ''} ${expanded ? '' : 'is-collapsed'}`}>
     <div className="work-schedule-heading">
       <div><h3>Turno habitual</h3><p>{getAssignedShiftId(schedule) ? getShiftLabel(getAssignedShiftId(schedule)) : 'Turno ainda não informado'}</p>{getAssignedShiftId(schedule) && <p>Jornada semanal prevista: 44h</p>}</div>
-      {admissionDate && <span className="work-schedule-admission">Admissão: {new Date(`${admissionDate}T12:00:00`).toLocaleDateString('pt-BR')}</span>}
+      <div className="work-schedule-heading-actions">
+        {admissionDate && <span className="work-schedule-admission">Admissão: {new Date(`${admissionDate}T12:00:00`).toLocaleDateString('pt-BR')}</span>}
+        <button type="button" className="btn btn-secondary btn-sm" aria-expanded={expanded} onClick={toggleExpanded}>{expanded ? 'Recolher' : 'Expandir'}</button>
+      </div>
     </div>
-    <WorkScheduleSummary schedule={schedule} />
+    {expanded && <WorkScheduleSummary schedule={schedule} />}
   </section>;
 }

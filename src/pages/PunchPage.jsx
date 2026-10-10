@@ -4,7 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { formatTime, getTodayInSP, formatDate } from '../lib/utils';
 import { Spinner, Badge } from '../components/ui';
-import { inferShiftForRecord } from '../lib/workShifts';
+import { getAssignedShiftId, getShiftLabel, inferShiftForRecord } from '../lib/workShifts';
 
 export const PunchInIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>;
 export const LunchOutIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>;
@@ -68,14 +68,14 @@ export default function PunchPage() {
       if (todayRecord) {
         setTodayRecord(todayRecord);
       } else {
-        const { data: previous, error: previousError } = await supabase
+        let previousQuery = supabase
           .from('registros_ponto')
           .select('*')
           .eq('funcionario_id', profile.id)
           .eq('data', previousIsoDate(todayDate))
-          .eq('turno_trabalhado', 'turno3')
-          .is('saida', null)
-          .maybeSingle();
+          .is('saida', null);
+        if (profile.tipo_contrato !== 'pj') previousQuery = previousQuery.eq('turno_trabalhado', 'turno3');
+        const { data: previous, error: previousError } = await previousQuery.maybeSingle();
         if (previousError) throw previousError;
         setTodayRecord(previous);
       }
@@ -84,14 +84,16 @@ export default function PunchPage() {
     } finally {
       setLoading(false);
     }
-  }, [profile?.id]);
+  }, [profile?.id, profile?.tipo_contrato]);
 
   useEffect(() => {
     fetchTodayRecord();
   }, [fetchTodayRecord]);
 
   // Determina o próximo passo
-  const punchSteps = getDailyPunchSteps(profile?.escala_trabalho, todayRecord);
+  const punchSteps = profile?.tipo_contrato === 'pj'
+    ? PUNCH_STEPS.filter((step) => ['entrada', 'saida'].includes(step.field))
+    : getDailyPunchSteps(profile?.escala_trabalho, todayRecord);
   const getNextStep = () => {
     if (!todayRecord) return 0; // entrada
     for (let i = 0; i < punchSteps.length; i++) {
@@ -175,6 +177,13 @@ export default function PunchPage() {
           {displayDate}
         </div>
       </div>
+
+      <div className="punch-employment-line">
+        <Badge variant="info">Vínculo: {profile?.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</Badge>
+        {profile?.tipo_contrato !== 'pj' && profile?.escala_trabalho && <Badge variant="neutral">Turno: {getShiftLabel(getAssignedShiftId(profile.escala_trabalho))}</Badge>}
+      </div>
+
+      {profile?.tipo_contrato === 'pj' && <div className="pj-punch-note">Registro de ponto PJ: marque somente a entrada e a saída do seu período de trabalho.</div>}
 
       {/* Punch button */}
       <div className="flex flex-center mb-6" style={{ flexDirection: 'column', gap: 'var(--space-4)' }}>

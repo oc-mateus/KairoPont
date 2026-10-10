@@ -81,11 +81,12 @@ Deno.serve(async (req) => {
     const nome = String(input.nome || "").trim();
     const cpf = String(input.cpf || "").replace(/\D/g, "");
     const cargo = String(input.cargo || "").trim();
+    const tipoContrato = String(input.tipo_contrato || "clt");
     const dataAdmissao = String(input.data_admissao || "");
     const escala = makeSchedule(input.escala_trabalho);
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
-    if (!/^\S+@\S+\.\S+$/.test(email) || nome.length < 3 || cargo.length < 2 || !validCPF(cpf)) {
+    if (!/^\S+@\S+\.\S+$/.test(email) || nome.length < 3 || cargo.length < 2 || !validCPF(cpf) || !["clt", "pj"].includes(tipoContrato)) {
       return response({ error: "Confira o nome, e-mail, CPF e cargo informados." }, 400);
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dataAdmissao) || dataAdmissao > today || !escala) {
@@ -99,6 +100,7 @@ Deno.serve(async (req) => {
         nome,
         cpf,
         cargo,
+        tipo_contrato: tipoContrato,
         data_admissao: dataAdmissao,
         escala_trabalho: escala,
         convidado_por: admin.id,

@@ -1557,6 +1557,12 @@ select.form-input {
 .employee-document-copy span, .employee-document-copy small { color: var(--text-muted); font-size: var(--font-xs); }
 
 .employee-list-toolbar { align-items: center; margin-bottom: var(--space-4); }
+.employee-search-label { display: grid; flex: 1; gap: var(--space-1); max-width: 520px; color: var(--text-secondary); font-size: var(--font-xs); }
+.employee-list-actions, .work-schedule-heading-actions { display: flex; align-items: center; gap: var(--space-2); }
+.pj-punch-note { max-width: 500px; margin: 0 auto var(--space-5); padding: var(--space-3) var(--space-4); color: var(--text-secondary); background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); font-size: var(--font-sm); text-align: center; }
+.punch-employment-line { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--space-2); margin: calc(var(--space-4) * -1) auto var(--space-4); }
+.pj-hours-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-4); color: var(--text-secondary); background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.pj-hours-summary strong { color: var(--text-primary); font-size: var(--font-lg); }
 .employee-employment-form { display: grid; gap: var(--space-4); }
 .employee-weekdays { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-secondary); }
 .employee-weekdays legend { padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--font-xs); }
@@ -1589,6 +1595,8 @@ select.form-input {
 .work-schedule-header { color: var(--text-muted); background: var(--bg-card); font-weight: 700; }
 .work-schedule-empty { color: var(--text-muted); font-size: var(--font-sm); }
 .work-schedule-card.compact { padding: var(--space-4); }
+.work-schedule-card.is-collapsed { padding-bottom: var(--space-3); }
+.work-schedule-card.is-collapsed .work-schedule-heading { margin-bottom: 0; }
 
 .vacations-page { display: grid; gap: var(--space-4); }
 .vacation-cycle-card, .vacation-admin-queue { padding: var(--space-5); background: var(--gradient-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
@@ -1842,6 +1850,9 @@ select.form-input {
   .employee-vacation-cycle { flex-direction: column; }
   .employee-vacation-request { justify-items: start; }
   .employee-list-toolbar { align-items: stretch; flex-direction: column; }
+  .employee-search-label { max-width: none; }
+  .employee-list-actions { justify-content: flex-end; }
+  .work-schedule-heading-actions { align-items: flex-end; flex-direction: column; }
   .employee-schedule-times { display: grid; grid-template-columns: 1fr 1fr; }
   .employee-day-time-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .work-schedule-times { grid-template-columns: repeat(2, minmax(0, 1fr)); }

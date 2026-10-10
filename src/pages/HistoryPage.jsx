@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import {
-  formatTime, formatDate, calcDailyTotal,
+  formatTime, formatDate, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, formatMinutesAsHours,
   getTodayInSP, getCurrentWeekRange, getCurrentMonthRange,
 } from '../lib/utils';
 import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
@@ -13,6 +13,8 @@ import { getShiftLabel, inferShiftForRecord, summarizeWorkedShifts } from '../li
 
 export default function HistoryPage() {
   const { profile } = useAuth();
+  const isPj = profile?.tipo_contrato === 'pj';
+  const dailyTotal = (record) => isPj ? calcElapsedDailyTotal(record) : calcDailyTotal(record);
   const shiftFor = (record) => getShiftLabel(inferShiftForRecord(record, profile?.escala_trabalho?.turno_id));
   const toast = useToast();
   const [records, setRecords] = useState([]);
@@ -22,6 +24,7 @@ export default function HistoryPage() {
   const [customEnd, setCustomEnd] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const pjPeriodMinutes = isPj ? records.reduce((total, record) => total + getElapsedWorkMinutes(record), 0) : 0;
 
   const getDateRange = useCallback(() => {
     switch (filter) {
@@ -86,40 +89,44 @@ export default function HistoryPage() {
       const tableStartY = await addKairoPdfHeader(doc, {
         title: `Relatório de Ponto - ${profile.nome}`,
         details: [
+          `Tipo de vínculo: ${isPj ? 'PJ' : 'CLT'}`,
+          ...(!isPj && profile?.escala_trabalho ? [`Turno: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}`] : []),
           `Período: ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}`,
           `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
         ],
       });
 
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(60, 60, 60);
-      doc.text(`Turnos trabalhados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
-      autoTable(doc, {
-        startY: tableStartY + 4,
-        head: [['1º turno', '2º turno', '3º turno', 'Sem turno identificado']],
-        body: [[shiftSummary.turno1, shiftSummary.turno2, shiftSummary.turno3, shiftSummary.unidentified].map((count) => `${count} dia${count === 1 ? '' : 's'}`)],
-        theme: 'grid',
-        headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
-        bodyStyles: { fontSize: 8, halign: 'center' },
-        styles: { cellPadding: 2.5 },
-      });
+      let tableStart = tableStartY;
+      if (!isPj) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+        doc.text(`Turnos trabalhados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
+        autoTable(doc, {
+          startY: tableStartY + 4,
+          head: [['1º turno', '2º turno', '3º turno', 'Sem turno identificado']],
+          body: [[shiftSummary.turno1, shiftSummary.turno2, shiftSummary.turno3, shiftSummary.unidentified].map((count) => `${count} dia${count === 1 ? '' : 's'}`)],
+          theme: 'grid',
+          headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
+          bodyStyles: { fontSize: 8, halign: 'center' },
+          styles: { cellPadding: 2.5 },
+        });
+        tableStart = doc.lastAutoTable.finalY + 5;
+      }
 
       // Table
       const tableData = records.map(r => [
         formatDate(r.data + 'T00:00:00'),
         formatTime(r.entrada),
-        shiftFor(r),
-        formatTime(r.saida_almoco),
-        formatTime(r.retorno_almoco),
+        ...(!isPj ? [shiftFor(r), formatTime(r.saida_almoco), formatTime(r.retorno_almoco)] : []),
         `${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}`,
-        calcDailyTotal(r),
+        dailyTotal(r),
         r.saida ? 'Completo' : 'Incompleto',
       ]);
 
       autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 5,
-        head: [['Data', 'Entrada', 'Turno', 'Saída Almoço', 'Retorno', 'Saída', 'Horas computadas', 'Status']],
+        startY: tableStart,
+        head: [[...(isPj ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Turno', 'Saída Almoço', 'Retorno']), 'Saída', 'Horas computadas', 'Status']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -170,9 +177,11 @@ export default function HistoryPage() {
         title: `Histórico de ponto - ${profile.nome}`,
         period: `Período: ${formatDate(`${start}T12:00:00`)} a ${formatDate(`${end}T12:00:00`)}`,
         filename: `ponto_${profile.nome.replace(/\s+/g, '_')}_${start}_${end}.xlsx`,
-        calcDailyTotal,
+        calcDailyTotal: dailyTotal,
+        summary: isPj ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(pjPeriodMinutes) } : null,
         extraColumns: [
-          { key: 'shift', header: 'Turno trabalhado', width: 20, value: shiftFor },
+          { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => isPj ? 'PJ' : 'CLT' },
+          ...(!isPj ? [{ key: 'shift', header: 'Turno trabalhado', width: 20, value: shiftFor }] : []),
           { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
         ],
       });
@@ -189,13 +198,13 @@ export default function HistoryPage() {
       const { start, end } = getDateRange();
       let md = `# Relatório de Ponto\n\n`;
       md += `**Funcionário:** ${profile.nome}\n`;
+      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Turno: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n`;
       md += `**Gerado em:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`;
-      md += `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Horas computadas | Status |\n`;
-      md += `|------|---------|-------|-------------|---------|-------|-------|--------|\n`;
+      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|------|---------|-------|------------------|--------|\n` : `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Horas computadas | Status |\n|------|---------|-------|-------------|---------|-------|-------|--------|\n`;
 
       records.forEach(r => {
-        md += `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${calcDailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
+        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
       });
 
       const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
@@ -215,12 +224,12 @@ export default function HistoryPage() {
     try {
       const { start, end } = getDateRange();
       let md = `## Relatório de Ponto - ${profile.nome}\n`;
+      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Turno: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n\n`;
-      md += `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Horas computadas | Status |\n`;
-      md += `|---|---|---|---|---|---|---|---|\n`;
+      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|---|---|---|---|---|\n` : `| Data | Entrada | Turno | Saída Almoço | Retorno | Saída | Horas computadas | Status |\n|---|---|---|---|---|---|---|---|\n`;
 
       records.forEach(r => {
-        md += `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${calcDailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
+        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${formatTime(r.saida_almoco)} | ${formatTime(r.retorno_almoco)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
       });
 
       await navigator.clipboard.writeText(md);
@@ -242,7 +251,7 @@ export default function HistoryPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h2 className="page-title">Meu Histórico</h2>
-          <p className="page-subtitle">Consulte seus registros de ponto</p>
+          <p className="page-subtitle">Consulte seus registros de ponto · Vínculo: {isPj ? 'PJ' : 'CLT'}{!isPj && profile?.escala_trabalho ? ` · Turno: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}</p>
         </div>
         <div className="page-header-actions">
           <button className="btn btn-secondary btn-sm" onClick={handleExportExcel} disabled={records.length === 0 || exportingExcel}>
@@ -309,9 +318,9 @@ export default function HistoryPage() {
                 <tr>
                   <th>Data</th>
                   <th>Entrada</th>
-                  <th>Turno do dia</th>
-                  <th>Saída Almoço</th>
-                  <th>Retorno</th>
+                  {!isPj && <th>Turno do dia</th>}
+                  {!isPj && <th>Saída Almoço</th>}
+                  {!isPj && <th>Retorno</th>}
                   <th>Saída</th>
                   <th>Horas computadas</th>
                   <th>Status</th>
@@ -322,11 +331,11 @@ export default function HistoryPage() {
                   <tr key={r.id}>
                     <td>{formatDate(r.data + 'T00:00:00')}</td>
                     <td>{formatTime(r.entrada)}</td>
-                    <td>{shiftFor(r)}</td>
-                    <td>{formatTime(r.saida_almoco)}</td>
-                    <td>{formatTime(r.retorno_almoco)}</td>
+                    {!isPj && <td>{shiftFor(r)}</td>}
+                    {!isPj && <td>{formatTime(r.saida_almoco)}</td>}
+                    {!isPj && <td>{formatTime(r.retorno_almoco)}</td>}
                     <td>{formatTime(r.saida)}{r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}</td>
-                    <td><strong>{calcDailyTotal(r)}</strong></td>
+                    <td><strong>{dailyTotal(r)}</strong></td>
                     <td>
                       <Badge variant={r.saida ? 'success' : 'warning'}>
                         {r.saida ? 'Completo' : 'Incompleto'}
@@ -350,25 +359,25 @@ export default function HistoryPage() {
                   <span className="table-card-label">Entrada</span>
                   <span className="table-card-value">{formatTime(r.entrada)}</span>
                 </div>
-                <div className="table-card-row">
+                {!isPj && <div className="table-card-row">
                   <span className="table-card-label">Turno do dia</span>
                   <span className="table-card-value">{shiftFor(r)}</span>
-                </div>
-                <div className="table-card-row">
+                </div>}
+                {!isPj && <div className="table-card-row">
                   <span className="table-card-label">Saída Almoço</span>
                   <span className="table-card-value">{formatTime(r.saida_almoco)}</span>
-                </div>
-                <div className="table-card-row">
+                </div>}
+                {!isPj && <div className="table-card-row">
                   <span className="table-card-label">Retorno</span>
                   <span className="table-card-value">{formatTime(r.retorno_almoco)}</span>
-                </div>
+                </div>}
                 <div className="table-card-row">
                   <span className="table-card-label">Saída</span>
                   <span className="table-card-value">{formatTime(r.saida)}{r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}</span>
                 </div>
                 <div className="table-card-row">
                   <span className="table-card-label">Horas computadas</span>
-                  <span className="table-card-value"><strong>{calcDailyTotal(r)}</strong></span>
+                  <span className="table-card-value"><strong>{dailyTotal(r)}</strong></span>
                 </div>
                 <div className="table-card-row">
                   <span className="table-card-label">Status</span>
@@ -389,6 +398,7 @@ export default function HistoryPage() {
               <span className="table-card-label">Dias registrados</span>
               <span className="table-card-value">{records.length}</span>
             </div>
+            {isPj && <div className="table-card-row"><span className="table-card-label">Total de horas trabalhadas</span><span className="table-card-value"><strong>{formatMinutesAsHours(pjPeriodMinutes)}</strong></span></div>}
             <div className="table-card-row">
               <span className="table-card-label">Dias completos</span>
               <span className="table-card-value">{records.filter(r => r.saida).length}</span>

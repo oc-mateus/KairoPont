@@ -18,7 +18,7 @@ function excelTime(timeValue) {
   return seconds / 86400;
 }
 
-export async function downloadTimesheetXlsx({ records, title, period, filename, calcDailyTotal, extraColumns = [] }) {
+export async function downloadTimesheetXlsx({ records, title, period, filename, calcDailyTotal, extraColumns = [], summary = null }) {
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Kairo Automações';
@@ -107,6 +107,21 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
       fgColor: { argb: record.saida ? 'FFE7F4EA' : 'FFFFF3DD' },
     };
   });
+
+  if (summary) {
+    const summaryRow = sheet.addRow([]);
+    summaryRow.height = 28;
+    summaryRow.getCell(1).value = summary.label;
+    summaryRow.getCell(1).font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FF123D27' } };
+    summaryRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
+    summaryRow.getCell(6).value = summary.value;
+    summaryRow.getCell(6).font = { name: 'Aptos', size: 11, bold: true, color: { argb: 'FF123D27' } };
+    summaryRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
+    summaryRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7F4EA' } };
+      cell.border = { top: { style: 'medium', color: { argb: 'FF218447' } } };
+    });
+  }
 
   sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + records.length, column: 7 + extraColumns.length } };
   const buffer = await workbook.xlsx.writeBuffer({ useStyles: true });

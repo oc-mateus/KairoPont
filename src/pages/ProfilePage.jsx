@@ -156,7 +156,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <WorkScheduleCard schedule={profile.escala_trabalho} admissionDate={profile.data_admissao} />
+      {profile.tipo_contrato !== 'pj' && <WorkScheduleCard schedule={profile.escala_trabalho} admissionDate={profile.data_admissao} preferenceKey={profile.id} />}
 
       {/* Info Card */}
       <div className="card mb-6">

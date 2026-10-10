@@ -327,13 +327,16 @@ export default function AdminEmployees() {
       setVacationRequests([]);
       setDetailLoading(true);
       try {
-        const { error: syncError } = await supabase.rpc('sync_current_vacation_periods');
-        if (syncError) throw syncError;
+        const isPj = selectedEmp.tipo_contrato === 'pj';
+        if (!isPj) {
+          const { error: syncError } = await supabase.rpc('sync_current_vacation_periods');
+          if (syncError) throw syncError;
+        }
         const [employeeRecords, employeeDocuments, employeeCycles, employeeVacations] = await Promise.all([
           hasValidRange ? fetchAllRows(() => supabase.from('registros_ponto').select('*').eq('funcionario_id', selectedEmp.id).gte('data', range.start).lte('data', range.end).order('data', { ascending: false })) : Promise.resolve([]),
           fetchAllRows(() => supabase.from('documentos').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
-          fetchAllRows(() => supabase.from('periodos_aquisitivos_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('periodo_inicio', { ascending: false })),
-          fetchAllRows(() => supabase.from('solicitacoes_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
+          isPj ? Promise.resolve([]) : fetchAllRows(() => supabase.from('periodos_aquisitivos_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('periodo_inicio', { ascending: false })),
+          isPj ? Promise.resolve([]) : fetchAllRows(() => supabase.from('solicitacoes_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
         ]);
         if (!cancelled) {
           setRecords(employeeRecords);
@@ -572,7 +575,7 @@ export default function AdminEmployees() {
           <section className="employee-records-section"><h3>{selectedEmp.tipo_contrato === 'pj' ? 'Dados de vínculo PJ' : 'Data de admissão e turno habitual'}</h3><p className="page-subtitle">{selectedEmp.tipo_contrato === 'pj' ? 'O registro de ponto PJ apura as horas trabalhadas entre a entrada e a saída.' : 'Os horários são preenchidos automaticamente pelo turno escolhido.'}</p>{employmentForm(saveEmployment, 'Salvar dados trabalhistas')}</section>
           {selectedEmp.tipo_contrato !== 'pj' && <WorkScheduleCard schedule={selectedEmp.escala_trabalho} admissionDate={selectedEmp.data_admissao} preferenceKey={selectedEmp.id} />}
 
-          <section className="employee-records-section employee-vacation-section">
+          {selectedEmp.tipo_contrato !== 'pj' && <section className="employee-records-section employee-vacation-section">
             <div className="employee-section-heading"><div><h3>Férias deste funcionário</h3><p>{vacationPeriods.length} período(s) aquisitivo(s) · {vacationRequests.length} solicitação(ões)</p></div><Link className="btn btn-secondary btn-sm" to={`/ferias?funcionario=${selectedEmp.id}`}>Abrir gestão de férias</Link></div>
             {(() => {
               const today = getTodayInSP();
@@ -590,7 +593,7 @@ export default function AdminEmployees() {
               const earliestLeaveDate = addIsoDays(period.periodo_fim, 31);
               return <article className="employee-vacation-cycle" key={period.id}><div><strong>Período aquisitivo: {formatDate(`${period.periodo_inicio}T12:00:00`)} – {formatDate(`${period.periodo_fim}T12:00:00`)}</strong><span>Admissão: {selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</span><span>Elegível para solicitar a partir de: {formatDate(`${firstRequestDate}T12:00:00`)}</span><span>Prazo final para gozo: {formatDate(`${period.prazo_concessivo}T12:00:00`)}</span><span>Abono escolhido: {period.dias_abono ? `${period.dias_abono} dia(s) vendido(s)` : 'Não'}</span>{!eligibleForLeave && today <= period.periodo_fim && <small className="vacation-ineligible-message">Ainda não elegível. Se o pedido for enviado na primeira data disponível, a saída mais cedo será {formatDate(`${earliestLeaveDate}T12:00:00`)}, respeitando a antecedência mínima de 30 dias.</small>}</div>{request ? <div className="employee-vacation-request"><Badge variant={request.status === 'aprovada' ? 'success' : request.status === 'recusada' ? 'danger' : 'warning'}>{request.status === 'aprovada' ? 'Aprovada' : request.status === 'recusada' ? 'Recusada' : 'Pendente'}</Badge><span>Saída: {formatDate(`${request.data_inicio}T12:00:00`)}</span><span>Retorno ao trabalho: {formatDate(`${(request.data_retorno || addIsoDays(request.data_fim, 1))}T12:00:00`)}</span>{request.status === 'recusada' && <small>Justificativa: {request.justificativa_recusa}</small>}<small>{request.email_enviado_em ? `E-mail enviado em ${formatDateTime(request.email_enviado_em)}` : request.email_erro ? `Falha no e-mail: ${request.email_erro}` : request.status !== 'pendente' ? 'E-mail da decisão pendente' : ''}</small></div> : <Badge variant={eligibleForLeave ? 'info' : 'warning'}>{eligibleForLeave ? 'Sem solicitação' : 'Ainda não elegível para gozo'}</Badge>}</article>;
             })}</div> : <p className="employee-no-results">Os períodos de férias serão calculados após informar a data de admissão e abrir a tela de gestão.</p>}
-          </section>
+          </section>}
 
           <section className="employee-records-section">
             <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecordsExcel} disabled={detailLoading || !records.length || exportingExcel}>{exportingExcel ? 'Gerando Excel…' : 'Baixar Excel'}</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>

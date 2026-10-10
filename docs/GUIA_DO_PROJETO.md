@@ -24,7 +24,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Solicitar redefinição de senha pela tela de login; o link funciona para administradores, CLT e PJ e abre a página de nova senha.
 - CLT registra entrada e saída. O intervalo é descontado pelo horário fixo do turno, sem precisar marcar saída e retorno do almoço.
 - PJ registra entrada e saída, sem turno ou almoço programado; o sistema soma o tempo entre as duas marcações para o acompanhamento das horas do período.
-- Contas PJ não exibem Documentos nem Minhas Férias e são redirecionadas caso tentem abrir essas rotas diretamente. Administradores mantêm o acesso administrativo.
+- Contas PJ não exibem Documentos nem Minhas Férias e são redirecionadas caso tentem abrir essas rotas diretamente. Na ficha administrativa, a seção de férias também aparece somente para CLT.
 - Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
 - Enviar atestado médico ou declaração de horas e baixar documentos autorizados.
 - Atualizar dados básicos do perfil e a foto.

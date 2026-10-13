@@ -143,7 +143,7 @@ export default function HistoryPage() {
 
       autoTable(doc, {
         startY: tableStart,
-        head: [[...(isPj ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Turno', 'Almoço fixo']), 'Saída', 'Horas computadas', 'Status']],
+        head: [[...(isPj ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Turno', 'Intervalo de almoço']), 'Saída', 'Horas computadas', 'Status']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -337,7 +337,7 @@ export default function HistoryPage() {
                   <th>Data</th>
                   <th>Entrada</th>
                   {!isPj && <th>Turno do dia</th>}
-                  {!isPj && <th>Almoço fixo</th>}
+                  {!isPj && <th>Intervalo de almoço</th>}
                   <th>Saída</th>
                   <th>Horas computadas</th>
                   <th>Status</th>
@@ -380,7 +380,7 @@ export default function HistoryPage() {
                   <span className="table-card-value">{shiftFor(r)}</span>
                 </div>}
                 {!isPj && <div className="table-card-row">
-                  <span className="table-card-label">Almoço fixo</span>
+                  <span className="table-card-label">Intervalo de almoço</span>
                   <span className="table-card-value">{lunchFor(r)}</span>
                 </div>}
                 <div className="table-card-row">

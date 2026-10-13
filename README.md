@@ -27,7 +27,7 @@ flowchart LR
     F --> G
 ```
 
-O Supabase valida o tipo de vínculo e a sequência das marcações e grava os horários oficiais no servidor, no fuso de São Paulo. Funcionários PJ registram entrada e saída e acompanham o total de horas trabalhadas; funcionários CLT também registram somente entrada e saída, com almoço fixo calculado a partir do turno. O funcionário consulta os próprios registros e pode exportar o histórico.
+O Supabase valida o tipo de vínculo e a sequência das marcações e grava os horários oficiais no servidor, no fuso de São Paulo. Funcionários PJ registram entrada e saída e acompanham o total de horas trabalhadas. Funcionários CLT usam o almoço fixo nos dias úteis; em dias sem almoço previsto, jornadas acima de seis horas exigem uma pausa marcada de pelo menos uma hora antes da saída. O funcionário consulta os próprios registros e pode exportar o histórico.
 
 ### Recursos
 
@@ -38,7 +38,7 @@ O Supabase valida o tipo de vínculo e a sequência das marcações e grava os h
 | Exportar folha de ponto em PDF ou Excel | Pesquisar funcionários por nome, CPF e cargo e ordenar alfabeticamente |
 | Solicitar redefinição de senha pela tela de login | Distinguir CLT/PJ e ver resumo de horas PJ e extras CLT |
 
-O painel de frequência filtra mês atual, mês/ano específico, últimos seis meses ou último ano; mostra os gráficos gerais primeiro e permite selecionar um funcionário CLT para ver os mesmos indicadores no mesmo período. Quando um mês específico não tem registros CLT, o painel informa que não há dados para aquele período. A folha de ponto identifica o vínculo; CLT apresenta turno e almoço fixo, enquanto PJ apresenta apenas entrada, saída e horas computadas. O cálculo de faltas, atrasos e horas extras considera funcionários CLT ativos e não inclui administradores.
+O painel de frequência filtra mês atual, mês/ano específico, últimos seis meses ou último ano; mostra os gráficos gerais primeiro e permite selecionar um funcionário CLT para ver os mesmos indicadores no mesmo período. Quando um mês específico não tem registros CLT, o painel informa que não há dados para aquele período. A folha de ponto identifica o vínculo; CLT apresenta turno e intervalo fixo ou marcado, enquanto PJ apresenta apenas entrada, saída e horas computadas. O cálculo de faltas, atrasos e horas extras considera funcionários CLT ativos e não inclui administradores.
 
 Funcionários CLT podem enviar e consultar documentos autorizados e acessar férias. Essas áreas não são exibidas para contas PJ, que usam o ponto apenas para registrar e acompanhar as horas trabalhadas. Na administração, a seção de férias da ficha também é exclusiva para CLT.
 

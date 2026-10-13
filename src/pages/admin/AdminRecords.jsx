@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDate, formatTime, calcDailyTotal, calcElapsedDailyTotal } from '../../lib/utils';
 import { Spinner, Badge } from '../../components/ui';
-import { getFixedLunchLabel, getShiftLabel, inferShiftFromEntry } from '../../lib/workShifts';
+import { getLunchLabelForRecord, getShiftLabel, inferShiftFromEntry } from '../../lib/workShifts';
 
 export default function AdminRecords() {
   const toast = useToast();
@@ -63,7 +63,7 @@ export default function AdminRecords() {
                   <td><Badge variant={r.funcionarios?.tipo_contrato === 'pj' ? 'info' : 'neutral'}>{r.funcionarios?.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</Badge></td>
                   <td>{formatDate(r.data + 'T00:00:00')}</td>
                   <td>{formatTime(r.entrada)}</td>
-                  <td>{r.funcionarios?.tipo_contrato === 'pj' ? '—' : `${getShiftLabel(r.turno_trabalhado || inferShiftFromEntry(r.entrada))} · ${getFixedLunchLabel(r.turno_trabalhado || inferShiftFromEntry(r.entrada), r.data)}`}</td>
+                  <td>{r.funcionarios?.tipo_contrato === 'pj' ? '—' : `${getShiftLabel(r.turno_trabalhado || inferShiftFromEntry(r.entrada))} · ${getLunchLabelForRecord(r, r.turno_trabalhado || inferShiftFromEntry(r.entrada))}`}</td>
                   <td>{formatTime(r.saida)}</td>
                   <td><strong>{r.funcionarios?.tipo_contrato === 'pj' ? calcElapsedDailyTotal(r) : calcDailyTotal(r)}</strong></td>
                   <td>

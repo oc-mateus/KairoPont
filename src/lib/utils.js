@@ -2,7 +2,7 @@
  * Utilitários de data/hora para o fuso America/Sao_Paulo
  */
 
-import { getFixedLunchSchedule, inferShiftForRecord, makeEmployeeSchedule } from './workShifts';
+import { getFixedLunchLabel, getFixedLunchSchedule, inferShiftForRecord, makeEmployeeSchedule } from './workShifts';
 
 const TIMEZONE = 'America/Sao_Paulo';
 
@@ -148,6 +148,20 @@ function nextIsoDate(dateValue) {
   return date.toISOString().slice(0, 10);
 }
 
+function getRecordedLunchDates(record) {
+  const entryMinutes = clockMinutes(record.entrada);
+  const lunchOutMinutes = clockMinutes(record.saida_almoco);
+  const lunchReturnMinutes = clockMinutes(record.retorno_almoco);
+  let lunchDate = record.data;
+  if (entryMinutes != null && lunchOutMinutes != null && lunchOutMinutes < entryMinutes) {
+    lunchDate = nextIsoDate(lunchDate);
+  }
+  const returnDate = lunchReturnMinutes != null && lunchOutMinutes != null && lunchReturnMinutes < lunchOutMinutes
+    ? nextIsoDate(lunchDate)
+    : lunchDate;
+  return { lunchDate, returnDate };
+}
+
 function dateAndTimeFromTimestamp(timestamp) {
   const value = new Date(timestamp).toISOString();
   return { date: value.slice(0, 10), time: value.slice(11, 19) };
@@ -162,17 +176,18 @@ export function calcCreditedDailyMilliseconds(record, shiftId = null) {
 
   if (record.saida_almoco || record.retorno_almoco) {
     let total = 0;
+    const { lunchDate, returnDate } = getRecordedLunchDates(record);
     if (record.entrada && record.saida_almoco) {
-      total += calcNightAdjustedMilliseconds(record.data, record.entrada, record.data, record.saida_almoco);
+      total += calcNightAdjustedMilliseconds(record.data, record.entrada, lunchDate, record.saida_almoco);
     }
     if (record.retorno_almoco && record.saida) {
-      total += calcNightAdjustedMilliseconds(record.data, record.retorno_almoco, endDate, record.saida);
+      total += calcNightAdjustedMilliseconds(returnDate, record.retorno_almoco, endDate, record.saida);
     }
     return total;
   }
 
   const total = calcNightAdjustedMilliseconds(record.data, record.entrada, endDate, record.saida);
-  const lunch = getFixedLunchSchedule(shift);
+  const lunch = getFixedLunchLabel(shift, record.data) === 'Sem intervalo' ? null : getFixedLunchSchedule(shift);
   if (!lunch) return total;
 
   const start = toUtcTimestamp(record.data, record.entrada);
@@ -268,7 +283,8 @@ export function getElapsedWorkMinutes(record) {
   const endDate = record.saida_data || record.data;
   let minutes = elapsedClockMinutes(record.data, record.entrada, endDate, record.saida);
   if (record.saida_almoco && record.retorno_almoco) {
-    minutes -= elapsedClockMinutes(record.data, record.saida_almoco, record.data, record.retorno_almoco);
+    const { lunchDate, returnDate } = getRecordedLunchDates(record);
+    minutes -= elapsedClockMinutes(lunchDate, record.saida_almoco, returnDate, record.retorno_almoco);
   }
   return Math.max(0, minutes);
 }

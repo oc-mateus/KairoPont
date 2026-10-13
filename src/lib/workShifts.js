@@ -20,6 +20,18 @@ export function getFixedLunchLabel(shiftId, workDate = null) {
   return `${lunch.start}–${lunch.end}${lunch.nextDay ? ' (dia seguinte)' : ''}`;
 }
 
+export function getLunchLabelForRecord(record, shiftId = null) {
+  if (record?.saida_almoco && record?.retorno_almoco) {
+    const start = String(record.saida_almoco).slice(0, 5);
+    const end = String(record.retorno_almoco).slice(0, 5);
+    const isNextDay = toMinutes(record.saida_almoco) < toMinutes(record.entrada)
+      || toMinutes(record.retorno_almoco) < toMinutes(record.saida_almoco);
+    return `${start}–${end}${isNextDay ? ' (dia seguinte)' : ''}`;
+  }
+  if (record?.saida_almoco || record?.retorno_almoco) return 'Intervalo incompleto';
+  return getFixedLunchLabel(shiftId || inferShiftFromEntry(record?.entrada), record?.data);
+}
+
 export function getShiftLabel(id) {
   return WORK_SHIFTS[id]?.label || 'Turno não identificado';
 }

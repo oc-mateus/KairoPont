@@ -9,14 +9,14 @@ import {
 import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
 import { addKairoPdfHeader } from '../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../lib/exportTimesheetXlsx';
-import { getFixedLunchLabel, getShiftLabel, inferShiftForRecord, summarizeWorkedShifts } from '../lib/workShifts';
+import { getLunchLabelForRecord, getShiftLabel, inferShiftForRecord, summarizeWorkedShifts } from '../lib/workShifts';
 
 export default function HistoryPage() {
   const { profile } = useAuth();
   const isPj = profile?.tipo_contrato === 'pj';
   const dailyTotal = (record) => isPj ? calcElapsedDailyTotal(record) : calcDailyTotal(record);
   const shiftFor = (record) => getShiftLabel(inferShiftForRecord(record, profile?.escala_trabalho?.turno_id));
-  const lunchFor = (record) => getFixedLunchLabel(inferShiftForRecord(record, profile?.escala_trabalho?.turno_id), record.data);
+  const lunchFor = (record) => getLunchLabelForRecord(record, inferShiftForRecord(record, profile?.escala_trabalho?.turno_id));
   const toast = useToast();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);

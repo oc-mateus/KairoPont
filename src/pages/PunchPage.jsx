@@ -4,7 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { formatTime, getTodayInSP, formatDate } from '../lib/utils';
 import { Spinner, Badge } from '../components/ui';
-import { getAssignedShiftId, getShiftLabel } from '../lib/workShifts';
+import { getAssignedShiftId, getFixedLunchLabel, getShiftLabel } from '../lib/workShifts';
 
 export const PunchInIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>;
 export const LunchOutIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>;
@@ -15,8 +15,18 @@ export const BlockIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="n
 
 const PUNCH_STEPS = [
   { field: 'entrada', label: 'Entrada', icon: PunchInIcon, description: 'Registrar entrada na empresa' },
+  { field: 'saida_almoco', label: 'Saída para almoço', icon: LunchOutIcon, description: 'Registrar início da pausa de almoço' },
+  { field: 'retorno_almoco', label: 'Retorno do almoço', icon: LunchInIcon, description: 'Registrar retorno após uma hora de almoço' },
   { field: 'saida', label: 'Saída', icon: PunchOutIcon, description: 'Registrar saída da empresa' },
 ];
+
+function timestampForClock(date, clock, referenceClock) {
+  const [hours, minutes] = String(clock).slice(0, 5).split(':').map(Number);
+  const [referenceHours, referenceMinutes] = String(referenceClock).slice(0, 5).split(':').map(Number);
+  let timestamp = Date.parse(`${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00-03:00`);
+  if (hours * 60 + minutes < referenceHours * 60 + referenceMinutes) timestamp += 24 * 60 * 60 * 1000;
+  return timestamp;
+}
 
 function previousIsoDate(date) {
   const value = new Date(`${date}T12:00:00`);
@@ -78,22 +88,47 @@ export default function PunchPage() {
     fetchTodayRecord();
   }, [fetchTodayRecord]);
 
-  // Determina o próximo passo
-  const punchSteps = PUNCH_STEPS;
+  const assignedShiftId = getAssignedShiftId(profile?.escala_trabalho);
+  const recordShiftId = todayRecord?.turno_trabalhado || assignedShiftId;
+  const hasFixedLunch = todayRecord
+    ? getFixedLunchLabel(recordShiftId, todayRecord.data) !== 'Sem intervalo'
+    : false;
+  const needsDynamicLunch = profile?.tipo_contrato !== 'pj' && Boolean(todayRecord) && !hasFixedLunch;
+  const entryTimestamp = todayRecord?.entrada
+    ? Date.parse(`${todayRecord.data}T${String(todayRecord.entrada).slice(0, 5)}:00-03:00`)
+    : null;
+  const elapsedSinceEntryMinutes = entryTimestamp == null ? 0 : (currentTime.getTime() - entryTimestamp) / 60000;
+  const breakStartTimestamp = todayRecord?.saida_almoco
+    ? timestampForClock(todayRecord.data, todayRecord.saida_almoco, todayRecord.entrada)
+    : null;
+  const breakMinutes = breakStartTimestamp == null ? 0 : (currentTime.getTime() - breakStartTimestamp) / 60000;
+  const waitingForLunchReturn = needsDynamicLunch && todayRecord?.saida_almoco && !todayRecord?.retorno_almoco && breakMinutes < 60;
+  const canRegisterEarlyLunch = needsDynamicLunch && todayRecord && !todayRecord.saida
+    && !todayRecord.saida_almoco && !todayRecord.retorno_almoco && elapsedSinceEntryMinutes > 0 && elapsedSinceEntryMinutes <= 360;
+
+  const punchSteps = needsDynamicLunch && (todayRecord?.saida_almoco || elapsedSinceEntryMinutes > 360)
+    ? PUNCH_STEPS
+    : PUNCH_STEPS.filter((step) => step.field !== 'saida_almoco' && step.field !== 'retorno_almoco');
+
+  // Determina o próximo passo, incluindo a pausa obrigatória em jornadas sem almoço fixo.
   const getNextStep = () => {
     if (!todayRecord) return 0; // entrada
-    for (let i = 0; i < punchSteps.length; i++) {
-      if (!todayRecord[punchSteps[i].field]) return i;
+    if (todayRecord.saida) return -1;
+    if (needsDynamicLunch) {
+      if (!todayRecord.saida_almoco && elapsedSinceEntryMinutes > 360) return punchSteps.findIndex((step) => step.field === 'saida_almoco');
+      if (todayRecord.saida_almoco && !todayRecord.retorno_almoco) return punchSteps.findIndex((step) => step.field === 'retorno_almoco');
+      if (todayRecord.saida_almoco && todayRecord.retorno_almoco) return punchSteps.findIndex((step) => step.field === 'saida');
+      return punchSteps.findIndex((step) => step.field === 'saida');
     }
-    return -1; // ciclo completo
+    return punchSteps.findIndex((step) => step.field === 'saida');
   };
 
   const nextStepIndex = getNextStep();
-  const isComplete = nextStepIndex === -1;
+  const isComplete = Boolean(todayRecord?.saida);
 
   // Registra o ponto usando RPC no servidor (horário gerado no Supabase)
-  const handlePunch = async () => {
-    if (isComplete || punching || cooldown) return;
+  const handlePunch = async (fieldOverride = null) => {
+    if (isComplete || punching || cooldown || waitingForLunchReturn) return;
 
     // Prevenção de clique duplo
     setCooldown(true);
@@ -101,7 +136,7 @@ export default function PunchPage() {
 
     setPunching(true);
     try {
-      const step = punchSteps[nextStepIndex];
+      const step = fieldOverride ? PUNCH_STEPS.find((item) => item.field === fieldOverride) : punchSteps[nextStepIndex];
       const { data, error } = await supabase.rpc('registrar_ponto', {
         p_funcionario_id: profile.id,
         p_tipo: step.field,
@@ -176,7 +211,7 @@ export default function PunchPage() {
         <button
           className="btn-punch"
           onClick={handlePunch}
-          disabled={isComplete || punching || cooldown || !profile?.ativo}
+          disabled={isComplete || punching || cooldown || waitingForLunchReturn || !profile?.ativo}
         >
           {punching ? (
             <Spinner />
@@ -204,6 +239,24 @@ export default function PunchPage() {
           </p>
         )}
 
+        {canRegisterEarlyLunch && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => handlePunch('saida_almoco')}
+            disabled={punching || cooldown || !profile?.ativo}
+          >
+            Registrar saída para almoço
+          </button>
+        )}
+
+        {needsDynamicLunch && (
+          <p className="text-muted" style={{ fontSize: 'var(--font-sm)', maxWidth: '500px', textAlign: 'center' }}>
+            Se o tempo trabalhado ultrapassar 6 horas, é necessário registrar uma pausa de almoço de 1 hora antes da saída.
+            {waitingForLunchReturn && ` O retorno poderá ser registrado em ${Math.ceil(60 - breakMinutes)} min.`}
+          </p>
+        )}
+
         {cooldown && !punching && (
           <p className="text-muted" style={{ fontSize: 'var(--font-xs)' }}>
             Aguarde alguns segundos antes de registrar novamente...
@@ -225,7 +278,6 @@ export default function PunchPage() {
             const value = todayRecord?.[step.field];
             const isCompleted = !!value;
             const isCurrent = index === nextStepIndex;
-            const isPending = index > nextStepIndex || (isComplete && false);
 
             let statusClass = 'pending';
             if (isCompleted) statusClass = 'completed';

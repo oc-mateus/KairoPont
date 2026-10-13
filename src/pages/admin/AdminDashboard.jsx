@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { formatMinutesAsHours, getOvertimeMinutes, getTodayInSP } from '../../lib/utils';
+import { formatMinutesAsHours, getCreditedDailyMinutes, getOvertimeMinutes, getTodayInSP } from '../../lib/utils';
 import { Spinner } from '../../components/ui';
 import { getAssignedShiftId, inferShiftFromEntry, makeEmployeeSchedule } from '../../lib/workShifts';
 
@@ -57,7 +57,7 @@ function isCltEmployee(employee) {
   return employee.tipo_contrato === 'clt' && employee.role !== 'admin';
 }
 
-function buildAttendanceChartData({ employees, records, vacations, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets }) {
+function buildAttendanceChartData({ employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets }) {
   if (!periodStartMonth) return [];
   const [startYear, startMonth] = periodStartMonth.split('-').map(Number);
   const startMonthIndex = startYear * 12 + startMonth - 1;
@@ -75,7 +75,8 @@ function buildAttendanceChartData({ employees, records, vacations, today, period
   });
   const scheduledEmployees = employees.filter((employee) => isCltEmployee(employee) && employee.ativo && getAssignedShiftId(employee.escala_trabalho));
   const recordByEmployeeDay = new Map(records.map((record) => [`${record.funcionario_id}:${record.data}`, record]));
-  const employeeById = new Map(scheduledEmployees.map((employee) => [employee.id, employee]));
+  const holidayDates = new Set(holidays.map((holiday) => holiday.data));
+  const employeeById = new Map(employees.filter(isCltEmployee).map((employee) => [employee.id, employee]));
 
   const daysToScan = monthlyBuckets
     ? Math.max(0, Math.floor((new Date(`${today}T12:00:00Z`) - new Date(`${periodStart}T12:00:00Z`)) / 86400000) + 1)
@@ -95,7 +96,7 @@ function buildAttendanceChartData({ employees, records, vacations, today, period
         if (employee.data_admissao && employee.data_admissao > date) return;
         const schedule = employee.escala_trabalho;
         if (!schedule?.dias_semana?.includes(weekday)) return;
-        if (isVacationDay(vacations, employee.id, date)) return;
+        if (holidayDates.has(date) || isVacationDay(vacations, employee.id, date)) return;
         const record = recordByEmployeeDay.get(`${employee.id}:${date}`);
         if (!record?.entrada) bucket.absences += 1;
       });
@@ -115,8 +116,10 @@ function buildAttendanceChartData({ employees, records, vacations, today, period
     const shiftDay = makeEmployeeSchedule(shiftId)?.horarios_por_dia?.[String(weekday)];
     const expectedEntry = clockMinutes(shiftDay?.entrada);
     const actualEntry = clockMinutes(record.entrada);
-    if (expectedEntry != null && actualEntry != null && actualEntry > expectedEntry) bucket.delays += 1;
-    bucket.overtimeMinutes += getOvertimeMinutes(record, shiftId);
+    if (!holidayDates.has(record.data) && expectedEntry != null && actualEntry != null && actualEntry > expectedEntry) bucket.delays += 1;
+    bucket.overtimeMinutes += holidayDates.has(record.data)
+      ? getCreditedDailyMinutes(record, shiftId)
+      : getOvertimeMinutes(record, shiftId);
   });
 
   return buckets;
@@ -147,6 +150,7 @@ export default function AdminDashboard() {
   const [todayPunches, setTodayPunches] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [vacations, setVacations] = useState([]);
+  const [holidays, setHolidays] = useState([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const today = getTodayInSP();
   const [period, setPeriod] = useState('current');
@@ -190,26 +194,31 @@ export default function AdminDashboard() {
       if (!periodStart) {
         setRecords([]);
         setVacations([]);
+        setHolidays([]);
         setTodayPunches([]);
         setAttendanceLoading(false);
         return;
       }
       try {
-        const [periodRecords, vacationsResult, todayRows] = await Promise.all([
+        const [periodRecords, vacationsResult, holidaysResult, todayRows] = await Promise.all([
           fetchAllRows(() => supabase.from('registros_ponto').select('*').gte('data', periodStart).lte('data', periodEnd).order('data', { ascending: false }).order('funcionario_id')),
           supabase.from('solicitacoes_ferias').select('funcionario_id,data_inicio,data_retorno,data_fim,status').eq('status', 'aprovada').lt('data_inicio', today).gte('data_retorno', periodStart),
+          supabase.from('feriados').select('data').gte('data', periodStart).lte('data', periodEnd),
           fetchAllRows(() => supabase.from('registros_ponto').select('funcionario_id').eq('data', today).order('funcionario_id')),
         ]);
         if (vacationsResult.error) throw vacationsResult.error;
+        if (holidaysResult.error) throw holidaysResult.error;
         if (cancelled) return;
         setRecords(periodRecords);
         setVacations(vacationsResult.data || []);
+        setHolidays(holidaysResult.data || []);
         setTodayPunches(todayRows);
       } catch (error) {
         if (!cancelled) {
           console.error('Erro ao carregar indicadores de ponto:', error);
           setRecords([]);
           setVacations([]);
+          setHolidays([]);
           setTodayPunches([]);
         }
       } finally {
@@ -225,8 +234,8 @@ export default function AdminDashboard() {
   const activeCltEmployeeIds = new Set(activeCltEmployees.map((employee) => employee.id));
   const todayRecords = todayPunches.filter((record) => activeCltEmployeeIds.has(record.funcionario_id)).length;
   const chartData = useMemo(() => buildAttendanceChartData({
-    employees, records, vacations, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets,
-  }), [employees, records, vacations, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets]);
+    employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets,
+  }), [employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets]);
 
   const absenceTotal = chartData.reduce((total, item) => total + item.absences, 0);
   const delayTotal = chartData.reduce((total, item) => total + item.delays, 0);
@@ -234,8 +243,8 @@ export default function AdminDashboard() {
   const hasSpecificCltRecords = records.some((record) => activeCltEmployeeIds.has(record.funcionario_id));
   const selectedEmployee = activeCltEmployees.find((employee) => employee.id === selectedEmployeeId) || null;
   const individualChartData = useMemo(() => selectedEmployee ? buildAttendanceChartData({
-    employees: [selectedEmployee], records, vacations, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets,
-  }) : [], [selectedEmployee, records, vacations, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets]);
+    employees: [selectedEmployee], records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets,
+  }) : [], [selectedEmployee, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets]);
   const individualAbsenceTotal = individualChartData.reduce((total, item) => total + item.absences, 0);
   const individualDelayTotal = individualChartData.reduce((total, item) => total + item.delays, 0);
   const individualOvertimeTotal = individualChartData.reduce((total, item) => total + item.overtimeMinutes, 0);

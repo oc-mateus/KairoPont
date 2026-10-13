@@ -22,7 +22,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Entrar com e-mail e senha e escolher CLT ou PJ na tela de login; se o vínculo selecionado não corresponder ao cadastro, a sessão é encerrada e o funcionário recebe uma orientação. Administradores podem entrar pelas duas opções e são encaminhados diretamente ao Painel Admin.
 - Receber convite do administrador e definir a própria senha.
 - Solicitar redefinição de senha pela tela de login; o link funciona para administradores, CLT e PJ e abre a página de nova senha.
-- CLT registra entrada e saída. O intervalo é descontado pelo horário fixo do turno, sem precisar marcar saída e retorno do almoço.
+- CLT registra entrada e saída. Nos dias com almoço fixo, o intervalo é descontado pelo horário do turno. Em dias sem almoço fixo, se a jornada passar de seis horas, o sistema exige uma pausa de almoço registrada de pelo menos uma hora.
 - PJ registra entrada e saída, sem turno ou almoço programado; o sistema soma o tempo entre as duas marcações para o acompanhamento das horas do período.
 - Contas PJ não exibem Documentos nem Minhas Férias e são redirecionadas caso tentem abrir essas rotas diretamente. Na ficha administrativa, a seção de férias também aparece somente para CLT.
 - Consultar o próprio histórico e exportá-lo para PDF, Excel (.xlsx) ou Markdown.
@@ -82,9 +82,9 @@ Operações administrativas dependem do papel armazenado no banco. Novos perfis 
 
 ## Registro de ponto
 
-A interface apresenta a próxima etapa válida e impede cliques repetidos enquanto a solicitação está em andamento. A função SQL registrar_ponto confere se o usuário ativo está registrando o próprio ponto, valida a sequência e usa a data e a hora do servidor Supabase no fuso America/Sao_Paulo. O fluxo PJ aceita apenas entrada e saída, não atribui turno e calcula o tempo decorrido para o pagamento. No fluxo CLT, são registradas entrada e saída; o almoço é fixo e calculado no relatório sem marcações extras: 12h–13h no 1º turno, 19h–20h no 2º e 02h–03h no 3º (dia seguinte). Sábados não têm intervalo.
+A interface apresenta a próxima etapa válida e impede cliques repetidos enquanto a solicitação está em andamento. A função SQL registrar_ponto confere se o usuário ativo está registrando o próprio ponto, valida a sequência e usa a data e a hora do servidor Supabase no fuso America/Sao_Paulo. O fluxo PJ aceita apenas entrada e saída, não atribui turno e calcula o tempo decorrido para o pagamento. No fluxo CLT, o almoço é fixo e calculado no relatório sem marcações extras nos dias úteis: 12h–13h no 1º turno, 19h–20h no 2º e 02h–03h no 3º (dia seguinte). Em dias sem almoço fixo, como o sábado, o funcionário pode marcar a pausa antes de seis horas; se o tempo efetivamente trabalhado passar de seis horas, é obrigatório registrar saída e retorno do almoço com pelo menos uma hora de intervalo antes da saída final.
 
-Cada funcionário pode ter um registro por dia. O esquema preserva as colunas de almoço para compatibilidade, mas a interface atual só solicita entrada e saída; o intervalo CLT é calculado conforme o turno efetivamente classificado. Registros PJ não guardam turno.
+Cada funcionário pode ter um registro por dia. O esquema preserva as colunas de almoço para os intervalos dinâmicos e compatibilidade; em dias CLT sem almoço fixo, a interface permite registrar a pausa antecipadamente e passa a exigir a marcação antes da saída quando o tempo trabalhado ultrapassa seis horas. O intervalo fixo CLT é calculado conforme o turno efetivamente classificado. Registros PJ não guardam turno.
 
 ## Dados e estrutura
 
@@ -171,7 +171,7 @@ A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIA
 
 Para perfis CLT existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível. Perfis PJ não usam escala de turno nem comparativo CLT.
 
-Existem três escalas fixas para CLT. O turno efetivo é classificado pela entrada mais próxima do horário de início e salvo no registro diário. Os intervalos em dias úteis são 12h–13h no turno 1, 19h–20h no turno 2 e 02h–03h no turno 3. O turno 3 cruza a meia-noite; a data de saída fica separada da data da entrada, e o cálculo considera a virada do dia. A jornada de sábado varia por turno e não inclui intervalo.
+Existem três escalas fixas para CLT. O turno efetivo é classificado pela entrada mais próxima do horário de início e salvo no registro diário. Os intervalos em dias úteis são 12h–13h no turno 1, 19h–20h no turno 2 e 02h–03h no turno 3. O turno 3 cruza a meia-noite; a data de saída fica separada da data da entrada, e o cálculo considera a virada do dia. A jornada de sábado varia por turno e não prevê intervalo; se a jornada efetiva ultrapassar seis horas, o funcionário deve marcar uma pausa de pelo menos uma hora antes da saída final.
 
 Na ficha do funcionário, administradores podem corrigir os horários do registro de ponto individual até 96 horas após sua criação. O limite é contado e validado no banco, não apenas na interface. Depois do prazo, um gatilho bloqueia alterações e exclusões, inclusive por chamadas diretas; data-base e identificadores também não podem ser alterados. Cada correção gera um item na tabela `auditoria`. A tela apresenta “Editar horários” dentro do prazo e “Prazo encerrado” após o vencimento.
 

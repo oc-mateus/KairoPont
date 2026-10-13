@@ -16,6 +16,7 @@ import SetPasswordPage from './pages/SetPasswordPage';
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminEmployees from './pages/admin/AdminEmployees';
+import AdminCalendar from './pages/admin/AdminCalendar';
 
 function PrivateRoute({ children, requireAdmin = false, requireClt = false }) {
   const { session, profile, loading } = useAuth();
@@ -78,6 +79,7 @@ export default function App() {
       {/* Rotas de Administração */}
       <Route path="/admin" element={<PrivateRoute requireAdmin><AdminDashboard /></PrivateRoute>} />
       <Route path="/admin/funcionarios" element={<PrivateRoute requireAdmin><AdminEmployees /></PrivateRoute>} />
+      <Route path="/admin/calendario" element={<PrivateRoute requireAdmin><AdminCalendar /></PrivateRoute>} />
 
       <Route path="*" element={<Navigate to="/ponto" replace />} />
     </Routes>

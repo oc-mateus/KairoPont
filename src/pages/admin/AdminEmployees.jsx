@@ -7,7 +7,7 @@ import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
 import WorkScheduleCard from '../../components/WorkScheduleCard';
-import { getAssignedShiftId, getFixedLunchLabel, getShiftLabel, inferShiftFromEntry, makeEmployeeSchedule, summarizeWorkedShifts, WORK_SHIFTS } from '../../lib/workShifts';
+import { getAssignedShiftId, getLunchLabelForRecord, getShiftLabel, inferShiftFromEntry, makeEmployeeSchedule, summarizeWorkedShifts, WORK_SHIFTS } from '../../lib/workShifts';
 
 const FILTERS = [
   { id: 'day', label: 'Dia' },
@@ -84,7 +84,11 @@ function durationLabel(minutes) {
   return `${sign}${hours}h ${remainingMinutes}min`;
 }
 
-function getScheduleComparison(record, schedule) {
+function getScheduleComparison(record, schedule, isHoliday = false) {
+  if (isHoliday) {
+    const workedMinutes = record.entrada && record.saida ? getCreditedDailyMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)) : null;
+    return { expected: 'Feriado', balance: workedMinutes == null ? '—' : durationLabel(workedMinutes), overtimeMinutes: workedMinutes || 0 };
+  }
   if (!schedule?.dias_semana?.length) return { expected: '—', balance: '—' };
   const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
   if (!schedule.dias_semana.includes(weekday)) return { expected: 'Folga', balance: record.saida ? 'Extra' : '—' };
@@ -109,7 +113,10 @@ export default function AdminEmployees() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [records, setRecords] = useState([]);
+  const [holidays, setHolidays] = useState([]);
   const [editingPunchId, setEditingPunchId] = useState(null);
+  const [punchToDelete, setPunchToDelete] = useState(null);
+  const [deletingPunch, setDeletingPunch] = useState(false);
   const [punchEditForm, setPunchEditForm] = useState({ entrada: '', saida_almoco: '', retorno_almoco: '', saida: '', saida_data: '' });
   const [savingPunch, setSavingPunch] = useState(false);
   const [documents, setDocuments] = useState([]);
@@ -137,6 +144,7 @@ export default function AdminEmployees() {
   const [employeeForm, setEmployeeForm] = useState({ nome: '', email: '', cpf: '', cargo: '', tipo_contrato: 'clt', data_admissao: getTodayInSP(), turno_id: 'turno1', ...makeEmployeeSchedule('turno1') });
 
   const hasSavedSchedule = Boolean(selectedEmp?.escala_trabalho?.dias_semana?.length || (selectedEmp?.escala_trabalho?.entrada && selectedEmp?.escala_trabalho?.saida));
+  const isHolidayRecord = (record) => holidays.some((holiday) => holiday.data === record.data);
   const contractChanged = selectedEmp && employeeForm.tipo_contrato !== (selectedEmp.tipo_contrato || 'clt');
   const employeeDailyTotal = (record) => selectedEmp?.tipo_contrato === 'pj' ? calcElapsedDailyTotal(record) : calcDailyTotal(record);
   const employeePeriodMinutes = selectedEmp?.tipo_contrato === 'pj' ? records.reduce((total, record) => total + getElapsedWorkMinutes(record), 0) : 0;
@@ -310,11 +318,29 @@ export default function AdminEmployees() {
     }
   };
 
+  const deletePunch = async () => {
+    if (!punchToDelete || deletingPunch) return;
+    setDeletingPunch(true);
+    try {
+      const { error } = await supabase.rpc('admin_delete_punch_record', { p_record_id: punchToDelete.id });
+      if (error) throw error;
+      setRecords((current) => current.filter((record) => record.id !== punchToDelete.id));
+      setEditingPunchId((current) => current === punchToDelete.id ? null : current);
+      toast.success('Registro de ponto excluído. A ação ficou registrada na auditoria.');
+    } catch (error) {
+      toast.error('Não foi possível excluir o registro: ' + error.message);
+    } finally {
+      setDeletingPunch(false);
+      setPunchToDelete(null);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function fetchEmployeeDetails() {
       if (!selectedEmp) {
         setRecords([]);
+        setHolidays([]);
         setDocuments([]);
         setVacationPeriods([]);
         setVacationRequests([]);
@@ -322,6 +348,7 @@ export default function AdminEmployees() {
       }
       const hasValidRange = Boolean(range.start && range.end && range.start <= range.end);
       setRecords([]);
+      setHolidays([]);
       setDocuments([]);
       setVacationPeriods([]);
       setVacationRequests([]);
@@ -332,14 +359,17 @@ export default function AdminEmployees() {
           const { error: syncError } = await supabase.rpc('sync_current_vacation_periods');
           if (syncError) throw syncError;
         }
-        const [employeeRecords, employeeDocuments, employeeCycles, employeeVacations] = await Promise.all([
+        const [employeeRecords, employeeDocuments, employeeCycles, employeeVacations, calendarDays] = await Promise.all([
           hasValidRange ? fetchAllRows(() => supabase.from('registros_ponto').select('*').eq('funcionario_id', selectedEmp.id).gte('data', range.start).lte('data', range.end).order('data', { ascending: false })) : Promise.resolve([]),
           fetchAllRows(() => supabase.from('documentos').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
           isPj ? Promise.resolve([]) : fetchAllRows(() => supabase.from('periodos_aquisitivos_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('periodo_inicio', { ascending: false })),
           isPj ? Promise.resolve([]) : fetchAllRows(() => supabase.from('solicitacoes_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
+          hasValidRange ? supabase.from('feriados').select('data').gte('data', range.start).lte('data', range.end) : Promise.resolve({ data: [], error: null }),
         ]);
+        if (calendarDays.error) throw calendarDays.error;
         if (!cancelled) {
           setRecords(employeeRecords);
+          setHolidays(calendarDays.data || []);
           setDocuments(employeeDocuments);
           setVacationPeriods(employeeCycles);
           setVacationRequests(employeeVacations);
@@ -389,15 +419,15 @@ export default function AdminEmployees() {
         period: `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
         filename: `ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.xlsx`,
         calcDailyTotal: employeeDailyTotal,
-        lunchLabel: selectedEmp.tipo_contrato === 'pj' ? null : (record) => getFixedLunchLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada), record.data),
+        lunchLabel: selectedEmp.tipo_contrato === 'pj' ? null : (record) => getLunchLabelForRecord(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)),
         summary: selectedEmp.tipo_contrato === 'pj' ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(employeePeriodMinutes) } : null,
         extraColumns: [
           { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT' },
           ...(selectedEmp.tipo_contrato === 'pj' ? [] : [{ key: 'shift', header: 'Turno trabalhado', width: 20, value: (record) => getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)) }]),
           { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
           ...(selectedEmp.tipo_contrato === 'pj' ? [] : [
-            { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).expected },
-            { key: 'balance', header: 'Saldo diário', width: 17, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho).balance },
+            { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).expected },
+            { key: 'balance', header: 'Saldo diário', width: 17, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).balance },
           ]),
         ],
       });
@@ -416,8 +446,11 @@ export default function AdminEmployees() {
       const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
       const pdf = new jsPDF({ orientation: 'landscape' });
       const shiftSummary = summarizeWorkedShifts(records);
-      const overtimeMinutes = selectedEmp.tipo_contrato === 'pj' ? 0 : records.reduce((total, record) => total + getOvertimeMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)), 0);
-      const overtimeDays = selectedEmp.tipo_contrato === 'pj' ? 0 : records.filter((record) => getOvertimeMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)) > 0).length;
+      const recordOvertimeMinutes = (record) => isHolidayRecord(record)
+        ? (record.entrada && record.saida ? getCreditedDailyMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)) : 0)
+        : getOvertimeMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada));
+      const overtimeMinutes = selectedEmp.tipo_contrato === 'pj' ? 0 : records.reduce((total, record) => total + recordOvertimeMinutes(record), 0);
+      const overtimeDays = selectedEmp.tipo_contrato === 'pj' ? 0 : records.filter((record) => recordOvertimeMinutes(record) > 0).length;
       const tableStartY = await addKairoPdfHeader(pdf, {
         title: `Relatório de ponto - ${selectedEmp.nome}`,
         details: [
@@ -461,9 +494,9 @@ export default function AdminEmployees() {
         head: [[...(selectedEmp.tipo_contrato === 'pj' ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Turno', 'Almoço fixo']), 'Saída', 'Saída em', 'Horas computadas', ...(selectedEmp.tipo_contrato === 'pj' ? [] : ['Previsto', 'Saldo']), 'Status']],
         body: records.map((record) => [
           formatDate(`${record.data}T12:00:00`), formatTime(record.entrada),
-          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), getFixedLunchLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada), record.data)]),
+          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), getLunchLabelForRecord(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada))]),
           formatTime(record.saida), record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia', employeeDailyTotal(record),
-          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getScheduleComparison(record, selectedEmp.escala_trabalho).expected, getScheduleComparison(record, selectedEmp.escala_trabalho).balance]),
+          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).expected, getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).balance]),
           record.saida ? 'Completo' : 'Incompleto',
         ]),
         theme: 'grid',
@@ -617,7 +650,7 @@ export default function AdminEmployees() {
                   </div>
                   <div className="employee-punch-edit-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingPunchId(null)} disabled={savingPunch}>Cancelar</button><button className="btn btn-primary btn-sm" disabled={savingPunch}>{savingPunch ? 'Salvando…' : 'Salvar horários'}</button></div>
                 </form>}
-                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Turno do dia</th><th>Almoço fixo</th></>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ajuste</th></tr></thead><tbody>{records.map((record) => { const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); const editable = canEditPunch(record); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}</td><td>{formatTime(record.entrada)}</td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{getShiftLabel(shiftId)}</td><td>{getFixedLunchLabel(shiftId, record.data)}</td></>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td>{editable ? <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Editar horários</button> : <span className="employee-punch-locked" title="Prazo de 96 horas após a criação encerrado">Prazo encerrado</span>}</td></tr>; })}</tbody></table></div>
+                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Turno do dia</th><th>Almoço fixo</th></>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ações</th></tr></thead><tbody>{records.map((record) => { const isHoliday = holidays.some((holiday) => holiday.data === record.data); const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho, isHoliday); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); const editable = canEditPunch(record); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}{isHoliday && <div className="employee-punch-locked">Feriado</div>}</td><td>{formatTime(record.entrada)}</td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{getShiftLabel(shiftId)}</td><td>{getLunchLabelForRecord(record, shiftId)}</td></>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td><div className="employee-punch-actions">{editable && <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Editar horários</button>}<button className="btn btn-danger btn-sm" onClick={() => setPunchToDelete(record)}>Excluir</button></div></td></tr>; })}</tbody></table></div>
               </>
             ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
           </section>
@@ -630,6 +663,7 @@ export default function AdminEmployees() {
       )}
 
       <ConfirmDialog isOpen={dialogOpen} onClose={() => setDialogOpen(false)} onConfirm={confirmAction} title="Confirmar ação" message={actionType === 'toggle_status' ? `Deseja realmente ${actionEmployee?.ativo ? 'desativar' : 'ativar'} o acesso de ${actionEmployee?.nome}?` : `Deseja alterar o perfil de ${actionEmployee?.nome} para ${actionEmployee?.role === 'admin' ? 'Funcionário' : 'Administrador'}?`} confirmText="Confirmar" danger={actionType === 'toggle_status' && actionEmployee?.ativo} />
+      <ConfirmDialog isOpen={Boolean(punchToDelete)} onClose={() => setPunchToDelete(null)} onConfirm={deletePunch} title="Excluir registro de ponto" message={`Deseja excluir o registro de ${selectedEmp?.nome || 'este funcionário'} do dia ${punchToDelete ? formatDate(`${punchToDelete.data}T12:00:00`) : ''}? A exclusão será registrada na auditoria.`} confirmText="Excluir registro" danger />
     </div>
   );
 }

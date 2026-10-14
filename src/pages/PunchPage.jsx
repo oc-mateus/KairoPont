@@ -136,7 +136,12 @@ export default function PunchPage() {
 
     setPunching(true);
     try {
-      const step = fieldOverride ? PUNCH_STEPS.find((item) => item.field === fieldOverride) : punchSteps[nextStepIndex];
+      // onClick handlers can pass the browser event as the first argument. Only
+      // treat a known field name as an override; otherwise use the next step.
+      const step = typeof fieldOverride === 'string'
+        ? PUNCH_STEPS.find((item) => item.field === fieldOverride)
+        : punchSteps[nextStepIndex];
+      if (!step) throw new Error('Não foi possível identificar a próxima etapa do registro. Atualize a página e tente novamente.');
       const { data, error } = await supabase.rpc('registrar_ponto', {
         p_funcionario_id: profile.id,
         p_tipo: step.field,
@@ -210,7 +215,7 @@ export default function PunchPage() {
       <div className="flex flex-center mb-6" style={{ flexDirection: 'column', gap: 'var(--space-4)' }}>
         <button
           className="btn-punch"
-          onClick={handlePunch}
+          onClick={() => handlePunch()}
           disabled={isComplete || punching || cooldown || waitingForLunchReturn || !profile?.ativo}
         >
           {punching ? (

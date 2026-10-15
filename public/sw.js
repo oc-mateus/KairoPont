@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'kairopont-shell-';
-const CACHE_NAME = `${CACHE_PREFIX}v1`;
+const CACHE_NAME = `${CACHE_PREFIX}v2`;
 const APP_ROOT = new URL('./', self.registration.scope).toString();
 
 self.addEventListener('install', (event) => {
@@ -42,14 +42,12 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const fresh = fetch(request).then((response) => {
-        if (response.ok && response.type === 'basic') {
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
-        }
-        return response;
-      });
-      return cached || fresh;
-    })
+    fetch(request).then((response) => {
+      if (response.ok && response.type === 'basic') {
+        const copy = response.clone();
+        event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+      }
+      return response;
+    }).catch(async () => (await caches.match(request)) || Response.error())
   );
 });

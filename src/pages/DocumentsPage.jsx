@@ -92,7 +92,16 @@ export default function DocumentsPage() {
           periodo_fim: docPeriodEnd || null,
         });
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        const { error: cleanupError } = await supabase.storage
+          .from('documentos')
+          .remove([fileName]);
+        if (cleanupError) {
+          console.error('Não foi possível remover o arquivo sem metadados:', cleanupError);
+          throw new Error(`${dbError.message} O arquivo enviado pode precisar de limpeza administrativa.`);
+        }
+        throw dbError;
+      }
 
       toast.success('Documento enviado com sucesso!');
       setShowUpload(false);
@@ -108,15 +117,21 @@ export default function DocumentsPage() {
   };
 
   const handleDownload = async (doc) => {
+    const downloadTab = window.open('about:blank', '_blank');
+    if (!downloadTab) {
+      toast.warning('Permita a abertura de uma nova aba para baixar o documento.');
+      return;
+    }
     try {
       const { data, error } = await supabase.storage
         .from('documentos')
         .createSignedUrl(doc.caminho_storage, 60); // URL válida por 60 segundos
 
       if (error) throw error;
-
-      window.open(data.signedUrl, '_blank');
+      downloadTab.opener = null;
+      downloadTab.location.replace(data.signedUrl);
     } catch (err) {
+      downloadTab.close();
       toast.error('Erro ao acessar documento: ' + err.message);
     }
   };

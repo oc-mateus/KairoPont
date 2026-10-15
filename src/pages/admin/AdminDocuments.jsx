@@ -31,14 +31,21 @@ export default function AdminDocuments() {
   }, []);
 
   const handleDownload = async (doc) => {
+    const downloadTab = window.open('about:blank', '_blank');
+    if (!downloadTab) {
+      toast.warning('Permita a abertura de uma nova aba para baixar o documento.');
+      return;
+    }
     try {
       const { data, error } = await supabase.storage
         .from('documentos')
         .createSignedUrl(doc.caminho_storage, 60);
 
       if (error) throw error;
-      window.open(data.signedUrl, '_blank');
+      downloadTab.opener = null;
+      downloadTab.location.replace(data.signedUrl);
     } catch (err) {
+      downloadTab.close();
       toast.error('Erro ao acessar documento: ' + err.message);
     }
   };

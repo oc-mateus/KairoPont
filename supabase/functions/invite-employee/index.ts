@@ -25,6 +25,12 @@ function validCPF(value: string) {
   return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
 }
 
+function validIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 function makeSchedule(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const submitted = value as Record<string, unknown>;
@@ -47,8 +53,8 @@ function makeSchedule(value: unknown) {
   }
   const saturdayHours: Record<string, { start: string; end: string }> = {
     turno1: { start: "08:00", end: "12:00" },
-    turno2: { start: "14:30", end: "18:30" },
-    turno3: { start: "22:45", end: "00:32" },
+    turno2: { start: "14:30", end: "18:33" },
+    turno3: { start: "22:45", end: "05:36" },
   };
   horarios_por_dia["6"] = {
     entrada: saturdayHours[id].start,
@@ -83,7 +89,7 @@ Deno.serve(async (req) => {
     const cargo = String(input.cargo || "").trim();
     const tipoContrato = String(input.tipo_contrato || "clt");
     const dataAdmissao = String(input.data_admissao || "");
-    const escala = makeSchedule(input.escala_trabalho);
+    const escala = tipoContrato === "clt" ? makeSchedule(input.escala_trabalho) : null;
     const todayParts = new Intl.DateTimeFormat("en-US", {
       timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
     }).formatToParts(new Date());
@@ -93,8 +99,11 @@ Deno.serve(async (req) => {
     if (!/^\S+@\S+\.\S+$/.test(email) || nome.length < 3 || cargo.length < 2 || !validCPF(cpf) || !["clt", "pj"].includes(tipoContrato)) {
       return response({ error: "Confira o nome, e-mail, CPF e cargo informados." }, 400);
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataAdmissao) || dataAdmissao > today || !escala) {
-      return response({ error: "Informe uma data de admissão válida e uma escala semanal completa." }, 400);
+    if (dataAdmissao && (!validIsoDate(dataAdmissao) || dataAdmissao > today)) {
+      return response({ error: "Informe uma data de admissão válida, igual ou anterior a hoje." }, 400);
+    }
+    if (tipoContrato === "clt" && (!validIsoDate(dataAdmissao) || !escala)) {
+      return response({ error: "Para CLT, informe uma data de admissão válida e uma escala semanal completa." }, 400);
     }
 
     const { error: inviteRecordError } = await ctx.supabaseAdmin

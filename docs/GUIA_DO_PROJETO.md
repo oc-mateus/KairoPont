@@ -44,7 +44,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
 - Criar funcionário por convite, informando admissão, cargo e vínculo. O turno é solicitado somente para CLT; editar um vínculo existente abre o seletor sob demanda. A escala e a data de admissão permanecem como informação depois do cadastro e só aparecem como campos quando o administrador escolhe editar. O resumo do turno pode ser recolhido ou expandido; a preferência fica salva neste navegador para cada perfil.
-- Para CLT, escolher entre três turnos fixos: 1º (08h–17h, almoço 12h–13h), 2º (14h–22h52, almoço 19h–20h) e 3º (22h45–06h15 do dia seguinte, almoço 02h–03h do dia seguinte). O sábado usa a jornada definida para cada turno; domingo é folga. A entrada classifica o turno feito no registro sem alterar o turno habitual do perfil. A saída noturna pode ser vinculada ao registro iniciado na véspera e recebe data própria.
+- Para CLT, escolher entre três turnos fixos: 1º (08h–17h, almoço 12h–13h), 2º (14h–22h52, almoço 19h–20h) e 3º (22h45–06h15 do dia seguinte, almoço 02h–03h do dia seguinte). Aos sábados, os horários são 08h–12h no 1º turno, 14h30–18h33 no 2º e 22h45–05h36 do dia seguinte no 3º; o domingo é folga. Essas escalas somam 44 horas semanais com a conversão de hora noturna aplicada pelo sistema. A entrada classifica o turno feito no registro sem alterar o turno habitual do perfil. A saída noturna pode ser vinculada ao registro iniciado na véspera e recebe data própria.
 - Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
 - Na ficha do funcionário, consultar a data de admissão, quando o pedido será liberado e a primeira data possível de saída; na fila, revisar saída e retorno solicitados.
 - Comparar nas tabelas de ponto as horas registradas, a jornada planejada para cada dia e o saldo diário.
@@ -108,7 +108,7 @@ A tabela `auditoria` continua no banco e recebe eventos administrativos previsto
 
 O bucket documentos é privado. As políticas do Storage exigem autenticação e restringem o envio à pasta vinculada ao perfil autenticado. A leitura é restrita ao funcionário correspondente ou a um administrador. O app cria links assinados de curta duração para download.
 
-A tela aceita PDF, JPEG, PNG e WebP e informa limite de 10 MB. Na configuração verificada, o bucket não tinha lista de tipos permitidos nem limite próprio definido. Assim, as restrições de tipo e tamanho eram verificadas apenas no frontend e não devem ser tratadas como controles suficientes do servidor.
+A tela aceita PDF, JPEG, PNG e WebP e informa limite de 10 MB. A configuração do bucket deve impor o mesmo limite e os mesmos tipos no servidor. Para configurar ou conferir o bucket existente, use `npm run configure:document-bucket` com `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` fornecidos somente no ambiente local seguro. A chave privilegiada não deve ser gravada em arquivo `.env` usado pelo Vite, adicionada ao frontend ou enviada ao Git.
 
 O arquivo é enviado antes dos metadados do documento. Se a gravação dos metadados falhar após o envio, o código atual pode deixar um arquivo sem referência na tabela; não há compensação automática que remova esse arquivo.
 
@@ -162,6 +162,9 @@ As migrações devem ser aplicadas nesta ordem:
 12. supabase/migrations/20261009203030_saturday_shift_weekly_44h.sql
 13. supabase/migrations/20261010174106_pj_punch_and_employee_preferences.sql
 14. supabase/migrations/20261010180000_fixed_lunch_and_entry_exit_only.sql
+15. supabase/migrations/20261013195909_require_meal_break_after_six_hours.sql
+16. supabase/migrations/20261013200129_holiday_calendar_and_admin_punch_deletion.sql
+17. supabase/migrations/20261015210151_enforce_active_employee_access_and_sp_dates.sql
 
 O projeto KairoPont registra as migrações listadas, com os buckets documentos (privado) e fotos-funcionarios (público). Não reaplique nem resete o banco de produção para seguir este guia.
 
@@ -171,7 +174,7 @@ A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIA
 
 Para perfis CLT existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível. Perfis PJ não usam escala de turno nem comparativo CLT.
 
-Existem três escalas fixas para CLT. O turno efetivo é classificado pela entrada mais próxima do horário de início e salvo no registro diário. Os intervalos em dias úteis são 12h–13h no turno 1, 19h–20h no turno 2 e 02h–03h no turno 3. O turno 3 cruza a meia-noite; a data de saída fica separada da data da entrada, e o cálculo considera a virada do dia. A jornada de sábado varia por turno e não prevê intervalo; se a jornada efetiva ultrapassar seis horas, o funcionário deve marcar uma pausa de pelo menos uma hora antes da saída final.
+Existem três escalas fixas para CLT. O turno efetivo é classificado pela entrada mais próxima do horário de início e salvo no registro diário. Os intervalos em dias úteis são 12h–13h no turno 1, 19h–20h no turno 2 e 02h–03h no turno 3. O turno 3 cruza a meia-noite; a data de saída fica separada da data da entrada, e o cálculo considera a virada do dia. A jornada de sábado é 08h–12h no turno 1, 14h30–18h33 no turno 2 e 22h45–05h36 do domingo no turno 3; não há intervalo programado. Se a jornada efetiva ultrapassar seis horas, o funcionário deve marcar uma pausa de pelo menos uma hora antes da saída final.
 
 Na ficha do funcionário, administradores podem corrigir os horários do registro de ponto individual até 96 horas após sua criação. O limite é contado e validado no banco, não apenas na interface. Depois do prazo, um gatilho bloqueia alterações e exclusões, inclusive por chamadas diretas; data-base e identificadores também não podem ser alterados. Cada correção gera um item na tabela `auditoria`. A tela apresenta “Editar horários” dentro do prazo e “Prazo encerrado” após o vencimento.
 
@@ -197,6 +200,7 @@ As verificações abaixo foram feitas em 6 de outubro de 2026. Reconfirme o esta
 5. **Evitar arquivos órfãos:** se o insert dos metadados falhar, remover o objeto enviado ou disponibilizar um processo administrativo de reconciliação.
 6. **Completar dados de vínculo:** conferir data de admissão e escala semanal de cada funcionário com o RH.
 7. **Validar sem dados reais:** testar convite, definição de senha, login, isolamento entre usuários fictícios, arquivo descartável, link assinado, comparação de ponto, prazos e e-mails de aprovação/recusa.
+8. **Configurar o Storage de documentos:** aplicar a configuração do bucket privado com `npm run configure:document-bucket`, usando as credenciais privilegiadas somente no ambiente seguro. O script não faz parte do workflow do frontend.
 
 ## Operação e suporte
 

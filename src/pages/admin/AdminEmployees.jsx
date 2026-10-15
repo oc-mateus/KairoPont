@@ -214,7 +214,12 @@ export default function AdminEmployees() {
     setSavingEmployment(true);
     try {
       const { error } = await supabase.functions.invoke('invite-employee', {
-        body: { ...employeeForm, cpf: employeeForm.cpf.replace(/\D/g, ''), escala_trabalho: scheduleFromForm(employeeForm) },
+        body: {
+          ...employeeForm,
+          cpf: employeeForm.cpf.replace(/\D/g, ''),
+          data_admissao: employeeForm.data_admissao || null,
+          escala_trabalho: employeeForm.tipo_contrato === 'clt' ? scheduleFromForm(employeeForm) : null,
+        },
       });
       if (error) throw error;
       toast.success('Convite enviado. O funcionário receberá um e-mail para definir a senha.');
@@ -239,8 +244,8 @@ export default function AdminEmployees() {
     try {
       const { error } = await supabase.rpc('admin_update_employee_employment', {
         p_funcionario_id: selectedEmp.id,
-        p_data_admissao: employeeForm.data_admissao,
-        p_escala_trabalho: scheduleFromForm(employeeForm),
+        p_data_admissao: employeeForm.data_admissao || null,
+        p_escala_trabalho: employeeForm.tipo_contrato === 'clt' ? scheduleFromForm(employeeForm) : null,
         p_tipo_contrato: employeeForm.tipo_contrato,
       });
       if (error) throw error;
@@ -266,7 +271,7 @@ export default function AdminEmployees() {
       {selectedEmp && editingContract && <label className="form-group">Tipo de vínculo<select className="form-input" value={employeeForm.tipo_contrato} onChange={(event) => setFormField('tipo_contrato', event.target.value)}><option value="clt">CLT</option><option value="pj">PJ</option></select></label>}
       {selectedEmp && editingContract && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setFormField('tipo_contrato', selectedEmp.tipo_contrato || 'clt'); setEditingContract(false); }}>Cancelar edição do vínculo</button>}
       {(!editingAdmission && !showInviteForm && selectedEmp?.data_admissao) && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingAdmission(true)}>Editar data de admissão</button>}
-      {(editingAdmission || showInviteForm || !selectedEmp?.data_admissao) && <label className="form-group">Data de admissão<input className="form-input" required type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>}
+      {(editingAdmission || showInviteForm || !selectedEmp?.data_admissao) && <label className="form-group">Data de admissão{employeeForm.tipo_contrato === 'pj' && <small> (opcional para PJ)</small>}<input className="form-input" required={employeeForm.tipo_contrato === 'clt'} type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>}
       {employeeForm.tipo_contrato === 'clt' && (!hasSavedSchedule || editingSchedule || showInviteForm) && <label className="form-group">Turno habitual<select className="form-input" value={employeeForm.turno_id} onChange={(event) => setScheduleType(event.target.value)}><option value="turno1">1º turno — 08:00 às 17:00</option><option value="turno2">2º turno — 14:00 às 22:52</option><option value="turno3">3º turno — 22:45 às 06:15 (dia seguinte)</option></select></label>}
       {employeeForm.tipo_contrato === 'clt' && hasSavedSchedule && !editingSchedule && !showInviteForm && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar turno</button>}
       {(editingAdmission || editingSchedule || !hasSavedSchedule || !selectedEmp?.data_admissao || showInviteForm || contractChanged) && <button className="btn btn-primary" disabled={savingEmployment || ((editingSchedule || !hasSavedSchedule || showInviteForm) && employeeForm.dias_semana.length === 0)}>{savingEmployment ? 'Salvando…' : editingSchedule || !hasSavedSchedule || showInviteForm ? submitLabel : contractChanged ? 'Salvar tipo de vínculo' : 'Salvar data de admissão'}</button>}

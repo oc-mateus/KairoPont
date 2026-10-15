@@ -50,10 +50,10 @@ O cadastro cria perfis de funcionário. A atribuição do papel de administrador
 
 - As políticas RLS limitam funcionários aos próprios dados; ações administrativas exigem perfil de administrador.
 - O bucket `documentos` é privado. O bucket de fotos de perfil é público para exibir avatares.
-- A tela valida formato e tamanho de arquivo; configure também limites e tipos aceitos no Storage para impor essas restrições no servidor.
+- A tela valida formato e tamanho de arquivo; configure o bucket privado com `npm run configure:document-bucket` para impor esses limites também no servidor. Use `SUPABASE_SERVICE_ROLE_KEY` somente como variável de ambiente local segura.
 - O acesso é feito com e-mail e senha, com seleção do vínculo CLT/PJ validada contra o cadastro do funcionário. Administradores podem usar qualquer opção. O CPF é solicitado no cadastro e usado para identificar o funcionário, não para entrar.
 
-O site está publicado. A URL padrão do Supabase Auth e o endereço permitido para redefinição de senha usam `https://oc-mateus.github.io/KairoPont/` e `https://oc-mateus.github.io/KairoPont/definir-senha`. Antes do uso operacional, revise as credenciais da conta administrativa de teste, confirme a entrega de e-mails do Auth e configure os limites de arquivo no Storage.
+O site está publicado. A URL padrão do Supabase Auth e o endereço permitido para redefinição de senha usam `https://oc-mateus.github.io/KairoPont/` e `https://oc-mateus.github.io/KairoPont/definir-senha`. Antes do uso operacional, revise as credenciais da conta administrativa de teste, confirme a entrega de e-mails do Auth e aplique a configuração de limite e tipos do Storage.
 
 ## Desenvolvimento local
 
@@ -64,6 +64,8 @@ npm install
 cp .env.example .env
 npm run dev
 ```
+
+Execute `npm test` para rodar os testes automatizados de cálculos de jornada, datas, escalas e CPF.
 
 Preencha no `.env` local `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` com os valores públicos apropriados ao cliente. Não envie `.env`, chaves privilegiadas, senhas ou tokens ao GitHub.
 

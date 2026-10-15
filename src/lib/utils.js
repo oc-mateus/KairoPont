@@ -2,7 +2,7 @@
  * Utilitários de data/hora para o fuso America/Sao_Paulo
  */
 
-import { getFixedLunchLabel, getFixedLunchSchedule, inferShiftForRecord, makeEmployeeSchedule } from './workShifts';
+import { getFixedLunchLabel, getFixedLunchSchedule, inferShiftForRecord, makeEmployeeSchedule } from './workShifts.js';
 
 const TIMEZONE = 'America/Sao_Paulo';
 
@@ -37,7 +37,11 @@ export function formatTime(timeString) {
  */
 export function formatDate(isoString) {
   if (!isoString) return '—';
-  const date = new Date(isoString);
+  const value = String(isoString);
+  // Date-only values represent a São Paulo calendar date, not a UTC instant.
+  const date = /^\d{4}-\d{2}-\d{2}(?:$|T)/.test(value) && !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)
+    ? new Date(`${value.slice(0, 10)}T12:00:00Z`)
+    : new Date(value);
   return date.toLocaleDateString('pt-BR', { timeZone: TIMEZONE });
 }
 
@@ -61,19 +65,14 @@ export function getTodayInSP() {
 /**
  * Retorna o início e fim da semana atual (segunda a domingo)
  */
-export function getCurrentWeekRange() {
-  const today = new Date();
-  const spDate = new Date(today.toLocaleString('en-US', { timeZone: TIMEZONE }));
-  const dayOfWeek = spDate.getDay();
+export function getWeekRangeForDateInSP(dateValue) {
+  const spDate = new Date(`${dateValue}T00:00:00Z`);
+  const dayOfWeek = spDate.getUTCDay();
   const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  
   const monday = new Date(spDate);
-  monday.setDate(spDate.getDate() + diffToMonday);
-  monday.setHours(0, 0, 0, 0);
-  
+  monday.setUTCDate(spDate.getUTCDate() + diffToMonday);
   const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
   
   return {
     start: monday.toISOString().split('T')[0],
@@ -81,20 +80,26 @@ export function getCurrentWeekRange() {
   };
 }
 
+export function getCurrentWeekRange() {
+  return getWeekRangeForDateInSP(getTodayInSP());
+}
+
 /**
  * Retorna o início e fim do mês atual
  */
-export function getCurrentMonthRange() {
-  const today = new Date();
-  const spDate = new Date(today.toLocaleString('en-US', { timeZone: TIMEZONE }));
-  
-  const firstDay = new Date(spDate.getFullYear(), spDate.getMonth(), 1);
-  const lastDay = new Date(spDate.getFullYear(), spDate.getMonth() + 1, 0);
+export function getMonthRangeForDateInSP(dateValue) {
+  const [year, month] = dateValue.split('-').map(Number);
+  const firstDay = new Date(Date.UTC(year, month - 1, 1));
+  const lastDay = new Date(Date.UTC(year, month, 0));
   
   return {
     start: firstDay.toISOString().split('T')[0],
     end: lastDay.toISOString().split('T')[0],
   };
+}
+
+export function getCurrentMonthRange() {
+  return getMonthRangeForDateInSP(getTodayInSP());
 }
 
 /**
@@ -242,8 +247,7 @@ export function formatMinutesAsHours(totalMinutes) {
   const roundedMinutes = Math.round(Math.abs(totalMinutes));
   let hours = Math.floor(roundedMinutes / 60);
   const minutes = roundedMinutes % 60;
-  if (minutes === 59) hours += 1;
-  if (minutes === 0 || minutes === 59) return `${hours}h`;
+  if (minutes === 0) return `${hours}h`;
   return `${hours}h ${minutes}min`;
 }
 

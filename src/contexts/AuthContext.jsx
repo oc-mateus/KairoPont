@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
@@ -8,37 +8,30 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(false);
+  const profileRequestId = useRef(0);
 
   useEffect(() => {
-    // Obtém sessão inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Escuta mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') setPasswordRecoveryPending(true);
         if (event === 'SIGNED_OUT') setPasswordRecoveryPending(false);
         setSession(session);
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          setLoading(true);
+          const requestId = ++profileRequestId.current;
+          // Do not make Supabase calls inside onAuthStateChange; auth-js holds an
+          // internal lock while notifying listeners.
+          window.setTimeout(() => fetchProfile(session.user.id, requestId), 0);
         } else {
+          profileRequestId.current += 1;
           setProfile(null);
           setLoading(false);
         }
-      }
-    );
+      });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  async function fetchProfile(userId) {
+  async function fetchProfile(userId, requestId = ++profileRequestId.current) {
     try {
       const { data, error } = await supabase
         .from('funcionarios')
@@ -50,20 +43,12 @@ export function AuthProvider({ children }) {
         console.error('Erro ao buscar perfil:', error);
       }
       
-      // Fallback para exibir foto mesmo sem banco configurado
-      if (data) {
-        const localPhoto = localStorage.getItem(`mock_foto_${userId}`);
-        if (localPhoto) {
-          data.foto_url = localPhoto;
-        }
-      }
-      
-      setProfile(data || null);
+      if (requestId === profileRequestId.current) setProfile(data || null);
     } catch (err) {
       console.error('Erro ao buscar perfil:', err);
-      setProfile(null);
+      if (requestId === profileRequestId.current) setProfile(null);
     } finally {
-      setLoading(false);
+      if (requestId === profileRequestId.current) setLoading(false);
     }
   }
 

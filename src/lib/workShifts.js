@@ -73,7 +73,7 @@ function creditedMinutesForShift(shift) {
 
 function saturdayHoursForShift(shift) {
   if (shift.id === 'turno2') {
-    return { entrada: '14:30', saida_almoco: null, retorno_almoco: null, saida: '18:30' };
+    return { entrada: '14:30', saida_almoco: null, retorno_almoco: null, saida: '18:33' };
   }
   const entry = toMinutes(shift.start);
   const remainingCredits = Math.max(0, WEEKLY_WORK_MINUTES - 5 * creditedMinutesForShift(shift));

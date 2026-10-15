@@ -60,38 +60,25 @@ export default function ProfilePage() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${profile.id}/foto.${fileExt}`;
 
-      let finalUrl = '';
-      try {
-        const { error: uploadError } = await supabase.storage
-          .from('fotos-funcionarios')
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: true,
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from('fotos-funcionarios')
-          .getPublicUrl(fileName);
-        
-        finalUrl = urlData.publicUrl + '?t=' + Date.now();
-
-        await supabase
-          .from('funcionarios')
-          .update({ foto_url: finalUrl })
-          .eq('id', profile.id);
-          
-      } catch (uploadErr) {
-        console.warn('Fallback para imagem local em base64 (Storage não configurado)');
-        const base64 = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(file);
+      const { error: uploadError } = await supabase.storage
+        .from('fotos-funcionarios')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
         });
-        finalUrl = base64;
-        localStorage.setItem(`mock_foto_${profile.id}`, base64);
-      }
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('fotos-funcionarios')
+        .getPublicUrl(fileName);
+      const finalUrl = urlData.publicUrl + '?t=' + Date.now();
+
+      const { error: profileError } = await supabase
+        .from('funcionarios')
+        .update({ foto_url: finalUrl })
+        .eq('id', profile.id);
+      if (profileError) throw profileError;
 
       await refreshProfile();
       toast.success('Foto atualizada com sucesso!');

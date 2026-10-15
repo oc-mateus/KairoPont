@@ -24,6 +24,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm test
       - name: Validar configuração do Supabase para o cliente
         run: |
           test -n "$VITE_SUPABASE_URL"

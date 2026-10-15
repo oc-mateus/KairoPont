@@ -19,7 +19,7 @@ import AdminEmployees from './pages/admin/AdminEmployees';
 import AdminCalendar from './pages/admin/AdminCalendar';
 
 function PrivateRoute({ children, requireAdmin = false, requireClt = false }) {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, signOut } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -28,6 +28,18 @@ function PrivateRoute({ children, requireAdmin = false, requireClt = false }) {
 
   if (!session) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (profile?.ativo === false) {
+    return (
+      <div className="login-page">
+        <section className="card" style={{ maxWidth: 480, margin: 'auto' }}>
+          <h1 className="card-title">Acesso desativado</h1>
+          <p className="text-muted">Esta conta está inativa. Fale com a equipe administrativa se precisar de ajuda.</p>
+          <button className="btn btn-primary" onClick={() => signOut().catch(() => {})}>Sair da conta</button>
+        </section>
+      </div>
+    );
   }
 
   if (requireAdmin && profile?.role !== 'admin') {

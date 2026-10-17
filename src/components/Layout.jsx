@@ -67,8 +67,7 @@ export default function Layout({ children }) {
       {/* Sidebar */}
       <aside className={`app-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <img src={`${import.meta.env.BASE_URL}assets/brand/adesivo_nome_simbolo.png`} alt="Kairo" />
-          <span>KairoPont</span>
+          <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-logo-3d.png`} alt="KairoPont — Controle de Ponto" />
         </div>
 
         <nav className="sidebar-nav">

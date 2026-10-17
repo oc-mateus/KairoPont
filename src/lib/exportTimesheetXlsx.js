@@ -18,6 +18,22 @@ function excelTime(timeValue) {
   return seconds / 86400;
 }
 
+async function loadBrandImage(fileName) {
+  const imageUrl = new URL(
+    `${import.meta.env.BASE_URL}assets/brand/${fileName}`,
+    window.location.origin,
+  );
+  const response = await fetch(imageUrl);
+  if (!response.ok) throw new Error(`Não foi possível carregar a imagem ${fileName}.`);
+  const imageBlob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error(`Não foi possível preparar a imagem ${fileName}.`));
+    reader.readAsDataURL(imageBlob);
+  });
+}
+
 export async function downloadTimesheetXlsx({ records, title, period, filename, calcDailyTotal, lunchLabel = null, extraColumns = [], summary = null }) {
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
@@ -26,7 +42,7 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet('Registros de ponto', {
-    views: [{ state: 'frozen', ySplit: 4, showGridLines: false }],
+    views: [{ state: 'frozen', ySplit: 7, showGridLines: false }],
     pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
   sheet.columns = [
@@ -41,25 +57,47 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
   const baseColumnCount = 6;
   const finalColumn = String.fromCharCode(64 + baseColumnCount + extraColumns.length);
 
-  sheet.mergeCells(`A1:${finalColumn}1`);
-  sheet.getCell('A1').value = title;
-  sheet.getRow(1).height = 34;
-  sheet.getRow(1).font = { name: 'Aptos Display', size: 17, bold: true, color: { argb: 'FFFFFFFF' } };
-  sheet.getRow(1).alignment = { vertical: 'middle', indent: 1 };
-  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123D27' } };
+  const kairoLogoId = workbook.addImage({
+    base64: await loadBrandImage('adesivo_nome_simbolo.png'),
+    extension: 'png',
+  });
+  const kairoPontLogoId = workbook.addImage({
+    base64: await loadBrandImage('kairopont-logo-3d.png'),
+    extension: 'png',
+  });
+  sheet.addImage(kairoLogoId, {
+    tl: { col: 0.2, row: 0.12 },
+    ext: { width: 190, height: 57 },
+    editAs: 'oneCell',
+  });
+  sheet.addImage(kairoPontLogoId, {
+    tl: { col: Math.max(3.2, baseColumnCount + extraColumns.length - 2.8), row: 0.05 },
+    ext: { width: 225, height: 75 },
+    editAs: 'oneCell',
+  });
+  sheet.getRow(1).height = 27;
+  sheet.getRow(2).height = 25;
+  sheet.getRow(3).height = 24;
 
-  sheet.mergeCells(`A2:${finalColumn}2`);
-  sheet.getCell('A2').value = period;
-  sheet.getRow(2).height = 24;
-  sheet.getRow(2).font = { name: 'Aptos', size: 10, color: { argb: 'FF355542' } };
-  sheet.getRow(2).alignment = { vertical: 'middle', indent: 1 };
-  sheet.getRow(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF3EC' } };
+  sheet.mergeCells(`A4:${finalColumn}4`);
+  sheet.getCell('A4').value = title;
+  sheet.getRow(4).height = 34;
+  sheet.getRow(4).font = { name: 'Aptos Display', size: 17, bold: true, color: { argb: 'FFFFFFFF' } };
+  sheet.getRow(4).alignment = { vertical: 'middle', indent: 1 };
+  sheet.getRow(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123D27' } };
 
-  sheet.mergeCells(`A3:${finalColumn}3`);
-  sheet.getCell('A3').value = `Gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
-  sheet.getRow(3).height = 22;
-  sheet.getRow(3).font = { name: 'Aptos', size: 9, color: { argb: 'FF66746B' }, italic: true };
-  sheet.getRow(3).alignment = { vertical: 'middle', indent: 1 };
+  sheet.mergeCells(`A5:${finalColumn}5`);
+  sheet.getCell('A5').value = period;
+  sheet.getRow(5).height = 24;
+  sheet.getRow(5).font = { name: 'Aptos', size: 10, color: { argb: 'FF355542' } };
+  sheet.getRow(5).alignment = { vertical: 'middle', indent: 1 };
+  sheet.getRow(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF3EC' } };
+
+  sheet.mergeCells(`A6:${finalColumn}6`);
+  sheet.getCell('A6').value = `Gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
+  sheet.getRow(6).height = 22;
+  sheet.getRow(6).font = { name: 'Aptos', size: 9, color: { argb: 'FF66746B' }, italic: true };
+  sheet.getRow(6).alignment = { vertical: 'middle', indent: 1 };
 
   const headers = ['Data', 'Entrada', 'Almoço fixo', 'Saída', 'Horas computadas', 'Status', ...extraColumns.map((column) => column.header)];
   const header = sheet.addRow(headers);
@@ -122,7 +160,7 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
     });
   }
 
-  sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + records.length, column: baseColumnCount + extraColumns.length } };
+  sheet.autoFilter = { from: { row: 7, column: 1 }, to: { row: 7 + records.length, column: baseColumnCount + extraColumns.length } };
   const buffer = await workbook.xlsx.writeBuffer({ useStyles: true });
   const url = URL.createObjectURL(new Blob([buffer], { type: spreadsheetMime }));
   const anchor = document.createElement('a');

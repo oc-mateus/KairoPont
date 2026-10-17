@@ -30,7 +30,7 @@ export default function SetPasswordPage() {
   };
 
   return <div className="login-page">
-    <div className="login-brand"><div className="login-brand-content"><img src={`${import.meta.env.BASE_URL}assets/brand/adesivo_nome_simbolo.png`} alt="Kairo Automações" /><h2>KairoPont</h2><p>Controle de ponto e jornada</p></div></div>
+    <div className="login-brand"><div className="login-brand-content"><img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-logo-3d.png`} alt="KairoPont — Controle de Ponto" /><p>Controle de ponto e jornada</p></div></div>
     <div className="login-form-container"><div className="login-form">
       <h1>Definir senha</h1>
       {authLoading ? <div className="flex flex-center" style={{ minHeight: 120 }}><Spinner size="lg" /></div> : session ? <>

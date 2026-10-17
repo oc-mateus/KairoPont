@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'kairopont-shell-';
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
+const CACHE_NAME = `${CACHE_PREFIX}v4`;
 const APP_ROOT = new URL('./', self.registration.scope).toString();
 
 self.addEventListener('install', (event) => {

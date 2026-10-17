@@ -191,16 +191,17 @@ A URL pública da aplicação é https://oc-mateus.github.io/KairoPont/. O READM
 
 ## Pendências para entrada em operação
 
-As verificações abaixo foram feitas em 6 de outubro de 2026. Reconfirme o estado antes de usar a aplicação com funcionários.
+Revisão atualizada em 17 de outubro de 2026. Confirme os itens abaixo antes de usar a aplicação com dados reais; os estados de serviços externos podem mudar sem alteração no repositório.
 
-1. **Auth configurado:** a URL padrão do Supabase Auth é https://oc-mateus.github.io/KairoPont/ e a lista permitida inclui https://oc-mateus.github.io/KairoPont/definir-senha. Confira essas URLs se mudar o domínio ou o caminho de publicação.
-2. **Revisar a administração de teste:** uma conta administrativa de teste foi provisionada em 7 de outubro de 2026. Troque ou remova suas credenciais antes de usar a aplicação com dados reais.
-3. **Configurar convites e e-mail:** verificar SMTP/URLs do Supabase Auth e cadastrar `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` como secrets da Edge Function.
-4. **Impor validação no Storage:** configurar no bucket privado o limite máximo e os MIME types adequados no servidor, além da validação existente no frontend.
-5. **Evitar arquivos órfãos:** se o insert dos metadados falhar, remover o objeto enviado ou disponibilizar um processo administrativo de reconciliação.
-6. **Completar dados de vínculo:** conferir data de admissão e escala semanal de cada funcionário com o RH.
-7. **Validar sem dados reais:** testar convite, definição de senha, login, isolamento entre usuários fictícios, arquivo descartável, link assinado, comparação de ponto, prazos e e-mails de aprovação/recusa.
-8. **Configurar o Storage de documentos:** aplicar a configuração do bucket privado com `npm run configure:document-bucket`, usando as credenciais privilegiadas somente no ambiente seguro. O script não faz parte do workflow do frontend.
+1. **Storage de documentos — pendente:** o bucket `documentos` está privado, mas o limite de 10 MB e os MIME types permitidos ainda precisam ser aplicados no servidor. Execute `npm run configure:document-bucket` com `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` fornecidos somente no ambiente local seguro. A chave privilegiada não deve ir para arquivos `.env` do Vite nem para o Git.
+2. **Proteção de senhas — pendente de configuração:** habilite no Supabase Auth a proteção contra senhas comprometidas e revise as regras de força de senha.
+3. **Conta administrativa de teste:** uma conta de teste foi provisionada em 7 de outubro de 2026. Troque ou remova suas credenciais antes de usar a aplicação com dados reais.
+4. **Convites e e-mail:** confira SMTP e URLs do Supabase Auth e configure `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` como secrets da Edge Function.
+5. **Dados de vínculo:** confira data de admissão e escala semanal de cada funcionário com o RH.
+6. **Teste de aceitação sem dados reais:** percorra convite, definição de senha, login, isolamento entre usuários fictícios, upload e link assinado de documento, registro e correção de ponto, férias e e-mails de aprovação/recusa. Os testes automatizados atuais não substituem essa validação ponta a ponta.
+7. **Backups e retenção:** confirme que a retenção configurada no plano Supabase atende às necessidades da empresa; esse item não foi auditado.
+
+Quando a gravação dos metadados de um documento falha, a aplicação tenta remover o objeto enviado. Se essa limpeza também falhar, o erro informa que o arquivo pode precisar de remoção administrativa.
 
 ## Operação e suporte
 

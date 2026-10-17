@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import {
   formatTime, formatDate, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, formatMinutesAsHours,
   getOvertimeMinutes, getTodayInSP, getCurrentWeekRange, getCurrentMonthRange,
+  isValidDateRange,
 } from '../lib/utils';
 import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
 import { addKairoPdfHeader } from '../lib/pdfBranding';
@@ -51,6 +52,11 @@ export default function HistoryPage() {
       if (!start || !end) {
         setRecords([]);
         setLoading(false);
+        return;
+      }
+      if (filter === 'custom' && !isValidDateRange(start, end)) {
+        setRecords([]);
+        toast.error('Confira o intervalo: a data inicial deve ser válida e anterior ou igual à data final.');
         return;
       }
 
@@ -298,6 +304,7 @@ export default function HistoryPage() {
               type="date"
               className="form-input"
               value={customStart}
+              max={customEnd || undefined}
               onChange={e => setCustomStart(e.target.value)}
             />
           </div>
@@ -307,6 +314,7 @@ export default function HistoryPage() {
               type="date"
               className="form-input"
               value={customEnd}
+              min={customStart || undefined}
               onChange={e => setCustomEnd(e.target.value)}
             />
           </div>

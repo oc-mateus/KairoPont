@@ -8,6 +8,7 @@ import {
   formatMinutesAsHours,
   getElapsedWorkMinutes,
   getExpectedShiftMinutes,
+  isValidDateRange,
   getMonthRangeForDateInSP,
   getWeekRangeForDateInSP,
   validateCPF,
@@ -40,6 +41,14 @@ test('builds month ranges including leap years', () => {
   assert.deepEqual(getMonthRangeForDateInSP('2026-02-15'), {
     start: '2026-02-01', end: '2026-02-28',
   });
+});
+
+test('validates custom date ranges and rejects reversed or impossible dates', () => {
+  assert.equal(isValidDateRange('2026-10-01', '2026-10-17'), true);
+  assert.equal(isValidDateRange('2026-10-17', '2026-10-17'), true);
+  assert.equal(isValidDateRange('2026-10-18', '2026-10-17'), false);
+  assert.equal(isValidDateRange('2026-02-29', '2026-03-01'), false);
+  assert.equal(isValidDateRange('', '2026-10-17'), false);
 });
 
 test('keeps a 59-minute remainder instead of rounding it to a full hour', () => {

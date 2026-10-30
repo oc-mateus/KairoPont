@@ -11,6 +11,7 @@ export function WorkScheduleSummary({ schedule }) {
       <span className="work-schedule-meal">{item.saida_almoco && item.retorno_almoco ? `Almoço ${item.saida_almoco}–${item.retorno_almoco}` : 'Sem intervalo fixo'}</span>
     </article>)}
     <p className="work-schedule-note">Aos sábados, a jornada prevista é de 4h, sem intervalo fixo.</p>
+    {schedule.contabilizar_atrasos === false && <p className="work-schedule-note">Atrasos não são contabilizados para este funcionário, pois os horários variam.</p>}
   </div>;
 }
 

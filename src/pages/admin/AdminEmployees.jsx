@@ -217,6 +217,7 @@ export default function AdminEmployees() {
     turno_id: getHabitualSchedules(form)[0]?.id || form.turno_id || form.tipo || 'turno1',
     dias_semana: [...(form.dias_semana || [])],
     horarios_habituais: getHabitualSchedules(form),
+    contabilizar_atrasos: form.contabilizar_atrasos !== false,
   });
 
   const formFromEmployee = (employee) => {
@@ -231,6 +232,7 @@ export default function AdminEmployees() {
       tipo: shiftId,
       dias_semana: schedule.dias_semana?.length ? schedule.dias_semana : [1, 2, 3, 4, 5, 6],
       horarios_habituais: habitualSchedules.length ? habitualSchedules : [makeHabitualSchedule(shiftId)],
+      contabilizar_atrasos: schedule.contabilizar_atrasos !== false,
     };
   };
 
@@ -301,6 +303,7 @@ export default function AdminEmployees() {
         <fieldset className="employee-habitual-schedule-editor"><legend>Horários habituais</legend><p>Adicione todos os horários que este trabalhador costuma cumprir.</p>
           <div className="employee-habitual-schedule-list">{getHabitualSchedules(employeeForm).map((schedule) => <div className="employee-habitual-schedule" key={schedule.id}><div><strong>{getShiftLabel(schedule.id)}</strong><span>Almoço {schedule.saida_almoco || 'sem intervalo'}{schedule.retorno_almoco ? `–${schedule.retorno_almoco}` : ''}</span></div><button type="button" className="btn btn-ghost btn-sm" aria-label={`Remover horário ${getShiftLabel(schedule.id)}`} onClick={() => removeHabitualSchedule(schedule.id)}>Remover</button></div>)}</div>
           <label className="form-group">Adicionar horário<select className="form-input" value="" onChange={(event) => addHabitualSchedule(event.target.value)}><option value="">Escolha um horário habitual</option>{Object.values(WORK_SHIFTS).filter((shift) => !getHabitualSchedules(employeeForm).some((item) => item.id === shift.id)).map((shift) => <option key={shift.id} value={shift.id}>{shift.label} · almoço {shift.lunchOut}–{shift.lunchReturn}</option>)}</select></label>
+          {selectedEmp && <label className="employee-delay-count-toggle"><input type="checkbox" checked={employeeForm.contabilizar_atrasos !== false} onChange={(event) => setFormField('contabilizar_atrasos', event.target.checked)} /><span><strong>Contabilizar atrasos</strong><small>Desative se os horários deste funcionário variam e não permitem uma comparação justa.</small></span></label>}
         </fieldset>
       </>}
       {employeeForm.tipo_contrato === 'clt' && hasSavedSchedule && !editingSchedule && !showInviteForm && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar horários</button>}

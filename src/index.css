@@ -509,6 +509,11 @@ input, select, textarea {
 .employee-habitual-schedule-editor { display: grid; gap: 0.9rem; padding: 1rem; border: 1px solid var(--border-default); border-radius: var(--radius-md); min-width: 0; }
 .employee-habitual-schedule-editor legend { padding: 0 0.4rem; color: var(--text-secondary); font-size: var(--font-sm); font-weight: 700; }
 .employee-habitual-schedule-editor > p { margin: -0.4rem 0 0; color: var(--text-muted); font-size: var(--font-sm); }
+.employee-delay-count-toggle { display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.85rem 1rem; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-card); cursor: pointer; }
+.employee-delay-count-toggle input { width: 1rem; height: 1rem; margin: 0.2rem 0 0; accent-color: var(--kairo-green-600); flex: 0 0 auto; }
+.employee-delay-count-toggle span { display: grid; gap: 0.25rem; }
+.employee-delay-count-toggle strong { color: var(--text-primary); font-size: var(--font-sm); }
+.employee-delay-count-toggle small { color: var(--text-muted); font-size: var(--font-xs); line-height: 1.5; }
 .employee-habitual-schedule-list { display: grid; gap: 0.5rem; }
 .employee-habitual-schedule { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-width: 0; padding: 0.75rem 0.9rem; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-card); }
 .employee-habitual-schedule > div { display: grid; gap: 0.2rem; min-width: 0; }
@@ -1651,6 +1656,7 @@ select.form-input {
 .attendance-selected-employee > div { display: grid; min-width: 0; gap: 2px; }
 .attendance-selected-employee > div span { color: var(--text-muted); font-size: var(--font-xs); }
 .attendance-selected-employee > div strong { overflow: hidden; color: var(--text-primary); font-size: var(--font-sm); text-overflow: ellipsis; white-space: nowrap; }
+.attendance-delay-exemption-note { margin: var(--space-3) 0 0; color: var(--text-muted); font-size: var(--font-sm); }
 .attendance-contract-badge { margin-left: auto; padding: 5px 10px; border: 1px solid rgba(53,183,106,.25); border-radius: 999px; background: rgba(53,183,106,.1); color: var(--kairo-green-300); font-size: var(--font-xs); font-weight: 700; }
 .attendance-chart-card { min-width: 0; padding: var(--space-4); border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--bg-card); }
 .attendance-chart-card > header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }

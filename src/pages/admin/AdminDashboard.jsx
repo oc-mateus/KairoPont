@@ -116,7 +116,8 @@ function buildAttendanceChartData({ employees, records, vacations, holidays, tod
     const expectedTime = expectedEntry == null ? null : `${String(Math.floor(expectedEntry / 60)).padStart(2, '0')}:${String(expectedEntry % 60).padStart(2, '0')}`;
     const shiftId = (expectedTime && inferShiftFromEntry(expectedTime)) || record.turno_trabalhado || inferShiftFromEntry(record.entrada) || getAssignedShiftId(employee.escala_trabalho);
     const actualEntry = clockMinutes(record.entrada);
-    if (!holidayDates.has(record.data) && expectedEntry != null && actualEntry != null && actualEntry > expectedEntry) bucket.delays += 1;
+    if (employee.escala_trabalho?.contabilizar_atrasos !== false
+      && !holidayDates.has(record.data) && expectedEntry != null && actualEntry != null && actualEntry > expectedEntry) bucket.delays += 1;
     bucket.overtimeMinutes += holidayDates.has(record.data)
       ? getCreditedDailyMinutes(record, shiftId)
       : getOvertimeMinutes(record, shiftId);
@@ -307,6 +308,7 @@ export default function AdminDashboard() {
             : period === 'specific' && !selectedMonth ? <p className="attendance-loading">Selecione um mês para consultar os indicadores.</p>
               : <>
                 <div className="attendance-selected-employee"><span className="attendance-selected-avatar">{selectedEmployee.nome.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span><div><span>Dados individuais de</span><strong>{selectedEmployee.nome}</strong></div><span className="attendance-contract-badge">CLT</span></div>
+                {selectedEmployee.escala_trabalho?.contabilizar_atrasos === false && <p className="attendance-delay-exemption-note">Atrasos não contabilizados para este funcionário porque os horários variam.</p>}
                 <div className="attendance-insights-grid">
                   <AttendanceChart title="Faltas" total={individualAbsenceTotal} unit="dias" values={individualChartData.map(({ label, fullLabel, absences }) => ({ label, fullLabel, value: absences }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--danger-500, #d95d5d)" />
                   <AttendanceChart title="Atrasos" total={individualDelayTotal} unit="registros" values={individualChartData.map(({ label, fullLabel, delays }) => ({ label, fullLabel, value: delays }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--warning-500, #d99a35)" />

@@ -44,6 +44,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
 - Criar funcionário por convite, informando admissão, cargo, vínculo e um ou mais horários habituais CLT. Os presets são 06h–15h (almoço 12h–13h), 08h–17h (almoço 12h–13h) e 14h–22h52 (almoço 18h–19h); não são configurados individualmente por dia. A previsão é de 8h de segunda a sexta, 4h aos sábados sem intervalo fixo e folga aos domingos. O início esperado é arredondado à hora cheia mais próxima; o sistema associa a marcação ao horário habitual mais próximo.
+- Ao editar os horários habituais, o administrador pode desmarcar **Contabilizar atrasos** quando a rotina do funcionário varia e a comparação com uma jornada fixa não é justa. Essa exceção remove apenas os atrasos dos gráficos gerais e individuais; faltas, horas extras e registros continuam sendo calculados normalmente.
 - Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
 - Na ficha do funcionário, consultar a data de admissão, quando o pedido será liberado e a primeira data possível de saída; na fila, revisar saída e retorno solicitados.
 - Corrigir registros de ponto com observação obrigatória; as alterações, o motivo e os valores anteriores ficam registrados na auditoria. Alterações históricas usam fluxo próprio e exigem justificativa.
@@ -187,6 +188,8 @@ Para perfis CLT existentes, o administrador precisa informar a data de admissão
 Cada perfil CLT guarda uma lista de horários habituais reutilizáveis, não um horário diferente para cada dia. Os presets atuais são 06h–15h com almoço 12h–13h, 08h–17h com almoço 12h–13h, e 14h–22h52 com almoço 18h–19h. As escalas antigas por dia continuam legíveis para compatibilidade; ao editar e salvar, são convertidas para a lista habitual.
 
 A jornada esperada nos dias úteis é de 8h; aos sábados é de 4h, sem intervalo fixo, e domingo é folga. Os horários iniciais esperados são arredondados à hora cheia mais próxima. Para calcular atrasos e classificar o registro, o sistema compara a entrada com todos os horários do perfil e usa o início mais próximo. Se as entradas previstas forem 08h e 14h, uma marcação às 13h se associa a 14h e não conta como atraso. A saída registrada no terceiro horário é 22h52; a previsão continua sendo 8h, conforme a regra de jornada definida.
+
+O indicador de atrasos pode ser desligado para um perfil CLT com rotina variável. Nesse caso, os registros desse funcionário não entram nem no total geral nem no gráfico individual de atrasos. Faltas, horas extras e marcações permanecem inalteradas.
 
 Na ficha do funcionário, administradores podem corrigir registros recentes dentro da janela de 96 horas e informam uma observação obrigatória, registrada na auditoria junto dos valores anteriores e novos. Para correções ou inclusões históricas, a tela exige motivo e grava os dados auditados pelo fluxo específico; a trava normal de 96 horas permanece ativa fora desse fluxo.
 

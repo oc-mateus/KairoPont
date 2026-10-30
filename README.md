@@ -42,7 +42,7 @@ O painel de frequência filtra mês atual, mês/ano específico, últimos seis m
 
 A interface mantém os mesmos componentes e espaçamentos nos temas claro e escuro, variando a paleta de cores. O botão de tema fica acessível no cabeçalho sem exigir rolagem horizontal. A navegação e os controles são responsivos para uso equivalente em celular e computador; ícones seguem o estilo do menu, sem emojis, e as páginas evitam títulos duplicados.
 
-Administradores podem corrigir marcações de ponto com uma observação obrigatória, registrada na auditoria junto dos valores alterados. O período administrativo de correção e o fluxo para ajustes históricos são descritos no [Guia do Projeto](docs/GUIA_DO_PROJETO.md).
+Administradores podem corrigir marcações de ponto com uma observação obrigatória, registrada na auditoria junto dos valores alterados. Para funcionários com horários variáveis, também podem desativar a contabilização de atrasos sem alterar os indicadores de faltas ou horas extras. O período administrativo de correção e o fluxo para ajustes históricos são descritos no [Guia do Projeto](docs/GUIA_DO_PROJETO.md).
 
 Funcionários CLT podem enviar e consultar documentos autorizados e acessar férias. Essas áreas não são exibidas para contas PJ, que usam o ponto apenas para registrar e acompanhar as horas trabalhadas. Na administração, a seção de férias da ficha também é exclusiva para CLT.
 

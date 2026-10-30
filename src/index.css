@@ -1949,6 +1949,25 @@ select.form-input {
 .attendance-chart-card { background: #fffefa; }
 .attendance-chart-track { background: #eef1eb; }
 
+:root[data-theme='dark'] .admin-summary-card {
+  background: var(--bg-secondary);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+:root[data-theme='dark'] .admin-summary-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-hover);
+}
+:root[data-theme='dark'] .admin-summary-card > svg { color: var(--text-secondary); }
+:root[data-theme='dark'] .admin-summary-icon {
+  background: rgba(114, 190, 130, 0.16);
+  color: #8ddd99;
+}
+:root[data-theme='dark'] .admin-summary-content > span { color: var(--text-secondary); }
+:root[data-theme='dark'] .admin-summary-content small { color: var(--text-muted); }
+:root[data-theme='dark'] .attendance-chart-card { background: var(--bg-card); }
+:root[data-theme='dark'] .attendance-chart-track { background: var(--bg-card-hover); }
+
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 3px solid rgba(36, 120, 69, 0.55);
   outline-offset: 2px;

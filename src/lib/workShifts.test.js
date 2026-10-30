@@ -31,5 +31,5 @@ test('builds the configured Saturday schedules for each shift', () => {
   assert.equal(makeEmployeeSchedule('turno1').horarios_habituais[0].entrada, '06:00');
   assert.equal(makeEmployeeSchedule('turno2').horarios_habituais[0].entrada, '08:00');
   assert.equal(makeEmployeeSchedule('turno3').horarios_habituais[0].entrada, '14:00');
-  assert.equal(makeEmployeeSchedule('turno3').horarios_habituais[0].saida, '22:00');
+  assert.equal(makeEmployeeSchedule('turno3').horarios_habituais[0].saida, '22:52');
 });

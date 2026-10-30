@@ -114,7 +114,7 @@ export default function HistoryPage() {
         doc.text(`Horários registrados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
         autoTable(doc, {
           startY: tableStartY + 4,
-          head: [['06:00–15:00', '08:00–17:00', '14:00–22:00', 'Sem horário identificado']],
+          head: [['06:00–15:00', '08:00–17:00', '14:00–22:52', 'Sem horário identificado']],
           body: [[shiftSummary.turno1, shiftSummary.turno2, shiftSummary.turno3, shiftSummary.unidentified].map((count) => `${count} dia${count === 1 ? '' : 's'}`)],
           theme: 'grid',
           headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },

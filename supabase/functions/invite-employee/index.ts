@@ -37,7 +37,7 @@ function makeSchedule(value: unknown) {
   const shifts: Record<string, { start: string; end: string; lunchOut: string | null; lunchReturn: string | null }> = {
     turno1: { start: "06:00", end: "15:00", lunchOut: "12:00", lunchReturn: "13:00" },
     turno2: { start: "08:00", end: "17:00", lunchOut: "12:00", lunchReturn: "13:00" },
-    turno3: { start: "14:00", end: "22:00", lunchOut: "18:00", lunchReturn: "19:00" },
+    turno3: { start: "14:00", end: "22:52", lunchOut: "18:00", lunchReturn: "19:00" },
   };
   const inferId = (entry: unknown) => {
     if (typeof entry !== "string" || !/^\d{2}:\d{2}/.test(entry)) return null;

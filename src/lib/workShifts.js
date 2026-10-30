@@ -1,7 +1,7 @@
 export const WORK_SHIFTS = {
   turno1: { id: 'turno1', label: '06:00–15:00', start: '06:00', end: '15:00', lunchOut: '12:00', lunchReturn: '13:00' },
   turno2: { id: 'turno2', label: '08:00–17:00', start: '08:00', end: '17:00', lunchOut: '12:00', lunchReturn: '13:00' },
-  turno3: { id: 'turno3', label: '14:00–22:00', start: '14:00', end: '22:00', lunchOut: '18:00', lunchReturn: '19:00' },
+  turno3: { id: 'turno3', label: '14:00–22:52', start: '14:00', end: '22:52', lunchOut: '18:00', lunchReturn: '19:00' },
 };
 
 export function getFixedLunchSchedule(shiftId) {
@@ -50,7 +50,9 @@ export function makeHabitualSchedule(shiftId) {
 
 export function getHabitualSchedules(schedule) {
   if (Array.isArray(schedule?.horarios_habituais) && schedule.horarios_habituais.length) {
-    return schedule.horarios_habituais.filter((item) => item?.entrada && item?.saida);
+    return schedule.horarios_habituais
+      .filter((item) => item?.entrada && item?.saida)
+      .map((item) => WORK_SHIFTS[item.id] ? makeHabitualSchedule(item.id) : item);
   }
 
   // Read older per-day schedules and collapse matching entries into a reusable list.

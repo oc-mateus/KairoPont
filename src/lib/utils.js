@@ -236,20 +236,7 @@ export function getExpectedShiftMinutes(record, shiftId = null) {
   const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
   if (weekday === 6) return 4 * 60;
   if (weekday === 7) return null;
-  const expected = WORK_SHIFTS[shift];
-  if (!expected?.start || !expected?.end) return null;
-  const expectedExitDate = clockMinutes(expected.end) <= clockMinutes(expected.start)
-    ? nextIsoDate(record.data)
-    : record.data;
-  return getCreditedDailyMinutes({
-    data: record.data,
-    entrada: expected.start,
-    saida_almoco: expected.lunchOut || null,
-    retorno_almoco: expected.lunchReturn || null,
-    saida: expected.end,
-    saida_data: expectedExitDate,
-    turno_trabalhado: shift,
-  }, shift);
+  return WORK_SHIFTS[shift] ? 8 * 60 : null;
 }
 
 export function getOvertimeMinutes(record, shiftId = null) {

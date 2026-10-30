@@ -10,7 +10,7 @@ import {
 import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
 import { addKairoPdfHeader } from '../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../lib/exportTimesheetXlsx';
-import { getLunchLabelForRecord, getShiftLabel, inferShiftForRecord, summarizeWorkedShifts } from '../lib/workShifts';
+import { getLunchLabelForRecord, getRegisteredScheduleLabel, getShiftLabel, inferShiftForRecord, summarizeWorkedShifts } from '../lib/workShifts';
 
 export default function HistoryPage() {
   const { profile } = useAuth();
@@ -99,7 +99,8 @@ export default function HistoryPage() {
         title: `Relatório de Ponto - ${profile.nome}`,
         details: [
           `Tipo de vínculo: ${isPj ? 'PJ' : 'CLT'}`,
-          ...(!isPj && profile?.escala_trabalho ? [`Horário: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}`] : []),
+          ...(!isPj && profile?.escala_trabalho ? [`Horários habituais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}`] : []),
+          ...(!isPj && profile?.escala_trabalho ? ['Sábados: 4h previstas, sem intervalo fixo'] : []),
           `Período: ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}`,
           `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
         ],
@@ -222,7 +223,7 @@ export default function HistoryPage() {
       const { start, end } = getDateRange();
       let md = `# Relatório de Ponto\n\n`;
       md += `**Funcionário:** ${profile.nome}\n`;
-      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horário: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}\n`;
+      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horários habituais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n`;
       md += `**Gerado em:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`;
       md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|------|---------|-------|------------------|--------|\n` : `| Data | Entrada | Horário | Almoço fixo | Saída | Horas computadas | Status |\n|------|---------|--------|-------------|-------|-------|--------|\n`;
@@ -248,7 +249,7 @@ export default function HistoryPage() {
     try {
       const { start, end } = getDateRange();
       let md = `## Relatório de Ponto - ${profile.nome}\n`;
-      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horário: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}\n`;
+      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horários habituais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n\n`;
       md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|---|---|---|---|---|\n` : `| Data | Entrada | Horário | Almoço fixo | Saída | Horas computadas | Status |\n|---|---|---|---|---|---|---|\n`;
 
@@ -275,7 +276,7 @@ export default function HistoryPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h2 className="page-title">Meu Histórico</h2>
-          <p className="page-subtitle">Consulte seus registros de ponto · Vínculo: {isPj ? 'PJ' : 'CLT'}{!isPj && profile?.escala_trabalho ? ` · Horário: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}</p>
+          <p className="page-subtitle">Consulte seus registros de ponto · Vínculo: {isPj ? 'PJ' : 'CLT'}{!isPj && profile?.escala_trabalho ? ` · Horários: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}</p>
         </div>
         <div className="page-header-actions">
           <button className="btn btn-secondary btn-sm" onClick={handleExportExcel} disabled={records.length === 0 || exportingExcel}>

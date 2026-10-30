@@ -36,13 +36,36 @@ export function getShiftLabel(id) {
   return WORK_SHIFTS[id]?.label || 'Horário não identificado';
 }
 
+export function makeHabitualSchedule(shiftId) {
+  const shift = WORK_SHIFTS[shiftId];
+  if (!shift) return null;
+  return {
+    id: shift.id,
+    entrada: shift.start,
+    saida_almoco: shift.lunchOut || null,
+    retorno_almoco: shift.lunchReturn || null,
+    saida: shift.end,
+  };
+}
+
+export function getHabitualSchedules(schedule) {
+  if (Array.isArray(schedule?.horarios_habituais) && schedule.horarios_habituais.length) {
+    return schedule.horarios_habituais.filter((item) => item?.entrada && item?.saida);
+  }
+
+  // Read older per-day schedules and collapse matching entries into a reusable list.
+  const legacyItems = Object.values(schedule?.horarios_por_dia || {}).filter((item) => item?.entrada && item?.saida);
+  const legacyItemsWithFallback = legacyItems.length ? legacyItems : (schedule?.entrada && schedule?.saida ? [schedule] : []);
+  const uniqueIds = [...new Set(legacyItemsWithFallback.map((item) => inferShiftFromEntry(item.entrada)).filter(Boolean))];
+  if (uniqueIds.length) return uniqueIds.map(makeHabitualSchedule).filter(Boolean);
+  const assignedId = WORK_SHIFTS[schedule?.turno_id || schedule?.tipo] ? (schedule.turno_id || schedule.tipo) : null;
+  return assignedId ? [makeHabitualSchedule(assignedId)] : [];
+}
+
 export function getRegisteredScheduleLabel(schedule) {
-  const registeredStarts = [...new Set(Object.values(schedule?.horarios_por_dia || {})
-    .map((item) => toMinutes(item?.entrada))
-    .filter((minute) => minute != null)
-    .map((minute) => (Math.round(minute / 60) * 60) % MINUTES_PER_DAY))];
-  if (registeredStarts.length > 1) return 'Horários variados';
-  return getShiftLabel(getAssignedShiftId(schedule));
+  const habituals = getHabitualSchedules(schedule);
+  if (!habituals.length) return 'Horário não informado';
+  return habituals.map((item) => getShiftLabel(item.id || inferShiftFromEntry(item.entrada))).join(' · ');
 }
 
 function toMinutes(value) {
@@ -52,42 +75,6 @@ function toMinutes(value) {
 }
 
 const MINUTES_PER_DAY = 24 * 60;
-const WEEKLY_WORK_MINUTES = 44 * 60;
-
-function creditedMinutesForInterval(startMinute, endMinute) {
-  let end = endMinute;
-  if (end <= startMinute) end += MINUTES_PER_DAY;
-  const elapsed = end - startMinute;
-  let nightMinutes = 0;
-  const firstNightDay = Math.floor(startMinute / MINUTES_PER_DAY) - 1;
-  const lastNightDay = Math.floor(end / MINUTES_PER_DAY);
-  for (let day = firstNightDay; day <= lastNightDay; day += 1) {
-    const nightStart = day * MINUTES_PER_DAY + 22 * 60;
-    const nightEnd = day * MINUTES_PER_DAY + MINUTES_PER_DAY + 5 * 60;
-    nightMinutes += Math.max(0, Math.min(end, nightEnd) - Math.max(startMinute, nightStart));
-  }
-  return elapsed + nightMinutes / 7;
-}
-
-function creditedMinutesForShift(shift) {
-  const entry = toMinutes(shift.start);
-  const exit = toMinutes(shift.end);
-  if (entry == null || exit == null) return 0;
-  if (shift.lunchOut && shift.lunchReturn) {
-    return creditedMinutesForInterval(entry, toMinutes(shift.lunchOut))
-      + creditedMinutesForInterval(toMinutes(shift.lunchReturn), exit);
-  }
-  return creditedMinutesForInterval(entry, exit);
-}
-
-function saturdayHoursForShift(shift) {
-  if (shift.id === 'turno3') {
-    return { entrada: '14:00', saida_almoco: null, retorno_almoco: null, saida: '18:00' };
-  }
-  const exitMinute = (toMinutes(shift.start) + 4 * 60) % MINUTES_PER_DAY;
-  const clock = (minute) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
-  return { entrada: shift.start, saida_almoco: null, retorno_almoco: null, saida: clock(exitMinute) };
-}
 
 // Classifica pela entrada cadastrada mais próxima, arredondando a previsão à hora cheia.
 export function inferShiftFromEntry(value) {
@@ -105,8 +92,7 @@ export function inferShiftFromEntry(value) {
 export function getNearestRegisteredSchedule(schedule, entry) {
   const actual = toMinutes(entry);
   if (actual == null) return null;
-  const daySchedules = Object.values(schedule?.horarios_por_dia || {}).filter((item) => item?.entrada);
-  const candidates = daySchedules.length ? daySchedules : (schedule?.entrada ? [schedule] : []);
+  const candidates = getHabitualSchedules(schedule);
   if (!candidates.length) return null;
   return candidates.reduce((best, item) => {
     const expectedRaw = toMinutes(item.entrada);
@@ -121,19 +107,12 @@ export function getAssignedShiftId(schedule) {
   const savedId = schedule?.turno_id || schedule?.tipo;
   return WORK_SHIFTS[savedId]
     ? savedId
-    : inferShiftFromEntry(schedule?.horarios_por_dia?.['1']?.entrada || schedule?.entrada);
+    : (getHabitualSchedules(schedule)[0]?.id || inferShiftFromEntry(getHabitualSchedules(schedule)[0]?.entrada));
 }
 
 export function makeEmployeeSchedule(shiftId) {
   const shift = WORK_SHIFTS[shiftId] || WORK_SHIFTS.turno1;
-  const weekdays = Object.fromEntries([1, 2, 3, 4, 5].map((day) => [String(day), {
-    entrada: shift.start,
-    saida_almoco: shift.lunchOut || null,
-    retorno_almoco: shift.lunchReturn || null,
-    saida: shift.end,
-  }]));
-  weekdays['6'] = saturdayHoursForShift(shift);
-  return { tipo: shift.id, turno_id: shift.id, dias_semana: [1, 2, 3, 4, 5, 6], horarios_por_dia: weekdays };
+  return { tipo: shift.id, turno_id: shift.id, dias_semana: [1, 2, 3, 4, 5, 6], horarios_habituais: [makeHabitualSchedule(shift.id)] };
 }
 
 export function inferShiftForRecord(record, assignedShiftId) {

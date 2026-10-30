@@ -7,17 +7,13 @@ import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
 import WorkScheduleCard from '../../components/WorkScheduleCard';
-import { getAssignedShiftId, getLunchLabelForRecord, getShiftLabel, getRegisteredScheduleLabel, getNearestRegisteredSchedule, inferShiftFromEntry, makeEmployeeSchedule, summarizeWorkedShifts, WORK_SHIFTS } from '../../lib/workShifts';
+import { getAssignedShiftId, getHabitualSchedules, getLunchLabelForRecord, getShiftLabel, getRegisteredScheduleLabel, getNearestRegisteredSchedule, inferShiftFromEntry, makeEmployeeSchedule, makeHabitualSchedule, summarizeWorkedShifts, WORK_SHIFTS } from '../../lib/workShifts';
 
 const FILTERS = [
   { id: 'day', label: 'Dia' },
   { id: 'week', label: 'Semana' },
   { id: 'month', label: 'Mês' },
   { id: 'custom', label: 'Período personalizado' },
-];
-const SCHEDULE_DAYS = [
-  { id: '1', name: 'Segunda-feira' }, { id: '2', name: 'Terça-feira' }, { id: '3', name: 'Quarta-feira' },
-  { id: '4', name: 'Quinta-feira' }, { id: '5', name: 'Sexta-feira' }, { id: '6', name: 'Sábado' },
 ];
 const PUNCH_EDIT_WINDOW_MS = 4 * 24 * 60 * 60 * 1000;
 
@@ -203,37 +199,38 @@ export default function AdminEmployees() {
 
   const setFormField = (field, value) => setEmployeeForm((current) => ({ ...current, [field]: value }));
 
-  const setScheduleType = (turnoId) => setEmployeeForm((current) => ({ ...current, ...makeEmployeeSchedule(turnoId), turno_id: turnoId }));
+  const addHabitualSchedule = (turnoId) => setEmployeeForm((current) => {
+    const schedules = getHabitualSchedules(current);
+    if (!turnoId || schedules.some((item) => item.id === turnoId)) return current;
+    const next = [...schedules, makeHabitualSchedule(turnoId)];
+    return { ...current, horarios_habituais: next, turno_id: next[0].id, tipo: next[0].id };
+  });
 
-  const setDaySchedule = (dayId, turnoId) => setEmployeeForm((current) => {
-    const horarios = { ...(current.horarios_por_dia || {}) };
-    const days = new Set(current.dias_semana || []);
-    if (!turnoId) {
-      delete horarios[dayId];
-      days.delete(Number(dayId));
-    } else {
-      horarios[dayId] = makeEmployeeSchedule(turnoId).horarios_por_dia[dayId];
-      days.add(Number(dayId));
-    }
-    const firstEntry = Object.keys(horarios).sort((a, b) => Number(a) - Number(b)).map((day) => horarios[day]?.entrada).find(Boolean);
-    const inferredId = firstEntry ? inferShiftFromEntry(firstEntry) : 'turno1';
-    return { ...current, horarios_por_dia: horarios, dias_semana: [...days].sort((a, b) => a - b), turno_id: inferredId, tipo: inferredId };
+  const removeHabitualSchedule = (turnoId) => setEmployeeForm((current) => {
+    const next = getHabitualSchedules(current).filter((item) => item.id !== turnoId);
+    const nextPrimary = next[0]?.id || '';
+    return { ...current, horarios_habituais: next, turno_id: nextPrimary, tipo: nextPrimary };
   });
 
   const scheduleFromForm = (form) => ({
-    tipo: form.turno_id || form.tipo || 'turno1',
-    turno_id: form.turno_id || form.tipo || 'turno1',
+    tipo: getHabitualSchedules(form)[0]?.id || form.turno_id || form.tipo || 'turno1',
+    turno_id: getHabitualSchedules(form)[0]?.id || form.turno_id || form.tipo || 'turno1',
     dias_semana: [...(form.dias_semana || [])],
-    horarios_por_dia: { ...(form.horarios_por_dia || {}) },
+    horarios_habituais: getHabitualSchedules(form),
   });
 
   const formFromEmployee = (employee) => {
     const schedule = employee.escala_trabalho || {};
-    const shiftId = WORK_SHIFTS[schedule.turno_id || schedule.tipo] ? (schedule.turno_id || schedule.tipo) : inferShiftFromEntry(schedule.horarios_por_dia?.['1']?.entrada || schedule.entrada) || 'turno1';
+    const habitualSchedules = getHabitualSchedules(schedule);
+    const shiftId = habitualSchedules[0]?.id || (WORK_SHIFTS[schedule.turno_id || schedule.tipo] ? (schedule.turno_id || schedule.tipo) : inferShiftFromEntry(schedule.entrada) || 'turno1');
     return {
       nome: employee.nome || '', email: employee.email || '', cpf: formatCPF(employee.cpf) || '', cargo: employee.cargo || '', tipo_contrato: employee.tipo_contrato || 'clt',
       data_admissao: employee.data_admissao || '', ...makeEmployeeSchedule(shiftId),
       ...schedule,
+      turno_id: shiftId,
+      tipo: shiftId,
+      dias_semana: schedule.dias_semana?.length ? schedule.dias_semana : [1, 2, 3, 4, 5, 6],
+      horarios_habituais: habitualSchedules.length ? habitualSchedules : [makeHabitualSchedule(shiftId)],
     };
   };
 
@@ -301,11 +298,13 @@ export default function AdminEmployees() {
       {(!editingAdmission && !showInviteForm && selectedEmp?.data_admissao) && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingAdmission(true)}>Editar data de admissão</button>}
       {(editingAdmission || showInviteForm || !selectedEmp?.data_admissao) && <label className="form-group">Data de admissão{employeeForm.tipo_contrato === 'pj' && <small> (opcional para PJ)</small>}<input className="form-input" required={employeeForm.tipo_contrato === 'clt'} type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>}
       {employeeForm.tipo_contrato === 'clt' && (!hasSavedSchedule || editingSchedule || showInviteForm) && <>
-        <label className="form-group">Aplicar horário a todos os dias<select className="form-input" value={employeeForm.turno_id} onChange={(event) => setScheduleType(event.target.value)}><option value="turno1">06:00 às 15:00 · almoço 12:00–13:00</option><option value="turno2">08:00 às 17:00 · almoço 12:00–13:00</option><option value="turno3">14:00 às 22:00 · almoço 18:00–19:00</option></select></label>
-        <fieldset className="employee-schedule-day-editor"><legend>Horários por dia</legend>{SCHEDULE_DAYS.map((day) => <label className="employee-schedule-day" key={day.id}><span>{day.name}</span><select className="form-input" value={employeeForm.horarios_por_dia?.[day.id]?.entrada ? inferShiftFromEntry(employeeForm.horarios_por_dia[day.id].entrada) : ''} onChange={(event) => setDaySchedule(day.id, event.target.value)}><option value="">Folga</option><option value="turno1">06:00–15:00</option><option value="turno2">08:00–17:00</option><option value="turno3">14:00–22:00</option></select></label>)}</fieldset>
+        <fieldset className="employee-habitual-schedule-editor"><legend>Horários habituais</legend><p>Adicione todos os horários que este trabalhador costuma cumprir.</p>
+          <div className="employee-habitual-schedule-list">{getHabitualSchedules(employeeForm).map((schedule) => <div className="employee-habitual-schedule" key={schedule.id}><div><strong>{getShiftLabel(schedule.id)}</strong><span>Almoço {schedule.saida_almoco || 'sem intervalo'}{schedule.retorno_almoco ? `–${schedule.retorno_almoco}` : ''}</span></div><button type="button" className="btn btn-ghost btn-sm" aria-label={`Remover horário ${getShiftLabel(schedule.id)}`} onClick={() => removeHabitualSchedule(schedule.id)}>Remover</button></div>)}</div>
+          <label className="form-group">Adicionar horário<select className="form-input" value="" onChange={(event) => addHabitualSchedule(event.target.value)}><option value="">Escolha um horário habitual</option>{Object.values(WORK_SHIFTS).filter((shift) => !getHabitualSchedules(employeeForm).some((item) => item.id === shift.id)).map((shift) => <option key={shift.id} value={shift.id}>{shift.label} · almoço {shift.lunchOut}–{shift.lunchReturn}</option>)}</select></label>
+        </fieldset>
       </>}
       {employeeForm.tipo_contrato === 'clt' && hasSavedSchedule && !editingSchedule && !showInviteForm && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSchedule(true)}>Editar horários</button>}
-      {(editingAdmission || editingSchedule || !hasSavedSchedule || !selectedEmp?.data_admissao || showInviteForm || contractChanged) && <button className="btn btn-primary" disabled={savingEmployment || ((editingSchedule || !hasSavedSchedule || showInviteForm) && employeeForm.dias_semana.length === 0)}>{savingEmployment ? 'Salvando…' : editingSchedule || !hasSavedSchedule || showInviteForm ? submitLabel : contractChanged ? 'Salvar tipo de vínculo' : 'Salvar data de admissão'}</button>}
+      {(editingAdmission || editingSchedule || !hasSavedSchedule || !selectedEmp?.data_admissao || showInviteForm || contractChanged) && <button className="btn btn-primary" disabled={savingEmployment || ((editingSchedule || !hasSavedSchedule || showInviteForm) && getHabitualSchedules(employeeForm).length === 0)}>{savingEmployment ? 'Salvando…' : editingSchedule || !hasSavedSchedule || showInviteForm ? submitLabel : contractChanged ? 'Salvar tipo de vínculo' : 'Salvar data de admissão'}</button>}
     </form>
   );
 
@@ -514,6 +513,8 @@ export default function AdminEmployees() {
         details: [
           `CPF: ${formatCPF(selectedEmp.cpf)}`,
           `Tipo de vínculo: ${selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}`,
+          ...(selectedEmp.tipo_contrato === 'pj' || !selectedEmp.escala_trabalho ? [] : [`Horários habituais: ${getRegisteredScheduleLabel(selectedEmp.escala_trabalho)}`]),
+          ...(selectedEmp.tipo_contrato === 'pj' || !selectedEmp.escala_trabalho ? [] : ['Sábados: 4h previstas, sem intervalo fixo']),
           ...(selectedEmp.tipo_contrato === 'pj' ? [`Total de horas trabalhadas: ${formatMinutesAsHours(employeePeriodMinutes)}`] : []),
           `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
           `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,

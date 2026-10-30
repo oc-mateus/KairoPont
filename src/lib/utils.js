@@ -2,7 +2,7 @@
  * Utilitários de data/hora para o fuso America/Sao_Paulo
  */
 
-import { getFixedLunchLabel, getFixedLunchSchedule, inferShiftForRecord, makeEmployeeSchedule } from './workShifts.js';
+import { getFixedLunchLabel, getFixedLunchSchedule, inferShiftForRecord, WORK_SHIFTS } from './workShifts.js';
 
 const TIMEZONE = 'America/Sao_Paulo';
 
@@ -234,15 +234,19 @@ export function getExpectedShiftMinutes(record, shiftId = null) {
   const shift = shiftId || inferShiftForRecord(record);
   if (!shift || !record?.data) return null;
   const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
-  const daily = makeEmployeeSchedule(shift)?.horarios_por_dia?.[String(weekday)];
-  if (!daily?.entrada || !daily?.saida) return null;
-  const expectedExitDate = clockMinutes(daily.saida) <= clockMinutes(daily.entrada)
+  if (weekday === 6) return 4 * 60;
+  if (weekday === 7) return null;
+  const expected = WORK_SHIFTS[shift];
+  if (!expected?.start || !expected?.end) return null;
+  const expectedExitDate = clockMinutes(expected.end) <= clockMinutes(expected.start)
     ? nextIsoDate(record.data)
     : record.data;
   return getCreditedDailyMinutes({
     data: record.data,
-    entrada: daily.entrada,
-    saida: daily.saida,
+    entrada: expected.start,
+    saida_almoco: expected.lunchOut || null,
+    retorno_almoco: expected.lunchReturn || null,
+    saida: expected.end,
     saida_data: expectedExitDate,
     turno_trabalhado: shift,
   }, shift);

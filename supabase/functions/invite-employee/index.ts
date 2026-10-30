@@ -34,35 +34,39 @@ function validIsoDate(value: string) {
 function makeSchedule(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const submitted = value as Record<string, unknown>;
-  const id = String(submitted.turno_id || "");
-  const shifts: Record<string, { start: string; end: string; lunchOut?: string; lunchReturn?: string }> = {
-    turno1: { start: "08:00", end: "17:00", lunchOut: "12:00", lunchReturn: "13:00" },
-    turno2: { start: "14:00", end: "22:52", lunchOut: "19:00", lunchReturn: "20:00" },
-    turno3: { start: "22:45", end: "06:15", lunchOut: "02:00", lunchReturn: "03:00" },
+  const shifts: Record<string, { start: string; end: string; lunchOut: string | null; lunchReturn: string | null }> = {
+    turno1: { start: "06:00", end: "15:00", lunchOut: "12:00", lunchReturn: "13:00" },
+    turno2: { start: "08:00", end: "17:00", lunchOut: "12:00", lunchReturn: "13:00" },
+    turno3: { start: "14:00", end: "22:00", lunchOut: "18:00", lunchReturn: "19:00" },
   };
-  const shift = shifts[id];
-  if (!shift) return null;
-  const horarios_por_dia: Record<string, Record<string, string | null>> = {};
-  for (const day of [1, 2, 3, 4, 5]) {
-    horarios_por_dia[String(day)] = {
-      entrada: shift.start,
-      saida_almoco: shift.lunchOut || null,
-      retorno_almoco: shift.lunchReturn || null,
-      saida: shift.end,
-    };
-  }
-  const saturdayHours: Record<string, { start: string; end: string }> = {
-    turno1: { start: "08:00", end: "12:00" },
-    turno2: { start: "14:30", end: "18:33" },
-    turno3: { start: "22:45", end: "05:36" },
+  const inferId = (entry: unknown) => {
+    if (typeof entry !== "string" || !/^\d{2}:\d{2}/.test(entry)) return null;
+    const actual = Number(entry.slice(0, 2)) * 60 + Number(entry.slice(3, 5));
+    return Object.entries(shifts).reduce<{ id: string | null; distance: number }>((best, [id, candidate]) => {
+      const expected = Number(candidate.start.slice(0, 2)) * 60 + Number(candidate.start.slice(3, 5));
+      const rawDistance = Math.abs(actual - expected);
+      const distance = Math.min(rawDistance, 1440 - rawDistance);
+      return distance < best.distance ? { id, distance } : best;
+    }, { id: null, distance: Infinity }).id;
   };
-  horarios_por_dia["6"] = {
-    entrada: saturdayHours[id].start,
-    saida_almoco: null,
-    retorno_almoco: null,
-    saida: saturdayHours[id].end,
-  };
-  return { tipo: id, turno_id: id, dias_semana: [1, 2, 3, 4, 5, 6], horarios_por_dia };
+  const selected = Array.isArray(submitted.horarios_habituais)
+    ? submitted.horarios_habituais.map((item) => item && typeof item === "object" ? String((item as Record<string, unknown>).id || "") : "")
+    : Object.values((submitted.horarios_por_dia && typeof submitted.horarios_por_dia === "object" ? submitted.horarios_por_dia : {}) as Record<string, Record<string, unknown>>)
+      .map((item) => inferId(item?.entrada)).filter((id): id is string => Boolean(id));
+  const scheduleIds = [...new Set(selected)].filter((id) => Boolean(shifts[id]));
+  if (!scheduleIds.length && shifts[String(submitted.turno_id || "")]) scheduleIds.push(String(submitted.turno_id));
+  if (!scheduleIds.length) return null;
+  const habitualSchedules = scheduleIds.map((id) => ({
+    id,
+    entrada: shifts[id].start,
+    saida_almoco: shifts[id].lunchOut,
+    retorno_almoco: shifts[id].lunchReturn,
+    saida: shifts[id].end,
+  }));
+  const workdays = Array.isArray(submitted.dias_semana)
+    ? [...new Set(submitted.dias_semana.map(Number).filter((day) => Number.isInteger(day) && day >= 1 && day <= 6))].sort((a, b) => a - b)
+    : [1, 2, 3, 4, 5, 6];
+  return { tipo: scheduleIds[0], turno_id: scheduleIds[0], dias_semana: workdays.length ? workdays : [1, 2, 3, 4, 5, 6], horarios_habituais: habitualSchedules };
 }
 
 Deno.serve(async (req) => {

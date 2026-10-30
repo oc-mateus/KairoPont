@@ -28,11 +28,8 @@ test('labels a recorded meal break on the following day', () => {
 });
 
 test('builds the configured Saturday schedules for each shift', () => {
-  assert.equal(makeEmployeeSchedule('turno1').horarios_por_dia['6'].entrada, '06:00');
-  assert.equal(makeEmployeeSchedule('turno1').horarios_por_dia['6'].saida, '10:00');
-  assert.equal(makeEmployeeSchedule('turno2').horarios_por_dia['6'].entrada, '08:00');
-  assert.equal(makeEmployeeSchedule('turno2').horarios_por_dia['6'].saida, '12:00');
-  assert.equal(makeEmployeeSchedule('turno3').horarios_por_dia['6'].entrada, '14:00');
-  assert.equal(makeEmployeeSchedule('turno3').horarios_por_dia['6'].saida_almoco, null);
-  assert.equal(makeEmployeeSchedule('turno3').horarios_por_dia['6'].saida, '18:00');
+  assert.equal(makeEmployeeSchedule('turno1').horarios_habituais[0].entrada, '06:00');
+  assert.equal(makeEmployeeSchedule('turno2').horarios_habituais[0].entrada, '08:00');
+  assert.equal(makeEmployeeSchedule('turno3').horarios_habituais[0].entrada, '14:00');
+  assert.equal(makeEmployeeSchedule('turno3').horarios_habituais[0].saida, '22:00');
 });

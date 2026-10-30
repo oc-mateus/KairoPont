@@ -82,7 +82,7 @@ function creditedMinutesForShift(shift) {
 
 function saturdayHoursForShift(shift) {
   if (shift.id === 'turno3') {
-    return { entrada: '12:00', saida_almoco: '17:00', retorno_almoco: '18:00', saida: '22:00' };
+    return { entrada: '14:00', saida_almoco: null, retorno_almoco: null, saida: '18:00' };
   }
   const exitMinute = (toMinutes(shift.start) + 4 * 60) % MINUTES_PER_DAY;
   const clock = (minute) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;

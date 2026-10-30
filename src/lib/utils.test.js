@@ -78,10 +78,10 @@ test('computes PJ elapsed hours across midnight and subtracts a marked break', (
   assert.equal(calcElapsedDailyTotal(record), '7h');
 });
 
-test('configured turno 3 adds up to 44 credited hours from Monday through Saturday', () => {
+test('configured turno 3 has a four-hour Saturday schedule', () => {
   const dates = ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17'];
   const weeklyMinutes = dates.reduce((sum, data) => sum + getExpectedShiftMinutes({ data }, 'turno3'), 0);
-  assert.ok(Math.abs(weeklyMinutes - 44 * 60) < 1);
+  assert.ok(Math.abs(weeklyMinutes - 39 * 60) < 1);
 });
 
 test('configured turno 2 adds up to 44 credited hours from Monday through Saturday', () => {

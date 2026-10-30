@@ -1,7 +1,7 @@
 export const WORK_SHIFTS = {
-  turno1: { id: 'turno1', label: '1º turno', start: '08:00', end: '17:00', lunchOut: '12:00', lunchReturn: '13:00' },
-  turno2: { id: 'turno2', label: '2º turno', start: '14:00', end: '22:52', lunchOut: '19:00', lunchReturn: '20:00' },
-  turno3: { id: 'turno3', label: '3º turno', start: '22:45', end: '06:15', lunchOut: '02:00', lunchReturn: '03:00', lunchNextDay: true, overnight: true },
+  turno1: { id: 'turno1', label: '06:00–15:00', start: '06:00', end: '15:00', lunchOut: '12:00', lunchReturn: '13:00' },
+  turno2: { id: 'turno2', label: '08:00–17:00', start: '08:00', end: '17:00', lunchOut: '12:00', lunchReturn: '13:00' },
+  turno3: { id: 'turno3', label: '14:00–22:00', start: '14:00', end: '22:00', lunchOut: '18:00', lunchReturn: '19:00' },
 };
 
 export function getFixedLunchSchedule(shiftId) {
@@ -33,7 +33,16 @@ export function getLunchLabelForRecord(record, shiftId = null) {
 }
 
 export function getShiftLabel(id) {
-  return WORK_SHIFTS[id]?.label || 'Turno não identificado';
+  return WORK_SHIFTS[id]?.label || 'Horário não identificado';
+}
+
+export function getRegisteredScheduleLabel(schedule) {
+  const registeredStarts = [...new Set(Object.values(schedule?.horarios_por_dia || {})
+    .map((item) => toMinutes(item?.entrada))
+    .filter((minute) => minute != null)
+    .map((minute) => (Math.round(minute / 60) * 60) % MINUTES_PER_DAY))];
+  if (registeredStarts.length > 1) return 'Horários variados';
+  return getShiftLabel(getAssignedShiftId(schedule));
 }
 
 function toMinutes(value) {
@@ -72,43 +81,40 @@ function creditedMinutesForShift(shift) {
 }
 
 function saturdayHoursForShift(shift) {
-  if (shift.id === 'turno2') {
-    return { entrada: '14:30', saida_almoco: null, retorno_almoco: null, saida: '18:33' };
+  if (shift.id === 'turno3') {
+    return { entrada: '12:00', saida_almoco: '17:00', retorno_almoco: '18:00', saida: '22:00' };
   }
-  const entry = toMinutes(shift.start);
-  const remainingCredits = Math.max(0, WEEKLY_WORK_MINUTES - 5 * creditedMinutesForShift(shift));
-  let minutesStillNeeded = remainingCredits;
-  let elapsedMinutes = 0;
-  while (minutesStillNeeded > 1e-7) {
-    const currentMinute = entry + elapsedMinutes;
-    const minuteOfDay = ((currentMinute % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
-    const dayStart = Math.floor(currentMinute / MINUTES_PER_DAY) * MINUTES_PER_DAY;
-    const inNightPeriod = minuteOfDay >= 22 * 60 || minuteOfDay < 5 * 60;
-    const nextBoundary = inNightPeriod
-      ? (minuteOfDay >= 22 * 60 ? dayStart + MINUTES_PER_DAY + 5 * 60 : dayStart + 5 * 60)
-      : (minuteOfDay < 22 * 60 ? dayStart + 22 * 60 : dayStart + MINUTES_PER_DAY + 22 * 60);
-    const rate = inNightPeriod ? 8 / 7 : 1;
-    const availableMinutes = Math.max(1, nextBoundary - currentMinute);
-    const availableCredits = availableMinutes * rate;
-    const usedMinutes = Math.min(availableMinutes, minutesStillNeeded / rate);
-    elapsedMinutes += usedMinutes;
-    minutesStillNeeded -= Math.min(availableCredits, minutesStillNeeded);
-  }
-  const exitMinute = (entry + Math.round(elapsedMinutes)) % MINUTES_PER_DAY;
+  const exitMinute = (toMinutes(shift.start) + 4 * 60) % MINUTES_PER_DAY;
   const clock = (minute) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
   return { entrada: shift.start, saida_almoco: null, retorno_almoco: null, saida: clock(exitMinute) };
 }
 
-// Classifica pela hora de entrada mais próxima do início dos turnos, considerando a virada do dia.
+// Classifica pela entrada cadastrada mais próxima, arredondando a previsão à hora cheia.
 export function inferShiftFromEntry(value) {
   const entry = toMinutes(value);
   if (entry == null) return null;
   return Object.values(WORK_SHIFTS).reduce((closest, shift) => {
-    const start = toMinutes(shift.start);
+    const rawStart = toMinutes(shift.start);
+    const start = (Math.round(rawStart / 60) * 60) % 1440;
     const rawDistance = Math.abs(entry - start);
     const distance = Math.min(rawDistance, 1440 - rawDistance);
     return distance < closest.distance ? { id: shift.id, distance } : closest;
   }, { id: null, distance: Infinity }).id;
+}
+
+export function getNearestRegisteredSchedule(schedule, entry) {
+  const actual = toMinutes(entry);
+  if (actual == null) return null;
+  const daySchedules = Object.values(schedule?.horarios_por_dia || {}).filter((item) => item?.entrada);
+  const candidates = daySchedules.length ? daySchedules : (schedule?.entrada ? [schedule] : []);
+  if (!candidates.length) return null;
+  return candidates.reduce((best, item) => {
+    const expectedRaw = toMinutes(item.entrada);
+    const expected = (Math.round(expectedRaw / 60) * 60) % MINUTES_PER_DAY;
+    const rawDistance = Math.abs(actual - expected);
+    const distance = Math.min(rawDistance, MINUTES_PER_DAY - rawDistance);
+    return distance < best.distance ? { item, expected, distance } : best;
+  }, { item: null, expected: null, distance: Infinity });
 }
 
 export function getAssignedShiftId(schedule) {

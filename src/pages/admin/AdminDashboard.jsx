@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { formatMinutesAsHours, getCreditedDailyMinutes, getOvertimeMinutes, getTodayInSP } from '../../lib/utils';
 import { Spinner } from '../../components/ui';
-import { getAssignedShiftId, inferShiftFromEntry, makeEmployeeSchedule } from '../../lib/workShifts';
+import { getAssignedShiftId, getNearestRegisteredSchedule, inferShiftFromEntry } from '../../lib/workShifts';
 
 const ATTENDANCE_TRACKING_START = '2026-10-06';
 
@@ -111,10 +111,10 @@ function buildAttendanceChartData({ employees, records, vacations, holidays, tod
     const bucketIndex = monthlyBuckets ? recordMonthIndex - startMonthIndex : Math.floor((Number(record.data.slice(8, 10)) - 1) / 7);
     const bucket = buckets[bucketIndex];
     if (!bucket) return;
-    const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada) || getAssignedShiftId(employee.escala_trabalho);
-    const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
-    const shiftDay = makeEmployeeSchedule(shiftId)?.horarios_por_dia?.[String(weekday)];
-    const expectedEntry = clockMinutes(shiftDay?.entrada);
+    const nearestSchedule = getNearestRegisteredSchedule(employee.escala_trabalho, record.entrada);
+    const expectedEntry = nearestSchedule?.expected ?? null;
+    const expectedTime = expectedEntry == null ? null : `${String(Math.floor(expectedEntry / 60)).padStart(2, '0')}:${String(expectedEntry % 60).padStart(2, '0')}`;
+    const shiftId = (expectedTime && inferShiftFromEntry(expectedTime)) || record.turno_trabalhado || inferShiftFromEntry(record.entrada) || getAssignedShiftId(employee.escala_trabalho);
     const actualEntry = clockMinutes(record.entrada);
     if (!holidayDates.has(record.data) && expectedEntry != null && actualEntry != null && actualEntry > expectedEntry) bucket.delays += 1;
     bucket.overtimeMinutes += holidayDates.has(record.data)
@@ -254,7 +254,7 @@ export default function AdminDashboard() {
   return (
     <div className="admin-dashboard">
       <div className="page-header admin-page-heading">
-        <div><span className="eyebrow">Administração</span><h2 className="page-title">Visão geral</h2><p className="page-subtitle">Indicadores de frequência e jornada dos funcionários CLT.</p></div>
+        <div><h2 className="page-title">Visão geral</h2><p className="page-subtitle">Indicadores de frequência e jornada dos funcionários CLT.</p></div>
         <span className="admin-date">Hoje, {new Date(`${today}T12:00:00`).toLocaleDateString('pt-BR')}</span>
       </div>
 

@@ -43,8 +43,7 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - O menu de administradores mostra Painel Admin, Funcionários e Férias; Meu Perfil permanece na seção Conta. Registrar Ponto, Meu Histórico, Documentos e Minhas Férias não aparecem para administradores, pois ponto e documentos são acessados pela ficha individual e as férias pela gestão administrativa.
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
-- Criar funcionário por convite, informando admissão, cargo e vínculo. O turno é solicitado somente para CLT; editar um vínculo existente abre o seletor sob demanda. A escala e a data de admissão permanecem como informação depois do cadastro e só aparecem como campos quando o administrador escolhe editar. O resumo do turno pode ser recolhido ou expandido; a preferência fica salva neste navegador para cada perfil.
-- Para CLT, escolher entre três turnos fixos: 1º (08h–17h, almoço 12h–13h), 2º (14h–22h52, almoço 19h–20h) e 3º (22h45–06h15 do dia seguinte, almoço 02h–03h do dia seguinte). Aos sábados, os horários são 08h–12h no 1º turno, 14h30–18h33 no 2º e 22h45–05h36 do dia seguinte no 3º; o domingo é folga. Essas escalas somam 44 horas semanais com a conversão de hora noturna aplicada pelo sistema. A entrada classifica o turno feito no registro sem alterar o turno habitual do perfil. A saída noturna pode ser vinculada ao registro iniciado na véspera e recebe data própria.
+- Criar funcionário por convite, informando admissão, cargo e vínculo. Para CLT, escolher horários de 06h–15h (almoço 12h–13h), 08h–17h (almoço 12h–13h) ou 14h–22h (almoço 18h–19h), aplicáveis à semana inteira ou configuráveis por dia. Aos sábados, os dois primeiros horários são 06h–10h e 08h–12h; no terceiro, 12h–22h com pausa prevista de 17h–18h. Domingo é folga. O início esperado é arredondado à hora cheia mais próxima; o sistema associa a marcação ao horário cadastrado mais próximo.
 - Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
 - Na ficha do funcionário, consultar a data de admissão, quando o pedido será liberado e a primeira data possível de saída; na fila, revisar saída e retorno solicitados.
 - Comparar nas tabelas de ponto as horas registradas, a jornada planejada para cada dia e o saldo diário.
@@ -93,7 +92,7 @@ As migrações criam as tabelas principais no esquema public:
 | Tabela | Dados armazenados | Proteção aplicada |
 | --- | --- | --- |
 | funcionarios | Perfil, vínculo com Auth, CPF, cargo, status, papel, admissão e escala semanal | Funcionário consulta o próprio perfil; admin pode consultar a equipe |
-| registros_ponto | Data de entrada, quatro marcações, turno efetivo e data de saída (para jornada noturna) | Funcionário consulta os próprios registros; admin consulta a equipe |
+| registros_ponto | Data de entrada, quatro marcações, horário efetivo e data de saída | Funcionário consulta os próprios registros; admin consulta a equipe |
 | documentos | Tipo, nome, caminho no Storage e período informado | Funcionário consulta os próprios metadados; admin consulta os autorizados |
 | auditoria | Ação administrativa, alvo e detalhes | Leitura limitada ao perfil admin |
 | periodos_aquisitivos_ferias | Períodos aquisitivos/concessivos e intenção de abono de 0–10 dias | Funcionário acessa os próprios períodos; admin consulta todos |
@@ -174,9 +173,9 @@ A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIA
 
 Para perfis CLT existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível. Perfis PJ não usam escala de turno nem comparativo CLT.
 
-Existem três escalas fixas para CLT. O turno efetivo é classificado pela entrada mais próxima do horário de início e salvo no registro diário. Os intervalos em dias úteis são 12h–13h no turno 1, 19h–20h no turno 2 e 02h–03h no turno 3. O turno 3 cruza a meia-noite; a data de saída fica separada da data da entrada, e o cálculo considera a virada do dia. A jornada de sábado é 08h–12h no turno 1, 14h30–18h33 no turno 2 e 22h45–05h36 do domingo no turno 3; não há intervalo programado. Se a jornada efetiva ultrapassar seis horas, o funcionário deve marcar uma pausa de pelo menos uma hora antes da saída final.
+Os horários esperados são arredondados à hora cheia mais próxima. Para calcular atrasos, o sistema compara a entrada com os horários cadastrados do funcionário e usa o início mais próximo. Se as entradas previstas forem 08h e 14h, uma marcação às 13h se associa a 14h e não conta como atraso.
 
-Na ficha do funcionário, administradores podem corrigir os horários do registro de ponto individual até 96 horas após sua criação. O limite é contado e validado no banco, não apenas na interface. Depois do prazo, um gatilho bloqueia alterações e exclusões, inclusive por chamadas diretas; data-base e identificadores também não podem ser alterados. Cada correção gera um item na tabela `auditoria`. A tela apresenta “Editar horários” dentro do prazo e “Prazo encerrado” após o vencimento.
+Na ficha do funcionário, administradores podem corrigir registros recentes dentro da janela de 96 horas e informam uma observação obrigatória, registrada na auditoria. Para correções históricas, a tela exige motivo e grava valores anteriores e novos na auditoria; inclusões antigas seguem o mesmo fluxo. A trava normal de 96 horas permanece ativa fora do fluxo administrativo auditado.
 
 A migração também corrigiu o fuso de criação dos registros já existentes e mudou o padrão futuro para `now()`, para que a janela de 96 horas seja precisa no banco configurado em UTC.
 

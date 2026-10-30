@@ -99,7 +99,7 @@ export default function HistoryPage() {
         title: `Relatório de Ponto - ${profile.nome}`,
         details: [
           `Tipo de vínculo: ${isPj ? 'PJ' : 'CLT'}`,
-          ...(!isPj && profile?.escala_trabalho ? [`Turno: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}`] : []),
+          ...(!isPj && profile?.escala_trabalho ? [`Horário: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}`] : []),
           `Período: ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}`,
           `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
         ],
@@ -110,10 +110,10 @@ export default function HistoryPage() {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
         doc.setTextColor(60, 60, 60);
-        doc.text(`Turnos trabalhados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
+        doc.text(`Horários registrados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
         autoTable(doc, {
           startY: tableStartY + 4,
-          head: [['1º turno', '2º turno', '3º turno', 'Sem turno identificado']],
+          head: [['06:00–15:00', '08:00–17:00', '14:00–22:00', 'Sem horário identificado']],
           body: [[shiftSummary.turno1, shiftSummary.turno2, shiftSummary.turno3, shiftSummary.unidentified].map((count) => `${count} dia${count === 1 ? '' : 's'}`)],
           theme: 'grid',
           headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' },
@@ -149,7 +149,7 @@ export default function HistoryPage() {
 
       autoTable(doc, {
         startY: tableStart,
-        head: [[...(isPj ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Turno', 'Intervalo de almoço']), 'Saída', 'Horas computadas', 'Status']],
+        head: [[...(isPj ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Horário', 'Intervalo de almoço']), 'Saída', 'Horas computadas', 'Status']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -205,7 +205,7 @@ export default function HistoryPage() {
         summary: isPj ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(pjPeriodMinutes) } : null,
         extraColumns: [
           { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => isPj ? 'PJ' : 'CLT' },
-          ...(!isPj ? [{ key: 'shift', header: 'Turno trabalhado', width: 20, value: shiftFor }] : []),
+          ...(!isPj ? [{ key: 'shift', header: 'Horário registrado', width: 20, value: shiftFor }] : []),
           { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
         ],
       });
@@ -222,13 +222,13 @@ export default function HistoryPage() {
       const { start, end } = getDateRange();
       let md = `# Relatório de Ponto\n\n`;
       md += `**Funcionário:** ${profile.nome}\n`;
-      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Turno: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}\n`;
+      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horário: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n`;
       md += `**Gerado em:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`;
-      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|------|---------|-------|------------------|--------|\n` : `| Data | Entrada | Turno | Almoço fixo | Saída | Horas computadas | Status |\n|------|---------|-------|-------------|-------|-------|--------|\n`;
+      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|------|---------|-------|------------------|--------|\n` : `| Data | Entrada | Horário | Almoço fixo | Saída | Horas computadas | Status |\n|------|---------|--------|-------------|-------|-------|--------|\n`;
 
       records.forEach(r => {
-        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
+        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n`;
       });
 
       const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
@@ -248,12 +248,12 @@ export default function HistoryPage() {
     try {
       const { start, end } = getDateRange();
       let md = `## Relatório de Ponto - ${profile.nome}\n`;
-      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Turno: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}\n`;
+      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horário: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n\n`;
-      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|---|---|---|---|---|\n` : `| Data | Entrada | Turno | Almoço fixo | Saída | Horas computadas | Status |\n|---|---|---|---|---|---|---|\n`;
+      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|---|---|---|---|---|\n` : `| Data | Entrada | Horário | Almoço fixo | Saída | Horas computadas | Status |\n|---|---|---|---|---|---|---|\n`;
 
       records.forEach(r => {
-        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? '✅ Completo' : '⚠️ Incompleto'} |\n`;
+        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n`;
       });
 
       await navigator.clipboard.writeText(md);
@@ -275,7 +275,7 @@ export default function HistoryPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h2 className="page-title">Meu Histórico</h2>
-          <p className="page-subtitle">Consulte seus registros de ponto · Vínculo: {isPj ? 'PJ' : 'CLT'}{!isPj && profile?.escala_trabalho ? ` · Turno: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}</p>
+          <p className="page-subtitle">Consulte seus registros de ponto · Vínculo: {isPj ? 'PJ' : 'CLT'}{!isPj && profile?.escala_trabalho ? ` · Horário: ${getShiftLabel(profile.escala_trabalho.turno_id || profile.escala_trabalho.tipo)}` : ''}</p>
         </div>
         <div className="page-header-actions">
           <button className="btn btn-secondary btn-sm" onClick={handleExportExcel} disabled={records.length === 0 || exportingExcel}>
@@ -344,7 +344,7 @@ export default function HistoryPage() {
                 <tr>
                   <th>Data</th>
                   <th>Entrada</th>
-                  {!isPj && <th>Turno do dia</th>}
+                  {!isPj && <th>Horário do dia</th>}
                   {!isPj && <th>Intervalo de almoço</th>}
                   <th>Saída</th>
                   <th>Horas computadas</th>
@@ -384,7 +384,7 @@ export default function HistoryPage() {
                   <span className="table-card-value">{formatTime(r.entrada)}</span>
                 </div>
                 {!isPj && <div className="table-card-row">
-                  <span className="table-card-label">Turno do dia</span>
+                  <span className="table-card-label">Horário do dia</span>
                   <span className="table-card-value">{shiftFor(r)}</span>
                 </div>}
                 {!isPj && <div className="table-card-row">

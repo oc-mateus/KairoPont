@@ -54,7 +54,10 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-brand">
         <div className="login-brand-content">
-          <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-logo-3d.png`} alt="KairoPont — Controle de Ponto" />
+          <div className="brand-lockup">
+            <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" />
+            <span><strong>KairoPont</strong><small>Controle de ponto</small></span>
+          </div>
           <p>Onde automação vira sistema confiável.</p>
           <InstallAppButton />
         </div>

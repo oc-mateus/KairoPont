@@ -183,36 +183,29 @@ export default function PunchPage() {
   }
 
   return (
-    <div>
-      {/* Clock display */}
-      <div className="text-center mb-6">
-        <div style={{
-          fontSize: 'clamp(2.5rem, 8vw, 4rem)',
-          fontWeight: 800,
-          color: 'var(--text-primary)',
-          letterSpacing: '-0.02em',
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          {displayTime}
+    <div className="punch-page">
+      <div className="punch-page-heading">
+        <div>
+          <h2 className="page-title">Jornada de hoje</h2>
+          <p className="page-subtitle">{displayDate}</p>
         </div>
-        <div style={{
-          fontSize: 'var(--font-sm)',
-          color: 'var(--text-muted)',
-          textTransform: 'capitalize',
-        }}>
-          {displayDate}
+        <div className="punch-clock" aria-label={`Horário atual: ${displayTime}`}>
+          <span>Horário de Brasília</span>
+          <strong>{displayTime}</strong>
         </div>
       </div>
 
       <div className="punch-employment-line">
         <Badge variant="info">Vínculo: {profile?.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</Badge>
-        {profile?.tipo_contrato !== 'pj' && profile?.escala_trabalho && <Badge variant="neutral">Turno: {getShiftLabel(getAssignedShiftId(profile.escala_trabalho))}</Badge>}
+        {profile?.tipo_contrato !== 'pj' && profile?.escala_trabalho && <Badge variant="neutral">Horário: {getShiftLabel(getAssignedShiftId(profile.escala_trabalho))}</Badge>}
       </div>
 
       {profile?.tipo_contrato === 'pj' && <div className="pj-punch-note">Registro de ponto PJ: marque somente a entrada e a saída do seu período de trabalho.</div>}
 
-      {/* Punch button */}
-      <div className="flex flex-center mb-6" style={{ flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="punch-workspace">
+      <section className="punch-action-panel">
+        <h3>{isComplete ? 'Sua jornada foi concluída' : 'Sua próxima marcação'}</h3>
+        <p className="punch-action-intro">{isComplete ? 'Todos os horários do dia foram registrados.' : punching ? 'Registrando seu horário…' : 'Quando estiver pronto, registre o próximo horário.'}</p>
         <button
           className="btn-punch"
           onClick={() => handlePunch()}
@@ -238,11 +231,7 @@ export default function PunchPage() {
           )}
         </button>
 
-        {!isComplete && profile?.ativo && (
-          <p className="text-muted" style={{ fontSize: 'var(--font-sm)' }}>
-            Próximo: <strong>{punchSteps[nextStepIndex].description}</strong>
-          </p>
-        )}
+        {!isComplete && profile?.ativo && <p className="punch-next-step">{punchSteps[nextStepIndex].description}</p>}
 
         {canRegisterEarlyLunch && (
           <button
@@ -256,21 +245,20 @@ export default function PunchPage() {
         )}
 
         {needsDynamicLunch && (
-          <p className="text-muted" style={{ fontSize: 'var(--font-sm)', maxWidth: '500px', textAlign: 'center' }}>
+          <p className="punch-policy-note">
             Se o tempo trabalhado ultrapassar 6 horas, é necessário registrar uma pausa de almoço de 1 hora antes da saída.
             {waitingForLunchReturn && ` O retorno poderá ser registrado em ${Math.ceil(60 - breakMinutes)} min.`}
           </p>
         )}
 
         {cooldown && !punching && (
-          <p className="text-muted" style={{ fontSize: 'var(--font-xs)' }}>
+          <p className="punch-cooldown-note">
             Aguarde alguns segundos antes de registrar novamente...
           </p>
         )}
-      </div>
+      </section>
 
-      {/* Timeline do dia */}
-      <div className="card" style={{ maxWidth: '500px', margin: '0 auto' }}>
+      <section className="card punch-record-card">
         <div className="card-header">
           <h3 className="card-title">Registros de Hoje</h3>
           <Badge variant={isComplete ? 'success' : todayRecord ? 'warning' : 'neutral'}>
@@ -303,6 +291,7 @@ export default function PunchPage() {
             );
           })}
         </div>
+      </section>
       </div>
     </div>
   );

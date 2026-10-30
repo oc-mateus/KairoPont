@@ -30,7 +30,9 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-body">
           <div className="confirm-dialog">
-            <div className="confirm-icon">{danger ? '⚠️' : '❓'}</div>
+            <div className="confirm-icon">{danger
+              ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 2.8 19h18.4L12 3Z"/><path d="M12 9v4m0 3h.01" /></svg>
+              : <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 1 1 4.3 1.7c-1.2 1.1-1.9 1.5-1.9 3"/><path d="M12 17h.01" /></svg>}</div>
             <h3 className="confirm-title">{title}</h3>
             <p className="confirm-text">{message}</p>
             <div className="confirm-actions">

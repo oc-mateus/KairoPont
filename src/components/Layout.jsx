@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from './ui';
 import InstallAppButton from './InstallAppButton';
 
@@ -33,6 +34,7 @@ const adminAccountNav = employeeNav.filter(item => item.id === 'perfil');
 
 export default function Layout({ children }) {
   const { profile, isAdmin, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -50,12 +52,6 @@ export default function Layout({ children }) {
     navigate('/login');
   };
 
-  const currentPageTitle = () => {
-    const allNav = isAdmin ? [...adminNav, ...employeeNav] : employeeNav;
-    const current = allNav.find(item => location.pathname === item.path);
-    return current?.label || 'KairoPont';
-  };
-
   return (
     <div className="app-layout">
       {/* Overlay para mobile */}
@@ -67,7 +63,8 @@ export default function Layout({ children }) {
       {/* Sidebar */}
       <aside className={`app-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-logo-3d.png`} alt="KairoPont — Controle de Ponto" />
+          <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" />
+          <span className="brand-wordmark"><strong>KairoPont</strong><small>Controle de ponto</small></span>
         </div>
 
         <nav className="sidebar-nav">
@@ -146,9 +143,19 @@ export default function Layout({ children }) {
             >
               ☰
             </button>
-            <h1 className="app-header-title">{currentPageTitle()}</h1>
           </div>
           <div className="app-header-actions">
+            <button
+              className="btn btn-ghost btn-icon theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              aria-label={`Ativar tema ${theme === 'dark' ? 'claro' : 'escuro'}`}
+              title={`Ativar tema ${theme === 'dark' ? 'claro' : 'escuro'}`}
+            >
+              {theme === 'dark'
+                ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+                : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.2 15.4A8.5 8.5 0 0 1 8.6 3.8 8.5 8.5 0 1 0 20.2 15.4Z"/></svg>}
+            </button>
             <InstallAppButton compact />
           </div>
         </header>

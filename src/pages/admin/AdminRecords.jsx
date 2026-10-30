@@ -50,7 +50,7 @@ export default function AdminRecords() {
                 <th>Vínculo</th>
                 <th>Data</th>
                 <th>Entrada</th>
-                <th>Turno / almoço fixo</th>
+                <th>Horário / almoço fixo</th>
                 <th>Saída</th>
                 <th>Horas computadas</th>
                 <th>Status</th>

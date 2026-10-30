@@ -159,13 +159,13 @@ export default function ProfilePage() {
         <div className="table-card-row">
           <span className="table-card-label">Status</span>
           <span className="table-card-value">
-            {profile.ativo ? '🟢 Ativo' : '🔴 Inativo'}
+            <span className={`profile-value-with-icon ${profile.ativo ? 'is-active' : 'is-inactive'}`}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg>{profile.ativo ? 'Ativo' : 'Inativo'}</span>
           </span>
         </div>
         <div className="table-card-row">
           <span className="table-card-label">Perfil</span>
           <span className="table-card-value">
-            {profile.role === 'admin' ? '🛡️ Administrador' : '👤 Funcionário'}
+            <span className="profile-value-with-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{profile.role === 'admin' ? <><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></> : <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>}</svg>{profile.role === 'admin' ? 'Administrador' : 'Funcionário'}</span>
           </span>
         </div>
       </div>

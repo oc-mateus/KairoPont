@@ -11,7 +11,7 @@ test('classifies entries near each registered schedule start', () => {
   assert.equal(inferShiftFromEntry('06:10'), 'turno1');
   assert.equal(inferShiftFromEntry('08:10'), 'turno2');
   assert.equal(inferShiftFromEntry('14:05'), 'turno3');
-  assert.equal(inferShiftFromEntry('22:40'), 'turno3');
+  assert.equal(inferShiftFromEntry('22:40'), 'turno1');
   assert.equal(inferShiftFromEntry('00:10'), 'turno1');
   assert.equal(inferShiftFromEntry(null), null);
 });

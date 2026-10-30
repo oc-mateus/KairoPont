@@ -1,6 +1,6 @@
 # KairoPont — guia do projeto
 
-Revisado em 10 de outubro de 2026
+Revisado em 30 de outubro de 2026
 
 **Aplicação:** [https://oc-mateus.github.io/KairoPont/](https://oc-mateus.github.io/KairoPont/)  
 **Código-fonte:** [https://github.com/oc-mateus/KairoPont](https://github.com/oc-mateus/KairoPont)
@@ -43,12 +43,15 @@ A aplicação também pode ser instalada como PWA em navegadores compatíveis. N
 - O menu de administradores mostra Painel Admin, Funcionários e Férias; Meu Perfil permanece na seção Conta. Registrar Ponto, Meu Histórico, Documentos e Minhas Férias não aparecem para administradores, pois ponto e documentos são acessados pela ficha individual e as férias pela gestão administrativa.
 - Filtrar os registros individuais por dia, semana, mês ou período personalizado e baixar o resultado em Excel (.xlsx) ou PDF.
 - Baixar documentos individuais por links assinados temporários.
-- Criar funcionário por convite, informando admissão, cargo e vínculo. Para CLT, escolher horários de 06h–15h (almoço 12h–13h), 08h–17h (almoço 12h–13h) ou 14h–22h (almoço 18h–19h), aplicáveis à semana inteira ou configuráveis por dia. Aos sábados, os dois primeiros horários são 06h–10h e 08h–12h; no terceiro, 12h–22h com pausa prevista de 17h–18h. Domingo é folga. O início esperado é arredondado à hora cheia mais próxima; o sistema associa a marcação ao horário cadastrado mais próximo.
+- Criar funcionário por convite, informando admissão, cargo, vínculo e um ou mais horários habituais CLT. Os presets são 06h–15h (almoço 12h–13h), 08h–17h (almoço 12h–13h) e 14h–22h52 (almoço 18h–19h); não são configurados individualmente por dia. A previsão é de 8h de segunda a sexta, 4h aos sábados sem intervalo fixo e folga aos domingos. O início esperado é arredondado à hora cheia mais próxima; o sistema associa a marcação ao horário habitual mais próximo.
 - Consultar solicitações de férias, aprovar ou recusar (justificativa obrigatória) e reenviar o e-mail da decisão quando necessário.
 - Na ficha do funcionário, consultar a data de admissão, quando o pedido será liberado e a primeira data possível de saída; na fila, revisar saída e retorno solicitados.
-- Comparar nas tabelas de ponto as horas registradas, a jornada planejada para cada dia e o saldo diário.
+- Corrigir registros de ponto com observação obrigatória; as alterações, o motivo e os valores anteriores ficam registrados na auditoria. Alterações históricas usam fluxo próprio e exigem justificativa.
+- Comparar nas tabelas de ponto as horas registradas, a jornada prevista de 8h nos dias úteis (4h no sábado) e o saldo diário.
 
-Os PDFs de ponto baixados pelo administrador na ficha do funcionário e pelo próprio funcionário no Histórico exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. Para CLT, o resumo contabiliza dias por turno, registros sem turno identificado e horas extras do período; para PJ, identifica o tipo de vínculo e totaliza as horas trabalhadas, sem exibir turno. A folha detalhada identifica o vínculo; CLT exibe o turno e o intervalo fixo, enquanto PJ exibe somente entrada, saída e horas computadas. A saída noturna CLT mostra a data correta quando atravessa a meia-noite. A ficha administrativa, PDF e Excel também comparam a jornada CLT prevista com o total marcado. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes. As telas usam navegação adaptada para celular, formulários em coluna e tabelas roláveis ou convertidas em cartões nos breakpoints móveis.
+Os PDFs de ponto baixados pelo administrador na ficha do funcionário e pelo próprio funcionário no Histórico exibem no cabeçalho a logo oficial da Kairo e o lockup próprio do KairoPont. Para CLT, mostram os horários habituais cadastrados, dias por horário, registros sem horário identificado e horas extras do período; também informam a previsão de quatro horas aos sábados sem intervalo. Para PJ, identificam o vínculo e totalizam as horas trabalhadas, sem exibir escala. A folha detalhada identifica o vínculo; CLT exibe o horário habitual mais próximo e o intervalo fixo ou marcado, enquanto PJ exibe entrada, saída e horas computadas. A ficha administrativa, PDF e Excel comparam a jornada prevista com o total marcado. As planilhas Excel incluem título, período, data de geração, cabeçalho estilizado, filtros e colunas dimensionadas para exibir datas e horários sem cortes.
+
+A identidade visual Kairo é mantida em celular, tablet e computador. Os temas claro e escuro usam os mesmos componentes, hierarquia, espaçamentos e interações; somente as cores mudam. O botão de tema fica acessível no cabeçalho sem exigir rolagem horizontal. O menu e os demais controles usam ícones lineares consistentes, sem emojis, e cada página tem um título principal, sem repetir o mesmo título em blocos consecutivos. Em telas móveis, o menu recolhe e as tabelas mantêm leitura sem alargar a página.
 
 Operações administrativas dependem do papel armazenado no banco. Novos perfis comuns só podem ser convidados pelo administrador; cadastros sem convite são recusados pelo banco.
 
@@ -81,9 +84,9 @@ Operações administrativas dependem do papel armazenado no banco. Novos perfis 
 
 ## Registro de ponto
 
-A interface apresenta a próxima etapa válida e impede cliques repetidos enquanto a solicitação está em andamento. A função SQL registrar_ponto confere se o usuário ativo está registrando o próprio ponto, valida a sequência e usa a data e a hora do servidor Supabase no fuso America/Sao_Paulo. O fluxo PJ aceita apenas entrada e saída, não atribui turno e calcula o tempo decorrido para o pagamento. No fluxo CLT, o almoço é fixo e calculado no relatório sem marcações extras nos dias úteis: 12h–13h no 1º turno, 19h–20h no 2º e 02h–03h no 3º (dia seguinte). Em dias sem almoço fixo, como o sábado, o funcionário pode marcar a pausa antes de seis horas; se o tempo efetivamente trabalhado passar de seis horas, é obrigatório registrar saída e retorno do almoço com pelo menos uma hora de intervalo antes da saída final.
+A interface apresenta a próxima etapa válida e impede cliques repetidos enquanto a solicitação está em andamento. A função SQL `registrar_ponto` confere se o usuário ativo está registrando o próprio ponto, valida a sequência e usa a data e a hora do servidor Supabase no fuso `America/Sao_Paulo`. O fluxo PJ aceita apenas entrada e saída, não atribui horário habitual e calcula o tempo decorrido para o pagamento. Para CLT, os horários de almoço fixos são 12h–13h nos horários de 06h e 08h, e 18h–19h no horário de 14h. Aos sábados, a previsão é de 4h contínuas, sem almoço fixo. Em dias CLT sem almoço fixo, o funcionário pode marcar uma pausa; se a jornada passar de seis horas, é obrigatório registrar saída e retorno do almoço com pelo menos uma hora de intervalo antes da saída final.
 
-Cada funcionário pode ter um registro por dia. O esquema preserva as colunas de almoço para os intervalos dinâmicos e compatibilidade; em dias CLT sem almoço fixo, a interface permite registrar a pausa antecipadamente e passa a exigir a marcação antes da saída quando o tempo trabalhado ultrapassa seis horas. O intervalo fixo CLT é calculado conforme o turno efetivamente classificado. Registros PJ não guardam turno.
+Cada funcionário pode ter um registro por dia. O esquema preserva as colunas de almoço para intervalos dinâmicos e compatibilidade; em dias CLT sem almoço fixo, a interface permite registrar a pausa antecipadamente e passa a exigir a marcação antes da saída quando o tempo trabalhado ultrapassa seis horas. O intervalo fixo CLT é calculado conforme o horário habitual mais próximo classificado para aquele registro. Registros PJ não guardam horário habitual.
 
 ## Dados e estrutura
 
@@ -91,7 +94,7 @@ As migrações criam as tabelas principais no esquema public:
 
 | Tabela | Dados armazenados | Proteção aplicada |
 | --- | --- | --- |
-| funcionarios | Perfil, vínculo com Auth, CPF, cargo, status, papel, admissão e escala semanal | Funcionário consulta o próprio perfil; admin pode consultar a equipe |
+| funcionarios | Perfil, vínculo com Auth, CPF, cargo, status, papel, admissão e lista de horários habituais CLT | Funcionário consulta o próprio perfil; admin pode consultar a equipe |
 | registros_ponto | Data de entrada, quatro marcações, horário efetivo e data de saída | Funcionário consulta os próprios registros; admin consulta a equipe |
 | documentos | Tipo, nome, caminho no Storage e período informado | Funcionário consulta os próprios metadados; admin consulta os autorizados |
 | auditoria | Ação administrativa, alvo e detalhes | Leitura limitada ao perfil admin |
@@ -164,6 +167,14 @@ As migrações devem ser aplicadas nesta ordem:
 15. supabase/migrations/20261013195909_require_meal_break_after_six_hours.sql
 16. supabase/migrations/20261013200129_holiday_calendar_and_admin_punch_deletion.sql
 17. supabase/migrations/20261015210151_enforce_active_employee_access_and_sp_dates.sql
+18. supabase/migrations/20261017184656_guard_stale_open_punches_and_index_foreign_keys.sql
+19. supabase/migrations/20261030174501_work_schedules_and_historical_punches.sql
+20. supabase/migrations/20261030175016_admin_punch_change_observations.sql
+21. supabase/migrations/20261030175515_classify_records_by_actual_schedule.sql
+22. supabase/migrations/20261030175611_saturday_hours_for_44_hour_schedule.sql
+23. supabase/migrations/20261030180121_saturday_shifts_four_hours.sql
+24. supabase/migrations/20261030181845_habitual_employee_schedules.sql
+25. supabase/migrations/20261030182814_standard_eight_hour_workdays.sql
 
 O projeto KairoPont registra as migrações listadas, com os buckets documentos (privado) e fotos-funcionarios (público). Não reaplique nem resete o banco de produção para seguir este guia.
 
@@ -171,11 +182,13 @@ As solicitações guardam separadamente o último dia de férias e a data de ret
 
 A função `vacation-decision-email` requer os secrets `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` (endereço verificado no Resend). Sem eles, a decisão é gravada, mas o envio falha e pode ser tentado novamente na fila administrativa. Convites e redefinições dependem do SMTP do Supabase Auth e da URL permitida `https://oc-mateus.github.io/KairoPont/definir-senha`. O formulário de recuperação envia o retorno para essa rota; se o evento `PASSWORD_RECOVERY` chega pelo endereço padrão do Site URL, o app também encaminha a sessão para a página de nova senha.
 
-Para perfis CLT existentes, o administrador precisa informar a data de admissão e a escala semanal em Funcionários, confirmando os dados com o RH; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível. Perfis PJ não usam escala de turno nem comparativo CLT.
+Para perfis CLT existentes, o administrador precisa informar a data de admissão e confirmar com o RH a lista de horários habituais em Funcionários; sem esses campos, férias não são calculadas e o comparativo de ponto não fica disponível. Perfis PJ não usam escala de turno nem comparativo CLT.
 
-Os horários esperados são arredondados à hora cheia mais próxima. Para calcular atrasos, o sistema compara a entrada com os horários cadastrados do funcionário e usa o início mais próximo. Se as entradas previstas forem 08h e 14h, uma marcação às 13h se associa a 14h e não conta como atraso.
+Cada perfil CLT guarda uma lista de horários habituais reutilizáveis, não um horário diferente para cada dia. Os presets atuais são 06h–15h com almoço 12h–13h, 08h–17h com almoço 12h–13h, e 14h–22h52 com almoço 18h–19h. As escalas antigas por dia continuam legíveis para compatibilidade; ao editar e salvar, são convertidas para a lista habitual.
 
-Na ficha do funcionário, administradores podem corrigir registros recentes dentro da janela de 96 horas e informam uma observação obrigatória, registrada na auditoria. Para correções históricas, a tela exige motivo e grava valores anteriores e novos na auditoria; inclusões antigas seguem o mesmo fluxo. A trava normal de 96 horas permanece ativa fora do fluxo administrativo auditado.
+A jornada esperada nos dias úteis é de 8h; aos sábados é de 4h, sem intervalo fixo, e domingo é folga. Os horários iniciais esperados são arredondados à hora cheia mais próxima. Para calcular atrasos e classificar o registro, o sistema compara a entrada com todos os horários do perfil e usa o início mais próximo. Se as entradas previstas forem 08h e 14h, uma marcação às 13h se associa a 14h e não conta como atraso. A saída registrada no terceiro horário é 22h52; a previsão continua sendo 8h, conforme a regra de jornada definida.
+
+Na ficha do funcionário, administradores podem corrigir registros recentes dentro da janela de 96 horas e informam uma observação obrigatória, registrada na auditoria junto dos valores anteriores e novos. Para correções ou inclusões históricas, a tela exige motivo e grava os dados auditados pelo fluxo específico; a trava normal de 96 horas permanece ativa fora desse fluxo.
 
 A migração também corrigiu o fuso de criação dos registros já existentes e mudou o padrão futuro para `now()`, para que a janela de 96 horas seja precisa no banco configurado em UTC.
 
@@ -196,7 +209,7 @@ Revisão atualizada em 17 de outubro de 2026. Confirme os itens abaixo antes de 
 2. **Proteção de senhas — pendente de configuração:** habilite no Supabase Auth a proteção contra senhas comprometidas e revise as regras de força de senha.
 3. **Conta administrativa de teste:** uma conta de teste foi provisionada em 7 de outubro de 2026. Troque ou remova suas credenciais antes de usar a aplicação com dados reais.
 4. **Convites e e-mail:** confira SMTP e URLs do Supabase Auth e configure `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` como secrets da Edge Function.
-5. **Dados de vínculo:** confira data de admissão e escala semanal de cada funcionário com o RH.
+5. **Dados de vínculo:** confira a data de admissão e os horários habituais de cada funcionário CLT com o RH.
 6. **Teste de aceitação sem dados reais:** percorra convite, definição de senha, login, isolamento entre usuários fictícios, upload e link assinado de documento, registro e correção de ponto, férias e e-mails de aprovação/recusa. Os testes automatizados atuais não substituem essa validação ponta a ponta.
 7. **Backups e retenção:** confirme que a retenção configurada no plano Supabase atende às necessidades da empresa; esse item não foi auditado.
 

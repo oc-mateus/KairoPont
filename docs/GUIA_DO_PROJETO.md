@@ -206,9 +206,9 @@ A URL pública da aplicação é https://oc-mateus.github.io/KairoPont/. O READM
 
 ## Pendências para entrada em operação
 
-Revisão atualizada em 17 de outubro de 2026. Confirme os itens abaixo antes de usar a aplicação com dados reais; os estados de serviços externos podem mudar sem alteração no repositório.
+Revisão atualizada em 5 de novembro de 2026. Confirme os itens abaixo antes de usar a aplicação com dados reais; os estados de serviços externos podem mudar sem alteração no repositório.
 
-1. **Storage de documentos — pendente:** o bucket `documentos` está privado, mas o limite de 10 MB e os MIME types permitidos ainda precisam ser aplicados no servidor. Execute `npm run configure:document-bucket` com `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` fornecidos somente no ambiente local seguro. A chave privilegiada não deve ir para arquivos `.env` do Vite nem para o Git.
+1. **Storage — pendente:** os buckets precisam receber limites e MIME types no servidor. Execute `npm run configure:storage` com `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` fornecidos somente no ambiente local seguro. O script mantém documentos privados (10 MB; PDF, JPEG, PNG ou WebP) e fotos públicas (5 MB; JPEG, PNG ou WebP). A chave privilegiada não deve ir para arquivos `.env` do Vite nem para o Git.
 2. **Proteção de senhas — pendente de configuração:** habilite no Supabase Auth a proteção contra senhas comprometidas e revise as regras de força de senha.
 3. **Conta administrativa de teste:** uma conta de teste foi provisionada em 7 de outubro de 2026. Troque ou remova suas credenciais antes de usar a aplicação com dados reais.
 4. **Convites e e-mail:** confira SMTP e URLs do Supabase Auth e configure `RESEND_API_KEY` e `FERIAS_EMAIL_FROM` como secrets da Edge Function.

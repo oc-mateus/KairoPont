@@ -14,14 +14,15 @@ export default function AdminAudit() {
     try {
       const { data, error } = await supabase
         .from('auditoria')
-        .select('*, admin:admin_id(nome), alvo:alvo_id(nome)')
+        .select('id,created_at,acao,detalhes,admin:admin_id(nome),alvo:alvo_id(nome)')
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
       setLogs(data || []);
     } catch (err) {
-      toast.error('Erro ao carregar auditoria: ' + err.message);
+      console.error('Erro ao carregar auditoria:', err);
+      toast.error('Não foi possível carregar o histórico de auditoria. Tente novamente.');
     } finally {
       setLoading(false);
     }

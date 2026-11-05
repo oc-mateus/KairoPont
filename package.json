@@ -7,6 +7,7 @@
     "dev": "vite",
     "test": "node --test",
     "configure:document-bucket": "node scripts/configure-document-bucket.mjs",
+    "configure:storage": "node scripts/configure-document-bucket.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

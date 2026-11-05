@@ -12,7 +12,7 @@
 
 ---
 
-O KairoPont organiza o registro de jornada, a consulta de históricos e a gestão de funcionários CLT e PJ. A aplicação web fica no GitHub Pages; autenticação, banco de dados e arquivos usam o Supabase. O [Guia do Projeto](docs/GUIA_DO_PROJETO.md) reúne os fluxos, regras de negócio, estrutura técnica e procedimentos de operação.
+O KairoPont organiza o registro de jornada, a consulta de históricos e a gestão de funcionários CLT e PJ. A aplicação web fica no GitHub Pages; autenticação, banco de dados e arquivos usam o Supabase. O [Guia do Projeto](docs/GUIA_DO_PROJETO.md) reúne os fluxos, regras de negócio, estrutura técnica e procedimentos de operação. A preparação para pilotos comerciais está documentada em [Comercialização e operação](docs/COMERCIALIZACAO.md).
 
 ## Como funciona
 
@@ -54,7 +54,7 @@ O cadastro cria perfis de funcionário. A atribuição do papel de administrador
 
 - As políticas RLS limitam funcionários aos próprios dados; ações administrativas exigem perfil de administrador.
 - O bucket `documentos` é privado. O bucket de fotos de perfil é público para exibir avatares.
-- A tela valida formato e tamanho de arquivo; configure o bucket privado com `npm run configure:document-bucket` para impor esses limites também no servidor. Use `SUPABASE_SERVICE_ROLE_KEY` somente como variável de ambiente local segura.
+- A tela valida formato e tamanho de arquivo; execute `npm run configure:storage` para impor limites e tipos também no servidor. Forneça `SUPABASE_SERVICE_ROLE_KEY` apenas no ambiente local seguro do terminal.
 - O acesso é feito com e-mail e senha, com seleção do vínculo CLT/PJ validada contra o cadastro do funcionário. Administradores podem usar qualquer opção. O CPF é solicitado no cadastro e usado para identificar o funcionário, não para entrar.
 
 O site está publicado. A URL padrão do Supabase Auth e o endereço permitido para redefinição de senha usam `https://oc-mateus.github.io/KairoPont/` e `https://oc-mateus.github.io/KairoPont/definir-senha`. Antes do uso operacional, revise as credenciais da conta administrativa de teste, confirme a entrega de e-mails do Auth e aplique a configuração de limite e tipos do Storage.

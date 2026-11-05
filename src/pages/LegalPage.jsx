@@ -61,8 +61,8 @@ function TermsOfUse() {
       <h2>Disponibilidade e mudanças</h2>
       <p>Recursos podem ser ajustados para manter a operação e a segurança do sistema. O aplicativo depende de conexão com a internet e de serviços externos de hospedagem, autenticação, armazenamento e envio de e-mails.</p>
 
-      <h2>Sem compras ou reembolsos</h2>
-      <p>O KairoPont não oferece planos pagos, venda de produtos ou cobrança dentro do aplicativo. Por isso, não há uma política de reembolso aplicável a este portal.</p>
+      <h2>Condições de contratação</h2>
+      <p>O acesso comercial ao KairoPont depende de proposta e contrato próprios, que devem apresentar o escopo do serviço, os valores, as condições de pagamento, o suporte e as regras de tratamento e encerramento dos dados antes de qualquer contratação.</p>
 
       <p className="legal-note">Estes termos descrevem o uso do aplicativo e não substituem políticas internas, acordos de trabalho ou direitos previstos em lei.</p>
     </>

@@ -24,8 +24,8 @@ function addIsoDays(dateValue, days) {
 function SaleChoiceFields({ choice, onChoiceChange, days, onDaysChange, disabled = false }) {
   return <fieldset className="vacation-choice-group" disabled={disabled}>
     <legend>Venda de até 10 dias (abono)</legend>
-    <label className="vacation-choice-option"><input type="checkbox" checked={choice === 'yes'} onChange={() => onChoiceChange('yes')} />Sim, pretendo vender parte das férias</label>
-    <label className="vacation-choice-option"><input type="checkbox" checked={choice === 'no'} onChange={() => onChoiceChange('no')} />Não pretendo vender férias</label>
+    <label className="vacation-choice-option"><input type="radio" name="vacation-sale-choice" value="yes" checked={choice === 'yes'} onChange={() => onChoiceChange('yes')} />Sim, pretendo vender parte das férias</label>
+    <label className="vacation-choice-option"><input type="radio" name="vacation-sale-choice" value="no" checked={choice === 'no'} onChange={() => onChoiceChange('no')} />Não pretendo vender férias</label>
     {choice === 'yes' && <label className="form-group">Quantidade de dias para venda<select className="form-input" value={days} onChange={(event) => onDaysChange(event.target.value)}>{Array.from({ length: 10 }, (_, index) => index + 1).map((day) => <option key={day} value={day}>{day} {day === 1 ? 'dia' : 'dias'}</option>)}</select></label>}
   </fieldset>;
 }
@@ -60,7 +60,7 @@ export default function VacationsPage() {
       const [periodResult, requestResult, notificationResult] = await Promise.all([
         periodQuery,
         requestQuery,
-        isAdmin || !profile?.id ? Promise.resolve({ data: [], error: null }) : supabase.from('notificacoes').select('*').eq('funcionario_id', profile.id).order('created_at', { ascending: false }),
+        isAdmin || !profile?.id ? Promise.resolve({ data: [], error: null }) : supabase.from('notificacoes').select('id,tipo,titulo,mensagem,lida_em,created_at').eq('funcionario_id', profile.id).order('created_at', { ascending: false }),
       ]);
       if (periodResult.error) throw periodResult.error;
       if (requestResult.error) throw requestResult.error;

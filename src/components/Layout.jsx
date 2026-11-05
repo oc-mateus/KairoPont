@@ -28,6 +28,7 @@ const adminNav = [
   { id: 'admin-dashboard', label: 'Painel Admin', icon: DashboardIcon, path: '/admin' },
   { id: 'admin-funcionarios', label: 'Funcionários', icon: UsersIcon, path: '/admin/funcionarios' },
   { id: 'admin-calendario', label: 'Calendário de feriados', icon: CalendarIcon, path: '/admin/calendario' },
+  { id: 'admin-auditoria', label: 'Auditoria', icon: ChartIcon, path: '/admin/auditoria' },
   { id: 'admin-ferias', label: 'Férias', icon: VacationIcon, path: '/ferias' },
 ];
 

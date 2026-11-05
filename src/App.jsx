@@ -1,23 +1,23 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import { Spinner } from './components/ui';
 
-// Pages
-import LoginPage from './pages/LoginPage';
-import PunchPage from './pages/PunchPage';
-import HistoryPage from './pages/HistoryPage';
-import DocumentsPage from './pages/DocumentsPage';
-import ProfilePage from './pages/ProfilePage';
-import VacationsPage from './pages/VacationsPage';
-import RecoverPasswordPage from './pages/RecoverPasswordPage';
-import SetPasswordPage from './pages/SetPasswordPage';
-import LegalPage from './pages/LegalPage';
-
-// Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminEmployees from './pages/admin/AdminEmployees';
-import AdminCalendar from './pages/admin/AdminCalendar';
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const PunchPage = lazy(() => import('./pages/PunchPage'));
+const HistoryPage = lazy(() => import('./pages/HistoryPage'));
+const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const VacationsPage = lazy(() => import('./pages/VacationsPage'));
+const RecoverPasswordPage = lazy(() => import('./pages/RecoverPasswordPage'));
+const SetPasswordPage = lazy(() => import('./pages/SetPasswordPage'));
+const LegalPage = lazy(() => import('./pages/LegalPage'));
+const MarketingPage = lazy(() => import('./pages/MarketingPage'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminEmployees = lazy(() => import('./pages/admin/AdminEmployees'));
+const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
+const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
 
 function PrivateRoute({ children, requireAdmin = false, requireClt = false }) {
   const { session, profile, loading, signOut } = useAuth();
@@ -77,26 +77,30 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/privacidade" element={<LegalPage type="privacy" />} />
-      <Route path="/termos" element={<LegalPage type="terms" />} />
-      <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-      <Route path="/recuperar-senha" element={<RecoverPasswordPage />} />
-      <Route path="/definir-senha" element={<SetPasswordPage />} />
+    <Suspense fallback={<div className="flex flex-center" style={{ minHeight: '100vh' }}><Spinner size="lg" /></div>}>
+      <Routes>
+        <Route path="/" element={<MarketingPage />} />
+        <Route path="/privacidade" element={<LegalPage type="privacy" />} />
+        <Route path="/termos" element={<LegalPage type="terms" />} />
+        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+        <Route path="/recuperar-senha" element={<RecoverPasswordPage />} />
+        <Route path="/definir-senha" element={<SetPasswordPage />} />
 
-      {/* Rotas de Funcionário */}
-      <Route path="/ponto" element={<PrivateRoute><PunchPage /></PrivateRoute>} />
-      <Route path="/historico" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
-      <Route path="/documentos" element={<PrivateRoute requireClt><DocumentsPage /></PrivateRoute>} />
-      <Route path="/perfil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
-      <Route path="/ferias" element={<PrivateRoute requireClt><VacationsPage /></PrivateRoute>} />
+        {/* Rotas de Funcionário */}
+        <Route path="/ponto" element={<PrivateRoute><PunchPage /></PrivateRoute>} />
+        <Route path="/historico" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
+        <Route path="/documentos" element={<PrivateRoute requireClt><DocumentsPage /></PrivateRoute>} />
+        <Route path="/perfil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+        <Route path="/ferias" element={<PrivateRoute requireClt><VacationsPage /></PrivateRoute>} />
 
-      {/* Rotas de Administração */}
-      <Route path="/admin" element={<PrivateRoute requireAdmin><AdminDashboard /></PrivateRoute>} />
-      <Route path="/admin/funcionarios" element={<PrivateRoute requireAdmin><AdminEmployees /></PrivateRoute>} />
-      <Route path="/admin/calendario" element={<PrivateRoute requireAdmin><AdminCalendar /></PrivateRoute>} />
+        {/* Rotas de Administração */}
+        <Route path="/admin" element={<PrivateRoute requireAdmin><AdminDashboard /></PrivateRoute>} />
+        <Route path="/admin/funcionarios" element={<PrivateRoute requireAdmin><AdminEmployees /></PrivateRoute>} />
+        <Route path="/admin/calendario" element={<PrivateRoute requireAdmin><AdminCalendar /></PrivateRoute>} />
+        <Route path="/admin/auditoria" element={<PrivateRoute requireAdmin><AdminAudit /></PrivateRoute>} />
 
-      <Route path="*" element={<Navigate to="/ponto" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/ponto" replace />} />
+      </Routes>
+    </Suspense>
   );
 }

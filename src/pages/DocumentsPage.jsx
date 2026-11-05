@@ -34,7 +34,7 @@ export default function DocumentsPage() {
     try {
       const { data, error } = await supabase
         .from('documentos')
-        .select('*')
+        .select('id,tipo,nome_arquivo,caminho_storage,periodo_inicio,periodo_fim,created_at')
         .eq('funcionario_id', profile.id)
         .order('created_at', { ascending: false });
 

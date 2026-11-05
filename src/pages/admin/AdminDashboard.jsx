@@ -149,7 +149,7 @@ export default function AdminDashboard() {
   const [employees, setEmployees] = useState([]);
   const [records, setRecords] = useState([]);
   const [todayPunches, setTodayPunches] = useState([]);
-  const [documents, setDocuments] = useState([]);
+  const [documentsCount, setDocumentsCount] = useState(0);
   const [vacations, setVacations] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -172,13 +172,13 @@ export default function AdminDashboard() {
       setLoading(true);
       try {
         const [employeesResult, documentsResult] = await Promise.all([
-          supabase.from('funcionarios').select('*').order('nome'),
-          supabase.from('documentos').select('*').order('created_at', { ascending: false }),
+          supabase.from('funcionarios').select('id,nome,ativo,role,tipo_contrato,data_admissao,escala_trabalho').order('nome'),
+          supabase.from('documentos').select('id', { count: 'exact', head: true }),
         ]);
         if (employeesResult.error) throw employeesResult.error;
         if (documentsResult.error) throw documentsResult.error;
         setEmployees(employeesResult.data || []);
-        setDocuments(documentsResult.data || []);
+        setDocumentsCount(documentsResult.count || 0);
       } catch (error) {
         console.error('Erro ao carregar painel administrativo:', error);
       } finally {
@@ -202,7 +202,7 @@ export default function AdminDashboard() {
       }
       try {
         const [periodRecords, vacationsResult, holidaysResult, todayRows] = await Promise.all([
-          fetchAllRows(() => supabase.from('registros_ponto').select('*').gte('data', periodStart).lte('data', periodEnd).order('data', { ascending: false }).order('funcionario_id')),
+          fetchAllRows(() => supabase.from('registros_ponto').select('id,funcionario_id,data,entrada,saida_almoco,retorno_almoco,saida,saida_data,turno_trabalhado').gte('data', periodStart).lte('data', periodEnd).order('data', { ascending: false }).order('funcionario_id')),
           supabase.from('solicitacoes_ferias').select('funcionario_id,data_inicio,data_retorno,data_fim,status').eq('status', 'aprovada').lt('data_inicio', today).gte('data_retorno', periodStart),
           supabase.from('feriados').select('data').gte('data', periodStart).lte('data', periodEnd),
           fetchAllRows(() => supabase.from('registros_ponto').select('funcionario_id').eq('data', today).order('funcionario_id')),
@@ -262,7 +262,7 @@ export default function AdminDashboard() {
       <div className="admin-summary-grid">
         <Link className="admin-summary-card" to="/admin/funcionarios"><span className="admin-summary-icon"><UsersIcon /></span><span className="admin-summary-content"><span>Funcionários CLT ativos</span><strong>{activeCltEmployees.length}<small> de {cltEmployees.length}</small></strong></span><ArrowIcon /></Link>
         <div className="admin-summary-card"><span className="admin-summary-icon"><ClockIcon /></span><span className="admin-summary-content"><span>Registros CLT hoje</span><strong>{todayRecords}<small> marcações</small></strong></span></div>
-        <div className="admin-summary-card"><span className="admin-summary-icon"><FileIcon /></span><span className="admin-summary-content"><span>Documentos enviados</span><strong>{documents.length}<small> arquivos</small></strong></span></div>
+        <div className="admin-summary-card"><span className="admin-summary-icon"><FileIcon /></span><span className="admin-summary-content"><span>Documentos enviados</span><strong>{documentsCount}<small> arquivos</small></strong></span></div>
       </div>
 
       <section className="admin-people-section attendance-insights-section">

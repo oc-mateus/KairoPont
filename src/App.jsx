@@ -12,6 +12,7 @@ import ProfilePage from './pages/ProfilePage';
 import VacationsPage from './pages/VacationsPage';
 import RecoverPasswordPage from './pages/RecoverPasswordPage';
 import SetPasswordPage from './pages/SetPasswordPage';
+import LegalPage from './pages/LegalPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -71,12 +72,14 @@ export default function App() {
   const { passwordRecoveryPending } = useAuth();
   const location = useLocation();
 
-  if (passwordRecoveryPending && location.pathname !== '/definir-senha') {
+  if (passwordRecoveryPending && !['/definir-senha', '/privacidade', '/termos'].includes(location.pathname)) {
     return <Navigate to="/definir-senha" replace />;
   }
 
   return (
     <Routes>
+      <Route path="/privacidade" element={<LegalPage type="privacy" />} />
+      <Route path="/termos" element={<LegalPage type="terms" />} />
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/recuperar-senha" element={<RecoverPasswordPage />} />
       <Route path="/definir-senha" element={<SetPasswordPage />} />

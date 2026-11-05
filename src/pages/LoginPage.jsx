@@ -6,6 +6,7 @@ import { Spinner } from '../components/ui';
 import InstallAppButton from '../components/InstallAppButton';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
+import LegalLinks from '../components/LegalLinks';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -86,6 +87,7 @@ export default function LoginPage() {
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>{loading ? <Spinner /> : 'Entrar'}</button>
           </form>
           <p className="login-subtitle" style={{ marginTop: 24 }}>Contas criadas exclusivamente pelo administrador. Se ainda não recebeu um convite, solicite acesso à equipe administrativa.</p>
+          <LegalLinks className="login-legal-links" />
         </div>
       </div>
     </div>

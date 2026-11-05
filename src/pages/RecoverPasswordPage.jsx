@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Spinner } from '../components/ui';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
+import LegalLinks from '../components/LegalLinks';
 
 export default function RecoverPasswordPage() {
   const [email, setEmail] = useState('');
@@ -46,6 +47,7 @@ export default function RecoverPasswordPage() {
         </form>
         <Link className="password-recovery-back" to="/login">Voltar para o login</Link>
       </>}
+      <LegalLinks className="login-legal-links" />
     </div></div>
   </div>;
 }

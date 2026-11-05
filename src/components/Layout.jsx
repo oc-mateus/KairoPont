@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from './ui';
 import InstallAppButton from './InstallAppButton';
+import LegalLinks from './LegalLinks';
 
 const ClockIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
 const ChartIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 17v-4"/><path d="M12 17V9"/><path d="M17 17v-8"/></svg>;
@@ -54,6 +55,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="app-layout">
+      <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
       {/* Overlay para mobile */}
       <div
         className={`sidebar-overlay ${sidebarOpen ? 'show' : ''}`}
@@ -159,9 +161,10 @@ export default function Layout({ children }) {
             <InstallAppButton compact />
           </div>
         </header>
-        <main className="app-content">
+        <main id="main-content" className="app-content" tabIndex={-1}>
           {children}
         </main>
+        <LegalLinks className="app-legal-links" />
       </div>
     </div>
   );

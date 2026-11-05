@@ -34,7 +34,7 @@ async function loadBrandImage(fileName) {
   });
 }
 
-export async function downloadTimesheetXlsx({ records, title, period, filename, calcDailyTotal, lunchLabel = null, extraColumns = [], summary = null }) {
+export async function downloadTimesheetXlsx({ records, title, period, filename, calcDailyTotal, lunchLabel = null, scheduleColumn = null, extraColumns = [], summary = null }) {
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Kairo Automações';
@@ -45,8 +45,10 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
     views: [{ state: 'frozen', ySplit: 7, showGridLines: false }],
     pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
+  const scheduleColumns = scheduleColumn ? [scheduleColumn] : [];
   sheet.columns = [
     { key: 'date', width: 16 },
+    ...scheduleColumns.map((column) => ({ key: column.key, width: column.width || 20 })),
     { key: 'entry', width: 17 },
     { key: 'lunch', width: 25 },
     { key: 'exit', width: 17 },
@@ -54,7 +56,12 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
     { key: 'status', width: 16 },
     ...extraColumns.map((column) => ({ key: column.key, width: column.width || 17 })),
   ];
-  const baseColumnCount = 6;
+  const baseColumnCount = 6 + scheduleColumns.length;
+  const entryColumnIndex = 2 + scheduleColumns.length;
+  const lunchColumnIndex = entryColumnIndex + 1;
+  const exitColumnIndex = lunchColumnIndex + 1;
+  const totalColumnIndex = exitColumnIndex + 1;
+  const statusColumnIndex = totalColumnIndex + 1;
   const finalColumn = String.fromCharCode(64 + baseColumnCount + extraColumns.length);
 
   const kairoLogoId = workbook.addImage({
@@ -99,7 +106,7 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
   sheet.getRow(6).font = { name: 'Aptos', size: 9, color: { argb: 'FF66746B' }, italic: true };
   sheet.getRow(6).alignment = { vertical: 'middle', indent: 1 };
 
-  const headers = ['Data', 'Entrada', 'Almoço fixo', 'Saída', 'Horas computadas', 'Status', ...extraColumns.map((column) => column.header)];
+  const headers = ['Data', ...scheduleColumns.map((column) => column.header), 'Entrada', 'Almoço fixo', 'Saída', 'Horas computadas', 'Status', ...extraColumns.map((column) => column.header)];
   const header = sheet.addRow(headers);
   header.height = 26;
   header.eachCell((cell) => {
@@ -112,6 +119,7 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
   records.forEach((record, index) => {
     const row = sheet.addRow([
       excelDate(record.data),
+      ...scheduleColumns.map((column) => column.value(record)),
       excelTime(record.entrada),
       lunchLabel ? lunchLabel(record) : (record.saida_almoco && record.retorno_almoco ? `${excelTime(record.saida_almoco)}–${excelTime(record.retorno_almoco)}` : '—'),
       excelTime(record.saida),
@@ -129,9 +137,9 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
       }
     });
     row.getCell(1).numFmt = 'dd/mm/yyyy';
-    [2, 4].forEach((column) => { row.getCell(column).numFmt = 'hh:mm:ss'; });
-    row.getCell(5).alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
-    const statusCell = row.getCell(6);
+    [entryColumnIndex, exitColumnIndex].forEach((column) => { row.getCell(column).numFmt = 'hh:mm:ss'; });
+    row.getCell(totalColumnIndex).alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+    const statusCell = row.getCell(statusColumnIndex);
     statusCell.font = {
       name: 'Aptos',
       size: 10,
@@ -151,9 +159,9 @@ export async function downloadTimesheetXlsx({ records, title, period, filename, 
     summaryRow.getCell(1).value = summary.label;
     summaryRow.getCell(1).font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FF123D27' } };
     summaryRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
-    summaryRow.getCell(5).value = summary.value;
-    summaryRow.getCell(5).font = { name: 'Aptos', size: 11, bold: true, color: { argb: 'FF123D27' } };
-    summaryRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
+    summaryRow.getCell(totalColumnIndex).value = summary.value;
+    summaryRow.getCell(totalColumnIndex).font = { name: 'Aptos', size: 11, bold: true, color: { argb: 'FF123D27' } };
+    summaryRow.getCell(totalColumnIndex).alignment = { vertical: 'middle', horizontal: 'center' };
     summaryRow.eachCell((cell) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7F4EA' } };
       cell.border = { top: { style: 'medium', color: { argb: 'FF218447' } } };

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { Spinner } from '../components/ui';
+import LegalLinks from '../components/LegalLinks';
 
 export default function SetPasswordPage() {
   const { session, loading: authLoading, clearPasswordRecovery } = useAuth();
@@ -44,6 +45,7 @@ export default function SetPasswordPage() {
         <p className="login-subtitle">Este link expirou, já foi usado ou não foi aberto no mesmo navegador. Solicite um novo link para redefinir a senha.</p>
         <button className="btn btn-primary btn-block btn-lg" type="button" onClick={() => navigate('/recuperar-senha')}>Solicitar novo link</button>
       </>}
+      <LegalLinks className="login-legal-links" />
     </div></div>
   </div>;
 }

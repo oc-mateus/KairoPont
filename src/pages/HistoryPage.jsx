@@ -66,7 +66,7 @@ export default function HistoryPage() {
         .eq('funcionario_id', profile.id)
         .gte('data', start)
         .lte('data', end)
-        .order('data', { ascending: false });
+        .order('data', { ascending: true });
 
       if (error) throw error;
       setRecords(data || []);
@@ -141,8 +141,9 @@ export default function HistoryPage() {
       // Table
       const tableData = records.map(r => [
         formatDate(r.data + 'T00:00:00'),
+        ...(!isPj ? [shiftFor(r)] : []),
         formatTime(r.entrada),
-        ...(!isPj ? [shiftFor(r), lunchFor(r)] : []),
+        ...(!isPj ? [lunchFor(r)] : []),
         `${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}`,
         dailyTotal(r),
         r.saida ? 'Completo' : 'Incompleto',
@@ -150,7 +151,7 @@ export default function HistoryPage() {
 
       autoTable(doc, {
         startY: tableStart,
-        head: [[...(isPj ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Horário', 'Intervalo de almoço']), 'Saída', 'Horas computadas', 'Status']],
+        head: [[...(isPj ? ['Data', 'Entrada'] : ['Data', 'Horário', 'Entrada', 'Intervalo de almoço']), 'Saída', 'Horas computadas', 'Status']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -203,10 +204,10 @@ export default function HistoryPage() {
         filename: `ponto_${profile.nome.replace(/\s+/g, '_')}_${start}_${end}.xlsx`,
         calcDailyTotal: dailyTotal,
         lunchLabel: isPj ? null : lunchFor,
+        scheduleColumn: isPj ? null : { key: 'shift', header: 'Horário', width: 20, value: shiftFor },
         summary: isPj ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(pjPeriodMinutes) } : null,
         extraColumns: [
           { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => isPj ? 'PJ' : 'CLT' },
-          ...(!isPj ? [{ key: 'shift', header: 'Horário registrado', width: 20, value: shiftFor }] : []),
           { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
         ],
       });
@@ -226,10 +227,10 @@ export default function HistoryPage() {
       md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horários habituais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n`;
       md += `**Gerado em:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`;
-      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|------|---------|-------|------------------|--------|\n` : `| Data | Entrada | Horário | Almoço fixo | Saída | Horas computadas | Status |\n|------|---------|--------|-------------|-------|-------|--------|\n`;
+      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|------|---------|-------|------------------|--------|\n` : `| Data | Horário | Entrada | Almoço fixo | Saída | Horas computadas | Status |\n|------|--------|---------|-------------|-------|-------|--------|\n`;
 
       records.forEach(r => {
-        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n`;
+        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${shiftFor(r)} | ${formatTime(r.entrada)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n`;
       });
 
       const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
@@ -251,10 +252,10 @@ export default function HistoryPage() {
       let md = `## Relatório de Ponto - ${profile.nome}\n`;
       md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horários habituais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n\n`;
-      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|---|---|---|---|---|\n` : `| Data | Entrada | Horário | Almoço fixo | Saída | Horas computadas | Status |\n|---|---|---|---|---|---|---|\n`;
+      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|---|---|---|---|---|\n` : `| Data | Horário | Entrada | Almoço fixo | Saída | Horas computadas | Status |\n|---|---|---|---|---|---|---|\n`;
 
       records.forEach(r => {
-        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${shiftFor(r)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n`;
+        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${shiftFor(r)} | ${formatTime(r.entrada)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n`;
       });
 
       await navigator.clipboard.writeText(md);
@@ -344,8 +345,8 @@ export default function HistoryPage() {
               <thead>
                 <tr>
                   <th>Data</th>
+                  {!isPj && <th>Horário</th>}
                   <th>Entrada</th>
-                  {!isPj && <th>Horário do dia</th>}
                   {!isPj && <th>Intervalo de almoço</th>}
                   <th>Saída</th>
                   <th>Horas computadas</th>
@@ -356,8 +357,8 @@ export default function HistoryPage() {
                 {records.map(r => (
                   <tr key={r.id}>
                     <td>{formatDate(r.data + 'T00:00:00')}</td>
-                    <td>{formatTime(r.entrada)}</td>
                     {!isPj && <td>{shiftFor(r)}</td>}
+                    <td>{formatTime(r.entrada)}</td>
                     {!isPj && <td>{lunchFor(r)}</td>}
                     <td>{formatTime(r.saida)}{r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}</td>
                     <td><strong>{dailyTotal(r)}</strong></td>
@@ -380,14 +381,14 @@ export default function HistoryPage() {
                   <span className="table-card-label">Data</span>
                   <span className="table-card-value">{formatDate(r.data + 'T00:00:00')}</span>
                 </div>
+                {!isPj && <div className="table-card-row">
+                  <span className="table-card-label">Horário</span>
+                  <span className="table-card-value">{shiftFor(r)}</span>
+                </div>}
                 <div className="table-card-row">
                   <span className="table-card-label">Entrada</span>
                   <span className="table-card-value">{formatTime(r.entrada)}</span>
                 </div>
-                {!isPj && <div className="table-card-row">
-                  <span className="table-card-label">Horário do dia</span>
-                  <span className="table-card-value">{shiftFor(r)}</span>
-                </div>}
                 {!isPj && <div className="table-card-row">
                   <span className="table-card-label">Intervalo de almoço</span>
                   <span className="table-card-value">{lunchFor(r)}</span>

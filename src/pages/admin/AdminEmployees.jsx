@@ -363,7 +363,7 @@ export default function AdminEmployees() {
       const { data, error: fetchError } = await supabase.from('registros_ponto').select('*').eq('id', savedId).single();
       if (fetchError) throw fetchError;
       setRecords((current) => creatingPunch
-        ? [...current, data].sort((a, b) => b.data.localeCompare(a.data))
+        ? [...current, data].sort((a, b) => a.data.localeCompare(b.data))
         : current.map((record) => record.id === editingPunchId ? data : record));
       setEditingPunchId(null);
       setCreatingPunch(false);
@@ -420,7 +420,7 @@ export default function AdminEmployees() {
           if (syncError) throw syncError;
         }
         const [employeeRecords, employeeDocuments, employeeCycles, employeeVacations, calendarDays] = await Promise.all([
-          hasValidRange ? fetchAllRows(() => supabase.from('registros_ponto').select('*').eq('funcionario_id', selectedEmp.id).gte('data', range.start).lte('data', range.end).order('data', { ascending: false })) : Promise.resolve([]),
+          hasValidRange ? fetchAllRows(() => supabase.from('registros_ponto').select('*').eq('funcionario_id', selectedEmp.id).gte('data', range.start).lte('data', range.end).order('data', { ascending: true })) : Promise.resolve([]),
           fetchAllRows(() => supabase.from('documentos').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
           isPj ? Promise.resolve([]) : fetchAllRows(() => supabase.from('periodos_aquisitivos_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('periodo_inicio', { ascending: false })),
           isPj ? Promise.resolve([]) : fetchAllRows(() => supabase.from('solicitacoes_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
@@ -480,10 +480,10 @@ export default function AdminEmployees() {
         filename: `ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.xlsx`,
         calcDailyTotal: employeeDailyTotal,
         lunchLabel: selectedEmp.tipo_contrato === 'pj' ? null : (record) => getLunchLabelForRecord(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)),
+        scheduleColumn: selectedEmp.tipo_contrato === 'pj' ? null : { key: 'shift', header: 'Horário', width: 20, value: (record) => getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)) },
         summary: selectedEmp.tipo_contrato === 'pj' ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(employeePeriodMinutes) } : null,
         extraColumns: [
           { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT' },
-          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [{ key: 'shift', header: 'Horário registrado', width: 20, value: (record) => getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)) }]),
           { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
           ...(selectedEmp.tipo_contrato === 'pj' ? [] : [
             { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).expected },
@@ -553,10 +553,10 @@ export default function AdminEmployees() {
       }
       autoTable(pdf, {
         startY: reportStart,
-        head: [[...(selectedEmp.tipo_contrato === 'pj' ? ['Data', 'Entrada'] : ['Data', 'Entrada', 'Horário', 'Intervalo de almoço']), 'Saída', 'Saída em', 'Horas computadas', ...(selectedEmp.tipo_contrato === 'pj' ? [] : ['Previsto', 'Saldo']), 'Status']],
+        head: [[...(selectedEmp.tipo_contrato === 'pj' ? ['Data', 'Entrada'] : ['Data', 'Horário', 'Entrada', 'Intervalo de almoço']), 'Saída', 'Saída em', 'Horas computadas', ...(selectedEmp.tipo_contrato === 'pj' ? [] : ['Previsto', 'Saldo']), 'Status']],
         body: records.map((record) => [
-          formatDate(`${record.data}T12:00:00`), formatTime(record.entrada),
-          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), getLunchLabelForRecord(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada))]),
+          formatDate(`${record.data}T12:00:00`),
+          ...(selectedEmp.tipo_contrato === 'pj' ? [formatTime(record.entrada)] : [getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), formatTime(record.entrada), getLunchLabelForRecord(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada))]),
           formatTime(record.saida), record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia', employeeDailyTotal(record),
           ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).expected, getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).balance]),
           record.saida ? 'Completo' : 'Incompleto',
@@ -727,7 +727,7 @@ export default function AdminEmployees() {
                     </>;
                   })()}
                 </form>}
-                <div className="table-container"><table className="table"><thead><tr><th>Data</th><th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Horário do dia</th><th>Intervalo de almoço</th></>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ações</th></tr></thead><tbody>{records.map((record) => { const isHoliday = holidays.some((holiday) => holiday.data === record.data); const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho, isHoliday); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}{isHoliday && <div className="employee-punch-locked">Feriado</div>}</td><td>{formatTime(record.entrada)}</td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{getShiftLabel(shiftId)}</td><td>{getLunchLabelForRecord(record, shiftId)}</td></>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td><div className="employee-punch-actions"><button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Corrigir horários</button><button className="btn btn-danger btn-sm" onClick={() => setPunchToDelete(record)}>Excluir</button></div></td></tr>; })}</tbody></table></div>
+                <div className="table-container"><table className="table"><thead><tr><th>Data</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Horário do dia</th>}<th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Intervalo de almoço</th>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ações</th></tr></thead><tbody>{records.map((record) => { const isHoliday = holidays.some((holiday) => holiday.data === record.data); const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho, isHoliday); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}{isHoliday && <div className="employee-punch-locked">Feriado</div>}</td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getShiftLabel(shiftId)}</td>}<td>{formatTime(record.entrada)}</td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getLunchLabelForRecord(record, shiftId)}</td>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td><div className="employee-punch-actions"><button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Corrigir horários</button><button className="btn btn-danger btn-sm" onClick={() => setPunchToDelete(record)}>Excluir</button></div></td></tr>; })}</tbody></table></div>
               </>
             ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
           </section>

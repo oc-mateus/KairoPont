@@ -5,6 +5,10 @@ import { supabase } from '../lib/supabase';
 import { formatDateTime } from '../lib/utils';
 import { Spinner, EmptyState, Badge, Modal } from '../components/ui';
 
+function UploadDocumentIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M12 18v-6m-3 3 3-3 3 3" /></svg>;
+}
+
 const DOC_TYPES = [
   { value: 'atestado', label: 'Atestado Médico' },
   { value: 'declaracao_horas', label: 'Declaração de Horas' },
@@ -145,7 +149,7 @@ export default function DocumentsPage() {
         </div>
         <div className="page-header-actions">
           <button className="btn btn-primary" onClick={() => setShowUpload(true)}>
-            📎 Enviar Documento
+            <UploadDocumentIcon /> Enviar Documento
           </button>
         </div>
       </div>

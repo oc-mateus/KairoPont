@@ -12,6 +12,17 @@ import { addKairoPdfHeader } from '../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../lib/exportTimesheetXlsx';
 import { getLunchLabelForRecord, getRegisteredScheduleLabel, getShiftLabel, inferShiftForRecord, summarizeWorkedShifts } from '../lib/workShifts';
 
+function ExportIcon({ kind }) {
+  const icons = {
+    excel: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M3 15h18M9 3v18M15 3v18" /></>,
+    markdown: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13v4m0-4 2 2 2-2v4m3-4v4m0-4 2 2" /></>,
+    pdf: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M12 12v6m-3-3 3 3 3-3" /></>,
+    notion: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 17V7l8 10V7" /></>,
+  };
+
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icons[kind]}</svg>;
+}
+
 export default function HistoryPage() {
   const { profile } = useAuth();
   const isPj = profile?.tipo_contrato === 'pj';
@@ -281,16 +292,16 @@ export default function HistoryPage() {
         </div>
         <div className="page-header-actions">
           <button className="btn btn-secondary btn-sm" onClick={handleExportExcel} disabled={records.length === 0 || exportingExcel}>
-            {exportingExcel ? <Spinner /> : '📊 Excel'}
+            {exportingExcel ? <Spinner /> : <><ExportIcon kind="excel" /> Excel</>}
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleExportMarkdown} disabled={records.length === 0}>
-            📝 Markdown
+            <ExportIcon kind="markdown" /> Markdown
           </button>
           <button className="btn btn-primary btn-sm" onClick={handleExportPDF} disabled={records.length === 0 || exporting}>
-            {exporting ? <Spinner /> : '📄 PDF'}
+            {exporting ? <Spinner /> : <><ExportIcon kind="pdf" /> PDF</>}
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleSendToNotion} disabled={records.length === 0}>
-            📓 Notion
+            <ExportIcon kind="notion" /> Notion
           </button>
         </div>
       </div>

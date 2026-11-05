@@ -21,7 +21,7 @@
     "react-router-dom": "^7.1.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.2.1",
     "vite": "^6.0.0"
   },
   "overrides": {

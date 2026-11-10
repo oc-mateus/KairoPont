@@ -126,6 +126,21 @@ test('support database permissions, idempotency and quotas in local PostgreSQL',
         assert.equal((await db.query('select claim_support_email($1) as claimed', [fixture.id])).rows[0].claimed, false);
       });
     });
+    await t.test('a thousand repeated requests cannot bypass or grow support quotas indefinitely', async () => {
+      await as('service_role', null, async () => {
+        let allowed = 0;
+        for (let attempt = 0; attempt < 1000; attempt++) {
+          const result = (await db.query("select consume_support_quota('support-question',$1) as quota", [ids[0]])).rows[0].quota;
+          if (result.allowed) allowed++;
+          else assert.ok(result.retry_after > 0);
+        }
+        assert.equal(allowed, 5);
+        await db.exec(`SET LOCAL ROLE ${owner}`);
+        const counters = (await db.query("select requests from private.edge_rate_limits where action='support-question' and subject=$1 and window_seconds=60", [ids[0]])).rows;
+        assert.equal(counters.length, 1);
+        assert.equal(counters[0].requests, 6);
+      });
+    });
     await t.test('old uncertain mail attempts require manual review', async () => {
       await as(owner, null, async () => {
         await db.query("insert into private.support_email_delivery(ticket_id,state,attempts,attempted_at,first_attempt_at) values($1,'failed',1,now()-interval '24 hours',now()-interval '24 hours')", [fixture.id]);

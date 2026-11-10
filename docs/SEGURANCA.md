@@ -1,5 +1,7 @@
 # Segurança do KairoPont
 
+Atualização em 10 de novembro de 2026: a publicação de localização foi concluída, e uma nova bateria incluiu APIs reais, tentativas de senha, injeção SQL, isolamento de dados, conteúdo malicioso no navegador e carga limitada. Foram corrigidas entradas nulas nas funções administrativas e URLs externas em avatares, com adição de uma política de conteúdo na publicação. Resultados, reprodução e limitações estão no [relatório de testes](PENTEST_2026-11-10.md). As seções abaixo registram a revisão anterior, de 8 de novembro.
+
 Verificado em 8 de novembro de 2026 no projeto Supabase KairoPont. A migração `20261108043421_restrict_api_grants_and_limit_email_abuse.sql` foi aplicada, e as funções `invite-employee` (versão 14) e `vacation-decision-email` (versão 3) foram publicadas com validação de JWT habilitada.
 
 ## Resultado das quatro verificações

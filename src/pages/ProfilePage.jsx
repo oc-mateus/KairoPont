@@ -57,7 +57,7 @@ export default function ProfilePage() {
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      const fileExt = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type];
       const fileName = `${profile.id}/foto.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage

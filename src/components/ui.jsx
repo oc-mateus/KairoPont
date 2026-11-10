@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { safeAvatarUrl } from '../lib/avatarUrl';
 
 export function Modal({ isOpen, onClose, title, children, size = 'md' }) {
   if (!isOpen) return null;
@@ -77,6 +78,7 @@ export function EmptyState({ icon = '📋', title, text, action }) {
 }
 
 export function Avatar({ src, name, size = 'md' }) {
+  const imageUrl = safeAvatarUrl(src, import.meta.env.VITE_SUPABASE_URL);
   const sizeClass = size !== 'md' ? `avatar-${size}` : '';
   const initials = name
     ? name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
@@ -84,8 +86,8 @@ export function Avatar({ src, name, size = 'md' }) {
 
   return (
     <div className={`avatar ${sizeClass}`}>
-      {src ? (
-        <img src={src} alt={name} />
+      {imageUrl ? (
+        <img src={imageUrl} alt={name} referrerPolicy="no-referrer" />
       ) : (
         initials
       )}

@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { formatTime, getTodayInSP, formatDate } from '../lib/utils';
 import { Spinner, Badge } from '../components/ui';
 import { getAssignedShiftId, getFixedLunchLabel, getShiftLabel } from '../lib/workShifts';
+import { capturePunchLocation, locationLabel } from '../lib/punchLocation';
+import PunchLocation from '../components/PunchLocation';
 
 export const PunchInIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>;
 export const LunchOutIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>;
@@ -14,10 +16,10 @@ export const CompleteIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill
 export const BlockIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>;
 
 const PUNCH_STEPS = [
-  { field: 'entrada', label: 'Entrada', icon: PunchInIcon, description: 'Registrar entrada na empresa' },
-  { field: 'saida_almoco', label: 'Saída para almoço', icon: LunchOutIcon, description: 'Registrar início da pausa de almoço' },
-  { field: 'retorno_almoco', label: 'Retorno do almoço', icon: LunchInIcon, description: 'Registrar retorno após uma hora de almoço' },
-  { field: 'saida', label: 'Saída', icon: PunchOutIcon, description: 'Registrar saída da empresa' },
+  { field: 'entrada', label: 'Entrada', icon: PunchInIcon },
+  { field: 'saida_almoco', label: 'Saída para almoço', icon: LunchOutIcon },
+  { field: 'retorno_almoco', label: 'Retorno do almoço', icon: LunchInIcon },
+  { field: 'saida', label: 'Saída', icon: PunchOutIcon },
 ];
 
 function timestampForClock(date, clock, referenceClock) {
@@ -42,6 +44,8 @@ export default function PunchPage() {
   const [punching, setPunching] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [cooldown, setCooldown] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const punchInFlight = useRef(false);
 
   // Atualiza relógio a cada segundo
   useEffect(() => {
@@ -128,7 +132,8 @@ export default function PunchPage() {
 
   // Registra o ponto usando RPC no servidor (horário gerado no Supabase)
   const handlePunch = async (fieldOverride = null) => {
-    if (isComplete || punching || cooldown || waitingForLunchReturn) return;
+    if (isComplete || punchInFlight.current || punching || cooldown || waitingForLunchReturn) return;
+    punchInFlight.current = true;
 
     // Prevenção de clique duplo
     setCooldown(true);
@@ -142,18 +147,28 @@ export default function PunchPage() {
         ? PUNCH_STEPS.find((item) => item.field === fieldOverride)
         : punchSteps[nextStepIndex];
       if (!step) throw new Error('Não foi possível identificar a próxima etapa do registro. Atualize a página e tente novamente.');
-      const { data, error } = await supabase.rpc('registrar_ponto', {
+      const collectLocation = step.field === 'entrada' || step.field === 'saida';
+      let location = null;
+      if (collectLocation) {
+        setLocating(true);
+        location = await capturePunchLocation();
+        setLocating(false);
+      }
+      const { error } = await supabase.rpc('registrar_ponto', {
         p_funcionario_id: profile.id,
         p_tipo: step.field,
+        p_localizacao: location,
       });
 
       if (error) throw error;
 
-      toast.success(`${step.label} registrada com sucesso!`);
+      toast.success(`${step.label} registrada com sucesso!${collectLocation && location.status !== 'captured' ? ` ${locationLabel(location)}.` : ''}`);
       await fetchTodayRecord();
     } catch (err) {
       toast.error('Erro ao registrar ponto: ' + err.message);
     } finally {
+      punchInFlight.current = false;
+      setLocating(false);
       setPunching(false);
     }
   };
@@ -200,12 +215,11 @@ export default function PunchPage() {
         {profile?.tipo_contrato !== 'pj' && profile?.escala_trabalho && <Badge variant="neutral">Horário: {getShiftLabel(getAssignedShiftId(profile.escala_trabalho))}</Badge>}
       </div>
 
-      {profile?.tipo_contrato === 'pj' && <div className="pj-punch-note">Registro de ponto PJ: marque somente a entrada e a saída do seu período de trabalho.</div>}
-
       <div className="punch-workspace">
       <section className="punch-action-panel">
         <h3>{isComplete ? 'Sua jornada foi concluída' : 'Sua próxima marcação'}</h3>
-        <p className="punch-action-intro">{isComplete ? 'Todos os horários do dia foram registrados.' : punching ? 'Registrando seu horário…' : 'Quando estiver pronto, registre o próximo horário.'}</p>
+        {punching && <p className="punch-action-intro" role="status">{locating ? 'Obtendo localização… Permita o acesso no navegador.' : 'Registrando ponto…'}</p>}
+        {!isComplete && <p className="punch-policy-note">Localização enviada à administração só na entrada e na saída. Sem permissão, o ponto será salvo sem localização.</p>}
         <button
           className="btn-punch"
           onClick={() => handlePunch()}
@@ -231,8 +245,6 @@ export default function PunchPage() {
           )}
         </button>
 
-        {!isComplete && profile?.ativo && <p className="punch-next-step">{punchSteps[nextStepIndex].description}</p>}
-
         {canRegisterEarlyLunch && (
           <button
             type="button"
@@ -246,14 +258,14 @@ export default function PunchPage() {
 
         {needsDynamicLunch && (
           <p className="punch-policy-note">
-            Se o tempo trabalhado ultrapassar 6 horas, é necessário registrar uma pausa de almoço de 1 hora antes da saída.
+            Acima de 6h de trabalho, registre uma pausa de 1h.
             {waitingForLunchReturn && ` O retorno poderá ser registrado em ${Math.ceil(60 - breakMinutes)} min.`}
           </p>
         )}
 
-        {cooldown && !punching && (
+        {cooldown && !punching && !isComplete && (
           <p className="punch-cooldown-note">
-            Aguarde alguns segundos antes de registrar novamente...
+            Aguarde para registrar novamente.
           </p>
         )}
       </section>
@@ -286,6 +298,7 @@ export default function PunchPage() {
                   <div className="punch-step-time">
                     {isCompleted ? formatTime(value) : isCurrent ? 'Aguardando registro' : '—'}
                   </div>
+                  {(step.field === 'entrada' || step.field === 'saida') && <PunchLocation location={todayRecord?.[`${step.field}_localizacao`]} punched={isCompleted} label={step.field === 'entrada' ? 'entrada' : 'saída'} />}
                 </div>
               </div>
             );

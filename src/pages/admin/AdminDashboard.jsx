@@ -255,7 +255,7 @@ export default function AdminDashboard() {
   return (
     <div className="admin-dashboard">
       <div className="page-header admin-page-heading">
-        <div><h2 className="page-title">Visão geral</h2><p className="page-subtitle">Indicadores de frequência e jornada dos funcionários CLT.</p></div>
+        <div><h2 className="page-title">Visão geral</h2><p className="page-subtitle">Frequência e jornada CLT.</p></div>
         <span className="admin-date">Hoje, {new Date(`${today}T12:00:00`).toLocaleDateString('pt-BR')}</span>
       </div>
 
@@ -282,7 +282,7 @@ export default function AdminDashboard() {
             <Link to="/admin/funcionarios">Gerenciar funcionários <ArrowIcon /></Link>
           </div>
         </div>
-        {attendanceLoading ? <p className="attendance-loading">Carregando indicadores…</p> : period === 'specific' && !selectedMonth ? <p className="attendance-loading">Selecione um mês para consultar os indicadores.</p> : period === 'specific' && !hasSpecificCltRecords ? <p className="attendance-loading">Não há registros de ponto de funcionários CLT para este mês.</p> : <div className="attendance-insights-grid">
+        {attendanceLoading ? <p className="attendance-loading">Carregando indicadores…</p> : period === 'specific' && !selectedMonth ? <p className="attendance-loading">Selecione um mês.</p> : period === 'specific' && !hasSpecificCltRecords ? <p className="attendance-loading">Nenhum registro CLT neste mês.</p> : <div className="attendance-insights-grid">
           <AttendanceChart title="Faltas" total={absenceTotal} unit="dias" values={chartData.map(({ label, fullLabel, absences }) => ({ label, fullLabel, value: absences }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--danger-500, #d95d5d)" />
           <AttendanceChart title="Atrasos" total={delayTotal} unit="registros" values={chartData.map(({ label, fullLabel, delays }) => ({ label, fullLabel, value: delays }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--warning-500, #d99a35)" />
           <AttendanceChart title="Horas extras" total={formatMinutesAsHours(overtimeTotal)} unit="total" values={chartData.map(({ label, fullLabel, overtimeMinutes }) => ({ label, fullLabel, value: overtimeMinutes }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--kairo-green-400, #35b76a)" formatValue={formatMinutesAsHours} />
@@ -293,7 +293,7 @@ export default function AdminDashboard() {
         <div className="section-heading attendance-section-heading">
           <div>
             <h3>Indicadores por funcionário</h3>
-            <p>Consulte faltas, atrasos e horas extras de um funcionário CLT no mesmo período acima.</p>
+
           </div>
           <label className="attendance-employee-control">
             <span>Funcionário CLT</span>
@@ -304,11 +304,11 @@ export default function AdminDashboard() {
           </label>
         </div>
         {attendanceLoading ? <p className="attendance-loading">Carregando indicadores…</p>
-          : !selectedEmployee ? <p className="attendance-loading">Escolha um funcionário CLT para visualizar os gráficos individuais.</p>
-            : period === 'specific' && !selectedMonth ? <p className="attendance-loading">Selecione um mês para consultar os indicadores.</p>
+          : !selectedEmployee ? <p className="attendance-loading">Selecione um funcionário CLT.</p>
+            : period === 'specific' && !selectedMonth ? <p className="attendance-loading">Selecione um mês.</p>
               : <>
                 <div className="attendance-selected-employee"><span className="attendance-selected-avatar">{selectedEmployee.nome.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span><div><span>Dados individuais de</span><strong>{selectedEmployee.nome}</strong></div><span className="attendance-contract-badge">CLT</span></div>
-                {selectedEmployee.escala_trabalho?.contabilizar_atrasos === false && <p className="attendance-delay-exemption-note">Atrasos não contabilizados para este funcionário porque os horários variam.</p>}
+                {selectedEmployee.escala_trabalho?.contabilizar_atrasos === false && <p className="attendance-delay-exemption-note">Atrasos não contabilizados: horários variáveis.</p>}
                 <div className="attendance-insights-grid">
                   <AttendanceChart title="Faltas" total={individualAbsenceTotal} unit="dias" values={individualChartData.map(({ label, fullLabel, absences }) => ({ label, fullLabel, value: absences }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--danger-500, #d95d5d)" />
                   <AttendanceChart title="Atrasos" total={individualDelayTotal} unit="registros" values={individualChartData.map(({ label, fullLabel, delays }) => ({ label, fullLabel, value: delays }))} groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'} color="var(--warning-500, #d99a35)" />

@@ -36,7 +36,7 @@ export default function AdminAudit() {
     <div>
       <div className="page-header">
         <h2 className="page-title">Auditoria do Sistema</h2>
-        <p className="page-subtitle">Histórico de ações administrativas.</p>
+
       </div>
 
       {loading ? (

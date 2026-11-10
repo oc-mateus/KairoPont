@@ -8,6 +8,8 @@ import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
 import WorkScheduleCard from '../../components/WorkScheduleCard';
+import PunchLocation from '../../components/PunchLocation';
+import { locationExportColumns, locationLabel } from '../../lib/punchLocation';
 import { getAssignedShiftId, getHabitualSchedules, getLunchLabelForRecord, getShiftLabel, getRegisteredScheduleLabel, getNearestRegisteredSchedule, inferShiftFromEntry, makeEmployeeSchedule, makeHabitualSchedule, summarizeWorkedShifts, WORK_SHIFTS } from '../../lib/workShifts';
 
 const FILTERS = [
@@ -143,6 +145,7 @@ export default function AdminEmployees() {
   const [downloadingDocument, setDownloadingDocument] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [includeLocationInReport, setIncludeLocationInReport] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [nameSort, setNameSort] = useState('asc');
@@ -175,6 +178,8 @@ export default function AdminEmployees() {
       setEditingEmployee(false);
     }
   }, [selectedEmp]);
+
+  useEffect(() => { setIncludeLocationInReport(false); }, [selectedEmp?.id]);
 
   useEffect(() => {
     const employeeId = searchParams.get('funcionario');
@@ -305,8 +310,8 @@ export default function AdminEmployees() {
       <label className="form-group">Tipo de vínculo<select className="form-input" value={employeeForm.tipo_contrato} onChange={(event) => setFormField('tipo_contrato', event.target.value)}><option value="clt">CLT</option><option value="pj">PJ</option></select></label>
       <label className="form-group">Data de admissão{employeeForm.tipo_contrato === 'pj' && <small> (opcional para PJ)</small>}<input className="form-input" required={employeeForm.tipo_contrato === 'clt'} type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>
       </div>
-      {editingEmployee && <label className="employee-support-access"><input type="checkbox" checked={employeeForm.suporte === true} onChange={(event) => setFormField('suporte', event.target.checked)} /><span><strong>Acesso ao suporte</strong><small>Permite consultar e responder em Atendimentos, com ou sem perfil de administrador.</small></span></label>}
-      {employeeForm.tipo_contrato === 'pj' && <p className="vacation-form-note">O vínculo PJ usa apenas entrada e saída para apurar horas trabalhadas, sem horários habituais nem gestão de férias.</p>}
+      {editingEmployee && <label className="employee-support-access"><input type="checkbox" checked={employeeForm.suporte === true} onChange={(event) => setFormField('suporte', event.target.checked)} /><span><strong>Acesso ao suporte</strong><small>Permite consultar e responder chamados.</small></span></label>}
+      {employeeForm.tipo_contrato === 'pj' && <p className="vacation-form-note">PJ: apenas entrada e saída, sem horários habituais ou férias.</p>}
       {employeeForm.tipo_contrato === 'clt' && <>
         <fieldset className="employee-habitual-schedule-editor"><legend>Horários habituais</legend><p>Adicione todos os horários que este trabalhador costuma cumprir.</p>
           <div className="employee-habitual-schedule-list">{getHabitualSchedules(employeeForm).map((schedule) => <div className="employee-habitual-schedule" key={schedule.id}><div><strong>{getShiftLabel(schedule.id)}</strong><span>Almoço {schedule.saida_almoco || 'sem intervalo'}{schedule.retorno_almoco ? `–${schedule.retorno_almoco}` : ''}</span></div><button type="button" className="btn btn-ghost btn-sm" aria-label={`Remover horário ${getShiftLabel(schedule.id)}`} onClick={() => removeHabitualSchedule(schedule.id)}>Remover</button></div>)}</div>
@@ -493,6 +498,7 @@ export default function AdminEmployees() {
         scheduleColumn: selectedEmp.tipo_contrato === 'pj' ? null : { key: 'shift', header: 'Horário', width: 20, value: (record) => getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)) },
         summary: selectedEmp.tipo_contrato === 'pj' ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(employeePeriodMinutes) } : null,
         extraColumns: [
+          ...locationExportColumns(includeLocationInReport),
           { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT' },
           { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
           ...(selectedEmp.tipo_contrato === 'pj' ? [] : [
@@ -577,6 +583,31 @@ export default function AdminEmployees() {
         alternateRowStyles: { fillColor: [232, 245, 233] },
         styles: { cellPadding: 3 },
       });
+      if (includeLocationInReport) {
+        pdf.addPage();
+        const locationStart = await addKairoPdfHeader(pdf, {
+          title: `Localizações do ponto - ${selectedEmp.nome}`,
+          details: [
+            `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
+            'Coordenadas informadas pelo dispositivo. A precisão é aproximada.',
+          ],
+        });
+        autoTable(pdf, {
+          startY: locationStart,
+          head: [['Data da jornada', 'Entrada', 'Localização da entrada', 'Saída', 'Localização da saída']],
+          body: records.map((record) => [
+            formatDate(`${record.data}T12:00:00`), formatTime(record.entrada),
+            locationLabel(record.entrada_localizacao, Boolean(record.entrada)),
+            `${formatTime(record.saida)}${record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}`,
+            locationLabel(record.saida_localizacao, Boolean(record.saida)),
+          ]),
+          theme: 'grid',
+          headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontSize: 8 },
+          bodyStyles: { fontSize: 8 },
+          styles: { cellPadding: 3 },
+          margin: { bottom: 20 },
+        });
+      }
       const pageCount = pdf.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         pdf.setPage(page);
@@ -618,7 +649,7 @@ export default function AdminEmployees() {
   return (
     <div className="admin-employees-page">
       <div className="page-header">
-        <div><h2 className="page-title">Funcionários</h2><p className="page-subtitle">Selecione um funcionário para ver os dados, documentos e registros de ponto.</p></div>
+        <div><h2 className="page-title">Funcionários</h2></div>
         {selectedEmp && <button className="btn btn-ghost" disabled={savingEmployment} onClick={closeEmployee}>Voltar à lista</button>}
       </div>
 
@@ -628,7 +659,7 @@ export default function AdminEmployees() {
             <label className="employee-search-label">Buscar funcionário<input className="form-input" type="search" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} placeholder="Nome, CPF ou cargo" /></label>
             <div className="employee-list-actions"><button className="btn btn-secondary" onClick={() => setNameSort((value) => value === 'asc' ? 'desc' : 'asc')} aria-label={`Ordenar nome ${nameSort === 'asc' ? 'decrescente' : 'crescente'}`}>Nome {nameSort === 'asc' ? 'A–Z' : 'Z–A'}</button><button className="btn btn-primary" disabled={savingEmployment} onClick={() => { if (!showInviteForm) setEmployeeForm(makeNewEmployeeForm()); setShowInviteForm((value) => !value); }}>{showInviteForm ? 'Cancelar' : 'Novo funcionário'}</button></div>
           </div>
-          {showInviteForm && <section className="employee-records-section"><h3>Convidar funcionário</h3><p className="page-subtitle">Enviaremos o convite para o e-mail informado, onde a pessoa poderá definir a própria senha.</p>{employmentForm(inviteEmployee, 'Enviar convite')}</section>}
+          {showInviteForm && <section className="employee-records-section"><h3>Convidar funcionário</h3><p className="page-subtitle">O funcionário receberá um convite por e-mail.</p>{employmentForm(inviteEmployee, 'Enviar convite')}</section>}
         <div className="employee-select-list">
           {employees.filter((emp) => {
             const normalize = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -662,7 +693,7 @@ export default function AdminEmployees() {
         </>
       ) : (
         <>
-          <div className="employee-section-heading"><div><h3>Cadastro do funcionário</h3><p>Consulte e atualize os dados pessoais e profissionais.</p></div><button type="button" className="btn btn-secondary" disabled={editingEmployee || savingEmployment} aria-expanded={editingEmployee} aria-controls="employee-registration-editor" onClick={() => { setEmployeeForm(formFromEmployee(selectedEmp)); setEditingEmployee(true); }}>Editar cadastro</button></div>
+          <div className="employee-section-heading"><div><h3>Cadastro do funcionário</h3></div><button type="button" className="btn btn-secondary" disabled={editingEmployee || savingEmployment} aria-expanded={editingEmployee} aria-controls="employee-registration-editor" onClick={() => { setEmployeeForm(formFromEmployee(selectedEmp)); setEditingEmployee(true); }}>Editar cadastro</button></div>
           <section className="employee-profile-card">
             <Avatar src={selectedEmp.foto_url} name={selectedEmp.nome} size="lg" />
             <div className="employee-profile-heading"><h3>{selectedEmp.nome}</h3><p>{selectedEmp.email}</p></div>
@@ -679,7 +710,7 @@ export default function AdminEmployees() {
             </div>
           </section>
 
-          {editingEmployee && <section className="employee-records-section" id="employee-registration-editor" aria-label="Editar cadastro"><h3>Editar cadastro</h3><p className="page-subtitle">Altere nome, cargo, vínculo, admissão e horários habituais. As alterações ficam registradas na auditoria.</p>{employmentForm(saveEmployment, 'Salvar alterações')}</section>}
+          {editingEmployee && <section className="employee-records-section" id="employee-registration-editor" aria-label="Editar cadastro"><h3>Editar cadastro</h3><p className="page-subtitle">Alterações registradas na auditoria.</p>{employmentForm(saveEmployment, 'Salvar alterações')}</section>}
           {selectedEmp.tipo_contrato !== 'pj' && <WorkScheduleCard schedule={selectedEmp.escala_trabalho} admissionDate={selectedEmp.data_admissao} preferenceKey={selectedEmp.id} />}
 
           {selectedEmp.tipo_contrato !== 'pj' && <section className="employee-records-section employee-vacation-section">
@@ -690,7 +721,7 @@ export default function AdminEmployees() {
               const upcomingPeriod = vacationPeriods.find((period) => today <= period.periodo_fim);
               const firstRequestDate = upcomingPeriod ? addIsoDays(upcomingPeriod.periodo_fim, 1) : null;
               const earliestLeaveDate = availablePeriod ? addIsoDays(today, 30) : upcomingPeriod ? addIsoDays(upcomingPeriod.periodo_fim, 31) : null;
-              return <div className="vacation-eligibility-overview"><div><span>Data de admissão</span><strong>{selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</strong></div><div><span>Direito atual</span><strong>{availablePeriod ? `Pode solicitar desde ${formatDate(`${addIsoDays(availablePeriod.periodo_fim, 1)}T12:00:00`)}` : firstRequestDate ? `Solicitações a partir de ${formatDate(`${firstRequestDate}T12:00:00`)}` : 'Sem período disponível'}</strong></div><div><span>Primeiro início de gozo possível</span><strong>{earliestLeaveDate ? formatDate(`${earliestLeaveDate}T12:00:00`) : 'A definir pelo período aquisitivo'}</strong><small>Considerando o prazo mínimo de 30 dias entre o pedido e a saída.</small></div></div>;
+              return <div className="vacation-eligibility-overview"><div><span>Data de admissão</span><strong>{selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</strong></div><div><span>Direito atual</span><strong>{availablePeriod ? `Pode solicitar desde ${formatDate(`${addIsoDays(availablePeriod.periodo_fim, 1)}T12:00:00`)}` : firstRequestDate ? `Solicitações a partir de ${formatDate(`${firstRequestDate}T12:00:00`)}` : 'Sem período disponível'}</strong></div><div><span>Primeiro início de gozo possível</span><strong>{earliestLeaveDate ? formatDate(`${earliestLeaveDate}T12:00:00`) : 'A definir pelo período aquisitivo'}</strong><small>Antecedência mínima: 30 dias.</small></div></div>;
             })()}
             {vacationPeriods.length ? <div className="employee-vacation-cycles">{vacationPeriods.map((period) => {
               const request = vacationRequests.find((item) => item.periodo_id === period.id);
@@ -698,13 +729,14 @@ export default function AdminEmployees() {
               const eligibleForLeave = today > period.periodo_fim && today <= period.prazo_concessivo;
               const firstRequestDate = addIsoDays(period.periodo_fim, 1);
               const earliestLeaveDate = addIsoDays(period.periodo_fim, 31);
-              return <article className="employee-vacation-cycle" key={period.id}><div><strong>Período aquisitivo: {formatDate(`${period.periodo_inicio}T12:00:00`)} – {formatDate(`${period.periodo_fim}T12:00:00`)}</strong><span>Admissão: {selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</span><span>Elegível para solicitar a partir de: {formatDate(`${firstRequestDate}T12:00:00`)}</span><span>Prazo final para gozo: {formatDate(`${period.prazo_concessivo}T12:00:00`)}</span><span>Abono escolhido: {period.dias_abono ? `${period.dias_abono} dia(s) vendido(s)` : 'Não'}</span>{!eligibleForLeave && today <= period.periodo_fim && <small className="vacation-ineligible-message">Ainda não elegível. Se o pedido for enviado na primeira data disponível, a saída mais cedo será {formatDate(`${earliestLeaveDate}T12:00:00`)}, respeitando a antecedência mínima de 30 dias.</small>}</div>{request ? <div className="employee-vacation-request"><Badge variant={request.status === 'aprovada' ? 'success' : request.status === 'recusada' ? 'danger' : 'warning'}>{request.status === 'aprovada' ? 'Aprovada' : request.status === 'recusada' ? 'Recusada' : 'Pendente'}</Badge><span>Saída: {formatDate(`${request.data_inicio}T12:00:00`)}</span><span>Retorno ao trabalho: {formatDate(`${(request.data_retorno || addIsoDays(request.data_fim, 1))}T12:00:00`)}</span>{request.status === 'recusada' && <small>Justificativa: {request.justificativa_recusa}</small>}<small>{request.email_enviado_em ? `E-mail enviado em ${formatDateTime(request.email_enviado_em)}` : request.email_erro ? `Falha no e-mail: ${request.email_erro}` : request.status !== 'pendente' ? 'E-mail da decisão pendente' : ''}</small></div> : <Badge variant={eligibleForLeave ? 'info' : 'warning'}>{eligibleForLeave ? 'Sem solicitação' : 'Ainda não elegível para gozo'}</Badge>}</article>;
-            })}</div> : <p className="employee-no-results">Os períodos de férias serão calculados após informar a data de admissão e abrir a tela de gestão.</p>}
+              return <article className="employee-vacation-cycle" key={period.id}><div><strong>Período aquisitivo: {formatDate(`${period.periodo_inicio}T12:00:00`)} – {formatDate(`${period.periodo_fim}T12:00:00`)}</strong><span>Admissão: {selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</span><span>Elegível para solicitar a partir de: {formatDate(`${firstRequestDate}T12:00:00`)}</span><span>Prazo final para gozo: {formatDate(`${period.prazo_concessivo}T12:00:00`)}</span><span>Abono escolhido: {period.dias_abono ? `${period.dias_abono} dia(s) vendido(s)` : 'Não'}</span>{!eligibleForLeave && today <= period.periodo_fim && <small className="vacation-ineligible-message">Primeira saída possível: {formatDate(`${earliestLeaveDate}T12:00:00`)} (antecedência de 30 dias).</small>}</div>{request ? <div className="employee-vacation-request"><Badge variant={request.status === 'aprovada' ? 'success' : request.status === 'recusada' ? 'danger' : 'warning'}>{request.status === 'aprovada' ? 'Aprovada' : request.status === 'recusada' ? 'Recusada' : 'Pendente'}</Badge><span>Saída: {formatDate(`${request.data_inicio}T12:00:00`)}</span><span>Retorno ao trabalho: {formatDate(`${(request.data_retorno || addIsoDays(request.data_fim, 1))}T12:00:00`)}</span>{request.status === 'recusada' && <small>Justificativa: {request.justificativa_recusa}</small>}<small>{request.email_enviado_em ? `E-mail enviado em ${formatDateTime(request.email_enviado_em)}` : request.email_erro ? `Falha no e-mail: ${request.email_erro}` : request.status !== 'pendente' ? 'E-mail da decisão pendente' : ''}</small></div> : <Badge variant={eligibleForLeave ? 'info' : 'warning'}>{eligibleForLeave ? 'Sem solicitação' : 'Ainda não elegível para gozo'}</Badge>}</article>;
+            })}</div> : <p className="employee-no-results">Informe a admissão e abra a gestão de férias para calcular os períodos.</p>}
           </section>}
 
           <section className="employee-records-section">
             <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecordsExcel} disabled={detailLoading || !records.length || exportingExcel}>{exportingExcel ? 'Gerando Excel…' : 'Baixar Excel'}</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>
-          <div className="employee-record-filters">
+            <label className="location-export-option"><input type="checkbox" checked={includeLocationInReport} disabled={exportingPdf || exportingExcel} onChange={(event) => setIncludeLocationInReport(event.target.checked)} /><span><strong>Incluir localizações no relatório</strong><small>PDF e Excel deste período. A coleta permanece ativa.</small></span></label>
+            <div className="employee-record-filters">
               <div className="filter-chips">{FILTERS.map((item) => <button key={item.id} className={`filter-chip ${filter === item.id ? 'active' : ''}`} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
               {filter === 'day' && <label className="employee-date-filter">Dia<input className="form-input" type="date" value={selectedDay} onChange={(event) => setSelectedDay(event.target.value)} /></label>}
               {(filter === 'week' || filter === 'month') && <label className="employee-date-filter">Referência<input className="form-input" type="date" value={referenceDate} onChange={(event) => setReferenceDate(event.target.value)} /></label>}
@@ -725,7 +757,7 @@ export default function AdminEmployees() {
                     const oldRecord = records.find((record) => record.id === editingPunchId);
                     const needsReason = creatingPunch || !canEditPunch(oldRecord);
                     return <>
-                      <div><h4>{creatingPunch ? 'Novo registro histórico' : 'Corrigir horários do ponto'}</h4><p>{creatingPunch ? 'A inclusão ficará registrada na auditoria.' : needsReason ? 'Este registro passou de 96 horas. A correção exige justificativa e será auditada.' : 'Este registro pode ser ajustado até 96 horas após a criação.'}</p></div>
+                      <div><h4>{creatingPunch ? 'Novo registro histórico' : 'Corrigir horários do ponto'}</h4><p>{creatingPunch ? 'A inclusão ficará registrada na auditoria.' : needsReason ? 'Após 96h: justificativa obrigatória e correção auditada.' : 'Correção disponível por 96h após a criação.'}</p></div>
                       {creatingPunch && <label className="form-group historical-record-date">Data do registro<input className="form-input" required type="date" value={punchCreateDate} onChange={(event) => { setPunchCreateDate(event.target.value); setPunchEditForm((current) => ({ ...current, saida_data: current.saida ? event.target.value : '' })); }} /></label>}
                       <div className="employee-punch-edit-fields">
                         <label className="form-group">Entrada<input className="form-input" required type="time" value={punchEditForm.entrada} onChange={(event) => setPunchEditForm((current) => ({ ...current, entrada: event.target.value }))} /></label>
@@ -739,14 +771,14 @@ export default function AdminEmployees() {
                     </>;
                   })()}
                 </form>}
-                <div className="table-container"><table className="table"><thead><tr><th>Data</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Horário do dia</th>}<th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Intervalo de almoço</th>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ações</th></tr></thead><tbody>{records.map((record) => { const isHoliday = holidays.some((holiday) => holiday.data === record.data); const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho, isHoliday); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}{isHoliday && <div className="employee-punch-locked">Feriado</div>}</td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getShiftLabel(shiftId)}</td>}<td>{formatTime(record.entrada)}</td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getLunchLabelForRecord(record, shiftId)}</td>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}</td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td><div className="employee-punch-actions"><button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Corrigir horários</button><button className="btn btn-danger btn-sm" onClick={() => setPunchToDelete(record)}>Excluir</button></div></td></tr>; })}</tbody></table></div>
+                <div className="table-container"><table className="table"><thead><tr><th>Data</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Horário do dia</th>}<th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Intervalo de almoço</th>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ações</th></tr></thead><tbody>{records.map((record) => { const isHoliday = holidays.some((holiday) => holiday.data === record.data); const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho, isHoliday); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}{isHoliday && <div className="employee-punch-locked">Feriado</div>}</td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getShiftLabel(shiftId)}</td>}<td>{formatTime(record.entrada)}<PunchLocation location={record.entrada_localizacao} punched={Boolean(record.entrada)} label="entrada" /></td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getLunchLabelForRecord(record, shiftId)}</td>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}<PunchLocation location={record.saida_localizacao} punched={Boolean(record.saida)} label="saída" /></td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td><div className="employee-punch-actions"><button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Corrigir horários</button><button className="btn btn-danger btn-sm" onClick={() => setPunchToDelete(record)}>Excluir</button></div></td></tr>; })}</tbody></table></div>
               </>
             ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
           </section>
 
           <section className="employee-documents-section">
             <div className="employee-section-heading"><div><h3>Documentos enviados</h3><p>{documents.length} documento{documents.length === 1 ? '' : 's'}</p></div></div>
-            {documents.length ? <div className="employee-document-list">{documents.map((document) => <article className="employee-document-item" key={document.id}><div className="employee-document-copy"><strong>{document.nome_arquivo}</strong><span>Enviado em {formatDateTime(document.created_at)}</span>{document.periodo_inicio && <small>Período: {formatDate(`${document.periodo_inicio}T12:00:00`)} a {formatDate(`${(document.periodo_fim || document.periodo_inicio)}T12:00:00`)}</small>}</div><Badge variant={document.tipo === 'atestado' ? 'warning' : 'info'}>{document.tipo}</Badge><button className="btn btn-secondary btn-sm" onClick={() => downloadDocument(document)} disabled={downloadingDocument === document.id}>{downloadingDocument === document.id ? 'Baixando…' : 'Baixar'}</button></article>)}</div> : <p className="employee-no-results">Este funcionário ainda não enviou documentos.</p>}
+            {documents.length ? <div className="employee-document-list">{documents.map((document) => <article className="employee-document-item" key={document.id}><div className="employee-document-copy"><strong>{document.nome_arquivo}</strong><span>Enviado em {formatDateTime(document.created_at)}</span>{document.periodo_inicio && <small>Período: {formatDate(`${document.periodo_inicio}T12:00:00`)} a {formatDate(`${(document.periodo_fim || document.periodo_inicio)}T12:00:00`)}</small>}</div><Badge variant={document.tipo === 'atestado' ? 'warning' : 'info'}>{document.tipo}</Badge><button className="btn btn-secondary btn-sm" onClick={() => downloadDocument(document)} disabled={downloadingDocument === document.id}>{downloadingDocument === document.id ? 'Baixando…' : 'Baixar'}</button></article>)}</div> : <p className="employee-no-results">Nenhum documento enviado.</p>}
           </section>
         </>
       )}

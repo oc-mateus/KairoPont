@@ -84,7 +84,7 @@ export default function AdminCalendar() {
     <div className="admin-calendar-page">
       <div className="page-header">
         <h2 className="page-title">Calendário de feriados</h2>
-        <p className="page-subtitle">Cadastre feriados nacionais, estaduais, municipais ou da empresa. Nessas datas, não há falta; o trabalho registrado entra como hora extra.</p>
+        <p className="page-subtitle">Feriados não geram faltas. Horas trabalhadas contam como extras.</p>
       </div>
 
       <section className="employee-records-section calendar-form-card">

@@ -2,16 +2,16 @@ import { useEffect, useState } from 'react';
 import { getHabitualSchedules, getRegisteredScheduleLabel } from '../lib/workShifts';
 
 export function WorkScheduleSummary({ schedule }) {
-  if (!schedule) return <p className="work-schedule-empty">Horário de trabalho ainda não informado pelo administrador.</p>;
+  if (!schedule) return <p className="work-schedule-empty">Horário não informado.</p>;
   const habitualSchedules = getHabitualSchedules(schedule);
-  if (!habitualSchedules.length) return <p className="work-schedule-empty">Horário de trabalho ainda não informado pelo administrador.</p>;
+  if (!habitualSchedules.length) return <p className="work-schedule-empty">Horário não informado.</p>;
   return <div className="work-schedule-list" aria-label="Horários habituais">
     {habitualSchedules.map((item) => <article className="work-schedule-item" key={item.id || item.entrada}>
       <span className="work-schedule-time">{item.entrada}–{item.saida}</span>
       <span className="work-schedule-meal">{item.saida_almoco && item.retorno_almoco ? `Almoço ${item.saida_almoco}–${item.retorno_almoco}` : 'Sem intervalo fixo'}</span>
     </article>)}
-    <p className="work-schedule-note">Aos sábados, a jornada prevista é de 4h, sem intervalo fixo.</p>
-    {schedule.contabilizar_atrasos === false && <p className="work-schedule-note">Atrasos não são contabilizados para este funcionário, pois os horários variam.</p>}
+    <p className="work-schedule-note">Sábados: 4h, sem intervalo fixo.</p>
+    {schedule.contabilizar_atrasos === false && <p className="work-schedule-note">Atrasos não contabilizados: horários variáveis.</p>}
   </div>;
 }
 
@@ -33,7 +33,7 @@ export default function WorkScheduleCard({ schedule, admissionDate, compact = fa
 
   return <section className={`work-schedule-card ${compact ? 'compact' : ''} ${expanded ? '' : 'is-collapsed'}`}>
     <div className="work-schedule-heading">
-      <div><h3>Horários habituais</h3><p>{getRegisteredScheduleLabel(schedule)}</p></div>
+      <div><h3>Horários habituais</h3>{!expanded && <p>{getRegisteredScheduleLabel(schedule)}</p>}</div>
       <div className="work-schedule-heading-actions">
         {admissionDate && <span className="work-schedule-admission">Admissão: {new Date(`${admissionDate}T12:00:00`).toLocaleDateString('pt-BR')}</span>}
         <button type="button" className="btn btn-secondary btn-sm" aria-expanded={expanded} onClick={toggleExpanded}>{expanded ? 'Recolher' : 'Expandir'}</button>

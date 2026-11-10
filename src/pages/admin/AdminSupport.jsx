@@ -41,7 +41,7 @@ export default function AdminSupport() {
     finally { setSaving(false); }
   }
 
-  return <div className="admin-support"><div className="page-header"><h1 className="page-title">Atendimentos</h1><p className="page-subtitle">Consulte os pedidos, responda por e-mail e acompanhe o status.</p></div>
+  return <div className="admin-support"><div className="page-header"><h1 className="page-title">Atendimentos</h1></div>
     {!supportEnabled ? <p role="status" className="support-empty">O atendimento está em preparação. A fila será habilitada na publicação do suporte.</p> : <>
       <div className="support-section-header"><label htmlFor="support-status-filter" className="form-group"><span className="form-label">Mostrar chamados</span><select id="support-status-filter" className="form-input" value={status} disabled={saving} onChange={(event) => setStatus(event.target.value)}><option value="todos">Todos</option>{Object.entries(SUPPORT_STATUS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label><button className="btn btn-secondary" onClick={state.refresh} disabled={state.loading || saving}>Atualizar lista</button></div>
       {error && <p role="alert" className="support-error">{error}</p>}{notice && <p role="status" className="support-confirmation">{notice}</p>}

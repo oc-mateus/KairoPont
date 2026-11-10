@@ -33,14 +33,14 @@ export default function RecoverPasswordPage() {
   };
 
   return <div className="login-page">
-    <div className="login-brand"><div className="login-brand-content"><div className="brand-lockup"><img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" /><span><strong>KairoPont</strong><small>Controle de ponto</small></span></div><p>Controle de ponto e jornada</p></div></div>
+    <div className="login-brand"><div className="login-brand-content"><div className="brand-lockup"><img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" /><span><strong>KairoPont</strong><small>Controle de ponto</small></span></div></div></div>
     <div className="login-form-container"><div className="login-form">
       <h1>Redefinir senha</h1>
       {sent ? <>
-        <p className="login-subtitle">Se houver uma conta vinculada a esse e-mail, enviaremos um link para você criar uma nova senha. Abra o link no mesmo navegador em que deseja acessar o KairoPont.</p>
+        <p className="login-subtitle">Se o e-mail estiver cadastrado, você receberá um link. Abra-o neste navegador.</p>
         <Link className="btn btn-primary btn-block btn-lg password-recovery-back" to="/login">Voltar para o login</Link>
       </> : <>
-        <p className="login-subtitle">Informe o e-mail da conta. O mesmo processo atende administradores, funcionários CLT e prestadores PJ.</p>
+        <p className="login-subtitle">Informe o e-mail da sua conta.</p>
         <form onSubmit={requestRecovery}>
           <div className="form-group"><label className="form-label" htmlFor="recovery-email">E-mail da conta</label><input id="recovery-email" className="form-input" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} disabled={sending} /></div>
           <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={sending}>{sending ? <Spinner /> : 'Enviar link de recuperação'}</button>

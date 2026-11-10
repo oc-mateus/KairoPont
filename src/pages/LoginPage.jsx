@@ -59,14 +59,14 @@ export default function LoginPage() {
             <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" />
             <span><strong>KairoPont</strong><small>Controle de ponto</small></span>
           </div>
-          <p>Onde automação vira sistema confiável.</p>
+
           <InstallAppButton />
         </div>
       </div>
       <div className="login-form-container">
         <div className="login-form">
           <h1>Entrar</h1>
-          <p className="login-subtitle">Acesse sua conta para registrar o ponto</p>
+
           <form onSubmit={handleLogin}>
             <div className="form-group login-contract-type">
               <span className="form-label">Tipo de vínculo</span>
@@ -86,7 +86,7 @@ export default function LoginPage() {
             </div>
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>{loading ? <Spinner /> : 'Entrar'}</button>
           </form>
-          <p className="login-subtitle" style={{ marginTop: 24 }}>Contas criadas exclusivamente pelo administrador. Se ainda não recebeu um convite, solicite acesso à equipe administrativa.</p>
+          <p className="login-subtitle" style={{ marginTop: 24 }}>Sem acesso? Solicite um convite ao administrador.</p>
           <LegalLinks className="login-legal-links" />
         </div>
       </div>

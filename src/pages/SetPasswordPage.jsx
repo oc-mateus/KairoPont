@@ -31,18 +31,18 @@ export default function SetPasswordPage() {
   };
 
   return <div className="login-page">
-    <div className="login-brand"><div className="login-brand-content"><div className="brand-lockup"><img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" /><span><strong>KairoPont</strong><small>Controle de ponto</small></span></div><p>Controle de ponto e jornada</p></div></div>
+    <div className="login-brand"><div className="login-brand-content"><div className="brand-lockup"><img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" /><span><strong>KairoPont</strong><small>Controle de ponto</small></span></div></div></div>
     <div className="login-form-container"><div className="login-form">
       <h1>Definir senha</h1>
       {authLoading ? <div className="flex flex-center" style={{ minHeight: 120 }}><Spinner size="lg" /></div> : session ? <>
-        <p className="login-subtitle">Crie uma nova senha para acessar sua conta do KairoPont.</p>
+
         <form onSubmit={setNewPassword}>
           <div className="form-group"><label className="form-label" htmlFor="new-password">Nova senha</label><input id="new-password" className="form-input" type="password" minLength={8} required autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} disabled={saving} /></div>
           <div className="form-group"><label className="form-label" htmlFor="confirm-password">Confirmar senha</label><input id="confirm-password" className="form-input" type="password" minLength={8} required autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={saving} /></div>
           <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={saving}>{saving ? <Spinner /> : 'Salvar senha'}</button>
         </form>
       </> : <>
-        <p className="login-subtitle">Este link expirou, já foi usado ou não foi aberto no mesmo navegador. Solicite um novo link para redefinir a senha.</p>
+        <p className="login-subtitle">Link inválido ou expirado. Solicite outro e abra-o neste navegador.</p>
         <button className="btn btn-primary btn-block btn-lg" type="button" onClick={() => navigate('/recuperar-senha')}>Solicitar novo link</button>
       </>}
       <LegalLinks className="login-legal-links" />

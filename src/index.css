@@ -1759,6 +1759,12 @@ select.form-input {
 .employee-punch-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .employee-section-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); margin-bottom: var(--space-4); }
 .employee-export-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.punch-location { display: grid; gap: var(--space-1); margin-top: var(--space-1); color: var(--text-muted); font-size: var(--font-xs); min-width: 10rem; max-width: 14rem; white-space: normal; }
+.punch-location a { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; width: fit-content; padding-block: var(--space-1); }
+.location-export-option { display: flex; align-items: flex-start; gap: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); font-size: var(--font-sm); }
+.location-export-option input { flex-shrink: 0; width: 20px; height: 20px; accent-color: var(--text-primary); }
+.location-export-option span { display: grid; gap: var(--space-1); }
+.location-export-option small { color: var(--text-secondary); }
 .employee-section-heading h3 { color: var(--text-primary); font-size: var(--font-xl); }
 .employee-section-heading p { color: var(--text-muted); font-size: var(--font-sm); }
 .employee-record-filters { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); }

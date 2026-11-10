@@ -31,6 +31,10 @@ O Supabase valida o tipo de vínculo e a sequência das marcações e grava os h
 
 ### Recursos
 
+A entrada e a saída solicitam a localização do dispositivo de todos os funcionários CLT e PJ, com permissão do navegador e sem rastreamento contínuo. O registro guarda coordenadas e precisão aproximada ou a indicação da falha de captura; uma falha não impede a marcação. O administrador consulta a localização junto de cada horário em **Funcionários** e abre o local no mapa. Antes de exportar o período, a opção **Incluir localizações no relatório** controla sua presença no PDF e no Excel, desmarcada por padrão. Desmarcá-la não desliga a coleta. Registros antigos ou inseridos manualmente não recebem coordenadas retroativas; horários corrigidos deixam de exibir a localização da marcação original.
+
+Para disponibilizar este recurso, aplique a migração `20261110164734_punch_location_sharing.sql` antes de publicar o frontend atualizado. A captura usa HTTPS (ou localhost em desenvolvimento). Coordenadas são informadas pelo dispositivo e não constituem verificação da presença física.
+
 | Funcionário | Administrador |
 | --- | --- |
 | Escolher CLT ou PJ no login e registrar o próprio ponto | Acompanhar faltas, atrasos e horas extras de CLT |

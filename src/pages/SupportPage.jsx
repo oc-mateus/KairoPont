@@ -47,7 +47,7 @@ export default function SupportPage() {
       <Link className="btn btn-secondary" to={active ? (profile.role === 'admin' ? '/admin' : '/ponto') : '/login'}>{active ? 'Voltar ao portal' : 'Acessar minha conta'}</Link>
     </header>
     <main className="support-main">
-      <section className="support-intro"><div><h1>Como podemos ajudar?</h1><p>Consulte as orientações ou envie sua dúvida para a equipe da Kairo.</p></div><span className="support-availability">Base de ajuda disponível 24h</span></section>
+      <section className="support-intro"><div><h1>Como podemos ajudar?</h1></div><span className="support-availability">Base de ajuda disponível 24h</span></section>
       <div className="support-workspace">
         <section className="support-guides" aria-labelledby="guides-title">
           <h2 id="guides-title">Resolva por aqui</h2>
@@ -55,14 +55,14 @@ export default function SupportPage() {
           <div className="support-topics" role="group" aria-label="Temas da ajuda">{SUPPORT_CATEGORIES.map((item) => <button type="button" key={item.id} aria-pressed={category === item.id} onClick={() => { setCategory(item.id); setSearch(''); }} disabled={asking}>{item.label}</button>)}</div>
           <div className="support-articles">{filtered.map((article) => <details key={article.id}><summary>{article.title}</summary><p>{article.answer}</p><ol>{article.steps.map((step) => <li key={step}>{step}</li>)}</ol><Link to={article.link.to}>{article.link.label}</Link></details>)}</div>
           {filtered.length === 0 && <p className="support-empty">{category === 'outro' && !search ? 'Correções de jornada, férias e dados pessoais precisam da análise da equipe. Abra um chamado na sua conta.' : 'Nenhuma orientação encontrada. Tente outro termo ou descreva sua dúvida ao lado.'}</p>}
-          <p className="support-guides-note">As orientações não alteram sua conta ou seus registros. Para corrigir uma informação, fale com a equipe.</p>
+          <p className="support-guides-note">Correções de dados e registros devem ser solicitadas à equipe.</p>
         </section>
         <aside className="support-contact" aria-labelledby="support-contact-title">
           <h2 id="support-contact-title">Descreva sua dúvida</h2>
           <form onSubmit={ask} aria-busy={asking}><label className="form-group" htmlFor="support-question"><span className="form-label">O que você precisa resolver?</span><textarea className="form-input" id="support-question" rows={5} required minLength={10} maxLength={3000} value={question} onChange={(event) => setQuestion(event.target.value)} disabled={asking} /></label><button className="btn btn-primary" type="submit" disabled={asking || authLoading}>{asking ? 'Enviando pedido…' : 'Buscar orientação'}</button></form>
           {error && <p role="alert" className="support-error">{error}</p>}
           {!active && !authLoading && <p className="support-guides-note"><Link to="/login">Entre na sua conta</Link> para enviar o pedido.</p>}
-          {confirmation && <p role="status" className="support-confirmation">Chamado #{confirmation.ticket.protocol} registrado. A equipe vai analisar seu pedido.</p>}
+          {confirmation && <p role="status" className="support-confirmation">Chamado #{confirmation.ticket.protocol} registrado.</p>}
         </aside>
       </div>
     </main>

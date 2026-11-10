@@ -145,7 +145,7 @@ export default function DocumentsPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h2 className="page-title">Documentos</h2>
-          <p className="page-subtitle">Envie atestados médicos e declarações de horas</p>
+
         </div>
         <div className="page-header-actions">
           <button className="btn btn-primary" onClick={() => setShowUpload(true)}>
@@ -229,7 +229,7 @@ export default function DocumentsPage() {
         <EmptyState
           icon="📄"
           title="Nenhum documento"
-          text="Você ainda não enviou nenhum documento. Clique em 'Enviar Documento' para começar."
+          text="Envie um atestado ou uma declaração de horas."
         />
       ) : (
         <>

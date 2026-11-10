@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run check:edge
+      - run: npm run test:edge
       - name: Auditar dependências de produção
         run: npm audit --omit=dev --audit-level=high
       - name: Validar configuração do Supabase para o cliente
@@ -38,6 +40,7 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_SUPPORT_ENABLED: 'true'
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://preview.invalid' }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'preview-build-only' }}
       - run: cp dist/index.html dist/404.html

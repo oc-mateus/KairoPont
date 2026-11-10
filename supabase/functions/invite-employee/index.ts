@@ -1,18 +1,6 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createSupabaseContext } from "npm:@supabase/server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function response(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+import "jsr:@supabase/functions-js@2.119.0/edge-runtime.d.ts";
+import { createSupabaseContext } from "npm:@supabase/server@1.9.2";
+import { enforceRateLimit, HttpError, readJsonObject, requestSecurity, stringField } from "../_shared/security.mjs";
 
 function validCPF(value: string) {
   const cpf = value.replace(/\D/g, "");
@@ -70,13 +58,12 @@ function makeSchedule(value: unknown) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return response({ error: "Método não permitido." }, 405);
-
-  const { data: ctx, error: authError } = await createSupabaseContext(req, { auth: "user" });
-  if (authError || !ctx?.userClaims?.id) return response({ error: "Sessão inválida." }, 401);
+  const { reply: response, earlyResponse } = requestSecurity(req);
+  if (earlyResponse) return earlyResponse;
 
   try {
+    const { data: ctx, error: authError } = await createSupabaseContext(req, { auth: "user" });
+    if (authError || !ctx?.userClaims?.id) return response({ error: "Sessão inválida." }, 401);
     const { data: admin, error: adminError } = await ctx.supabase
       .from("funcionarios")
       .select("id")
@@ -86,13 +73,20 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (adminError || !admin) return response({ error: "Somente um administrador ativo pode criar contas." }, 403);
 
-    const input = await req.json();
-    const email = String(input.email || "").trim().toLowerCase();
-    const nome = String(input.nome || "").trim();
-    const cpf = String(input.cpf || "").replace(/\D/g, "");
-    const cargo = String(input.cargo || "").trim();
-    const tipoContrato = String(input.tipo_contrato || "clt");
-    const dataAdmissao = String(input.data_admissao || "");
+    const limited = await enforceRateLimit(ctx.supabaseAdmin, "invite-employee", ctx.userClaims.id, response);
+    if (limited) return limited;
+
+    const input = await readJsonObject(req, [
+      "email", "nome", "cpf", "cargo", "tipo_contrato", "data_admissao", "escala_trabalho",
+      // Older published clients send these UI-only fields; they are never persisted.
+      "turno_id", "tipo", "dias_semana", "horarios_habituais", "contabilizar_atrasos",
+    ]);
+    const email = stringField(input, "email", 254).toLowerCase();
+    const nome = stringField(input, "nome", 150);
+    const cpf = stringField(input, "cpf", 18).replace(/\D/g, "");
+    const cargo = stringField(input, "cargo", 100);
+    const tipoContrato = stringField(input, "tipo_contrato", 3, true) || "clt";
+    const dataAdmissao = stringField(input, "data_admissao", 10, true);
     const escala = tipoContrato === "clt" ? makeSchedule(input.escala_trabalho) : null;
     const todayParts = new Intl.DateTimeFormat("en-US", {
       timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
@@ -118,7 +112,7 @@ Deno.serve(async (req) => {
         cpf,
         cargo,
         tipo_contrato: tipoContrato,
-        data_admissao: dataAdmissao,
+        data_admissao: dataAdmissao || null,
         escala_trabalho: escala,
         convidado_por: admin.id,
       });
@@ -141,7 +135,8 @@ Deno.serve(async (req) => {
 
     return response({ message: "Convite enviado para o e-mail do funcionário." }, 201);
   } catch (error) {
-    console.error("employee invite failed", error);
+    if (error instanceof HttpError) return response({ error: error.message }, error.status);
+    console.error("employee invite failed");
     return response({ error: "Não foi possível criar o funcionário agora. Verifique os dados e tente novamente." }, 500);
   }
 });

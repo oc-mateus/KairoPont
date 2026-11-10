@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import LegalLinks from '../components/LegalLinks';
 
-const lastUpdated = '5 de novembro de 2026';
+const lastUpdated = '10 de novembro de 2026';
 
 function PrivacyPolicy() {
   return (
@@ -19,6 +19,7 @@ function PrivacyPolicy() {
         <li>Pedidos de férias e documentos enviados pelo funcionário, quando esses recursos forem aplicáveis ao vínculo.</li>
         <li>Foto de perfil opcional, para exibição de avatar. O arquivo fica em um bucket público de imagens; não envie imagens sensíveis ou que não queira tornar acessíveis publicamente.</li>
         <li>Preferências básicas do aplicativo, como tema e sessão de acesso, guardadas no navegador para manter o funcionamento escolhido.</li>
+        <li>Dúvidas e chamados de suporte, quando o atendimento estiver habilitado, para orientar o uso do portal e acompanhar as respostas da equipe. Evite incluir senhas, CPF e informações médicas nas mensagens.</li>
       </ul>
 
       <h2>Finalidades e bases de tratamento</h2>
@@ -28,6 +29,7 @@ function PrivacyPolicy() {
       <p>O KairoPont usa Supabase para autenticação, banco de dados e armazenamento; o projeto de banco está hospedado na região US East (N. Virginia). E-mails de acesso, recuperação de senha e notificações podem ser enviados por Supabase e Resend. A fonte tipográfica DM Sans é carregada do Google Fonts. O aplicativo também é servido pelo GitHub Pages. Esses serviços recebem os dados técnicos necessários às respectivas solicitações; não usamos Google Analytics, pixels de publicidade ou scripts de rastreamento no código do aplicativo.</p>
 
       <h2>Compartilhamento e segurança</h2>
+      <p>Quando a ajuda por IA estiver habilitada, a dúvida enviada pode ser processada pela OpenAI junto das orientações públicas do produto. A aplicação remove padrões comuns de e-mail, telefone e CPF do texto enviado ao modelo e encaminha temas sensíveis para atendimento humano. Registros de ponto, documentos e dados cadastrais não são consultados pela IA. Os chamados ficam acessíveis somente às contas autorizadas. Ao enviar um pedido de suporte, a mensagem, o nome e o e-mail de cadastro podem ser enviados à caixa de suporte da Kairo, com o protocolo e um link para o portal, para permitir a resposta por e-mail.</p>
       <p>Os registros de funcionários são limitados por regras de acesso no banco: funcionários consultam os próprios dados e administradores autorizados gerenciam os registros necessários à operação. Documentos enviados ficam em armazenamento privado; fotos de perfil são públicas, como explicado acima. As chaves privilegiadas do banco não são usadas no navegador. O sistema aplica controles técnicos, mas nenhum serviço conectado à internet pode prometer risco zero.</p>
 
       <h2>Cookies e armazenamento no navegador</h2>
@@ -57,6 +59,7 @@ function TermsOfUse() {
 
       <h2>Registros e suporte</h2>
       <p>O aplicativo oferece consulta e exportação dos dados disponíveis à conta. Correções administrativas podem exigir justificativa e ficam registradas em auditoria. Se uma informação parecer incorreta ou o acesso falhar, procure a equipe administrativa da Kairo Automações pelo canal corporativo de RH.</p>
+      <p>A <Link to="/suporte">central de ajuda</Link> reúne orientações de uso. Quando habilitado, o suporte permite abrir e acompanhar chamados pelo portal. A ajuda automática é limitada aos temas publicados; correções de jornada, férias e solicitações sobre dados pessoais dependem da equipe. A disponibilidade da base de ajuda não implica atendimento humano imediato.</p>
 
       <h2>Disponibilidade e mudanças</h2>
       <p>Recursos podem ser ajustados para manter a operação e a segurança do sistema. O aplicativo depende de conexão com a internet e de serviços externos de hospedagem, autenticação, armazenamento e envio de e-mails.</p>

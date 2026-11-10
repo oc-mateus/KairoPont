@@ -1,0 +1,71 @@
+import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { SUPPORT_ARTICLES, SUPPORT_CATEGORIES, normalizeSupportText } from '../../shared/support.mjs';
+import { supportEmail, supportRequest } from '../lib/support';
+import LegalLinks from '../components/LegalLinks';
+
+export default function SupportPage() {
+  const { session, profile, loading: authLoading } = useAuth();
+  const active = Boolean(session && profile?.ativo);
+  const [category, setCategory] = useState('acesso');
+  const [search, setSearch] = useState('');
+  const [question, setQuestion] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmation, setConfirmation] = useState(null);
+  const request = useRef(null);
+  const sending = useRef(false);
+  const filtered = SUPPORT_ARTICLES.filter((article) => (!search ? article.category === category : normalizeSupportText(`${article.title} ${article.answer}`).includes(normalizeSupportText(search))));
+
+  async function ask(event) {
+    event.preventDefault();
+    if (sending.current) return;
+    setError('');
+    setConfirmation(null);
+    if (!active) { setError('Entre na sua conta para enviar o pedido com seu nome e e-mail.'); return; }
+    const description = question.trim();
+    if (Array.from(description).length < 10) { setError('Descreva o que aconteceu com pelo menos 10 caracteres.'); return; }
+    sending.current = true;
+    setAsking(true);
+    const body = { action: 'create_ticket', category, subject: Array.from(description.replace(/\s+/g, ' ')).slice(0, 120).join(''), description };
+    const fingerprint = JSON.stringify(body);
+    if (request.current?.fingerprint !== fingerprint) request.current = { fingerprint, id: crypto.randomUUID() };
+    try {
+      const result = await supportRequest({ ...body, request_id: request.current.id });
+      if (!result?.ticket?.id) throw new Error('Não foi possível confirmar o chamado. Tente novamente.');
+      request.current = null;
+      setConfirmation(result);
+      setQuestion('');
+    } catch (err) { setError(err.message); }
+    finally { sending.current = false; setAsking(false); }
+  }
+
+  return <div className="support-page">
+    <header className="support-header">
+      <Link className="marketing-brand" to="/" aria-label="KairoPont, início"><img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" /><span><strong>KairoPont</strong><small>Central de ajuda</small></span></Link>
+      <Link className="btn btn-secondary" to={active ? (profile.role === 'admin' ? '/admin' : '/ponto') : '/login'}>{active ? 'Voltar ao portal' : 'Acessar minha conta'}</Link>
+    </header>
+    <main className="support-main">
+      <section className="support-intro"><div><h1>Como podemos ajudar?</h1><p>Consulte as orientações ou envie sua dúvida para a equipe da Kairo.</p></div><span className="support-availability">Base de ajuda disponível 24h</span></section>
+      <div className="support-workspace">
+        <section className="support-guides" aria-labelledby="guides-title">
+          <h2 id="guides-title">Resolva por aqui</h2>
+          <label className="support-search" htmlFor="support-search"><span className="form-label">Buscar na ajuda</span><input className="form-input" id="support-search" type="search" placeholder="Senha, ponto, PDF…" maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+          <div className="support-topics" role="group" aria-label="Temas da ajuda">{SUPPORT_CATEGORIES.map((item) => <button type="button" key={item.id} aria-pressed={category === item.id} onClick={() => { setCategory(item.id); setSearch(''); }} disabled={asking}>{item.label}</button>)}</div>
+          <div className="support-articles">{filtered.map((article) => <details key={article.id}><summary>{article.title}</summary><p>{article.answer}</p><ol>{article.steps.map((step) => <li key={step}>{step}</li>)}</ol><Link to={article.link.to}>{article.link.label}</Link></details>)}</div>
+          {filtered.length === 0 && <p className="support-empty">{category === 'outro' && !search ? 'Correções de jornada, férias e dados pessoais precisam da análise da equipe. Abra um chamado na sua conta.' : 'Nenhuma orientação encontrada. Tente outro termo ou descreva sua dúvida ao lado.'}</p>}
+          <p className="support-guides-note">As orientações não alteram sua conta ou seus registros. Para corrigir uma informação, fale com a equipe.</p>
+        </section>
+        <aside className="support-contact" aria-labelledby="support-contact-title">
+          <h2 id="support-contact-title">Descreva sua dúvida</h2><p className="text-muted">Ao buscar orientação, você abre um chamado e envia sua mensagem, nome e e-mail de cadastro à equipe{supportEmail ? ` em ${supportEmail}` : ''}. Não inclua senha, CPF ou informações médicas.</p>
+          <form onSubmit={ask} aria-busy={asking}><label className="form-group" htmlFor="support-question"><span className="form-label">O que você precisa resolver?</span><textarea className="form-input" id="support-question" rows={5} required minLength={10} maxLength={3000} value={question} onChange={(event) => setQuestion(event.target.value)} disabled={asking} /></label><button className="btn btn-primary" type="submit" disabled={asking || authLoading}>{asking ? 'Enviando pedido…' : 'Buscar orientação'}</button></form>
+          {error && <p role="alert" className="support-error">{error}</p>}
+          {!active && !authLoading && <p className="support-guides-note"><Link to="/login">Entre na sua conta</Link> para enviar o pedido.</p>}
+          {confirmation && <p role="status" className="support-confirmation">Chamado #{confirmation.ticket.protocol} registrado.{confirmation.delivery === 'sent' ? ' Sua mensagem foi enviada por e-mail à equipe.' : ' Seu pedido está salvo para a equipe, mas o envio por e-mail ainda não foi confirmado.'}</p>}
+        </aside>
+      </div>
+    </main>
+    <footer className="support-footer"><span>Kairo Automações · KairoPont</span><LegalLinks /></footer>
+  </div>;
+}

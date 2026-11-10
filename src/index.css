@@ -533,11 +533,6 @@ input, select, textarea {
 .employee-habitual-schedule-editor { display: grid; gap: 0.9rem; padding: 1rem; border: 1px solid var(--border-default); border-radius: var(--radius-md); min-width: 0; }
 .employee-habitual-schedule-editor legend { padding: 0 0.4rem; color: var(--text-secondary); font-size: var(--font-sm); font-weight: 700; }
 .employee-habitual-schedule-editor > p { margin: -0.4rem 0 0; color: var(--text-muted); font-size: var(--font-sm); }
-.employee-delay-count-toggle { display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.85rem 1rem; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-card); cursor: pointer; }
-.employee-delay-count-toggle input { width: 1rem; height: 1rem; margin: 0.2rem 0 0; accent-color: var(--kairo-green-600); flex: 0 0 auto; }
-.employee-delay-count-toggle span { display: grid; gap: 0.25rem; }
-.employee-delay-count-toggle strong { color: var(--text-primary); font-size: var(--font-sm); }
-.employee-delay-count-toggle small { color: var(--text-muted); font-size: var(--font-xs); line-height: 1.5; }
 .employee-habitual-schedule-list { display: grid; gap: 0.5rem; }
 .employee-habitual-schedule { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-width: 0; padding: 0.75rem 0.9rem; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-card); }
 .employee-habitual-schedule > div { display: grid; gap: 0.2rem; min-width: 0; }
@@ -1754,14 +1749,14 @@ select.form-input {
 .employee-select-cpf { color: var(--text-secondary); font-size: var(--font-xs); white-space: nowrap; }
 .employee-select-arrow { color: var(--text-muted); font-size: 1.75rem; line-height: 1; }
 .employee-select-actions { display: flex; gap: var(--space-1); border-left: 1px solid var(--border-default); padding-left: var(--space-2); }
-.employee-profile-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-3); padding: var(--space-5); margin-bottom: var(--space-6); background: var(--gradient-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.employee-profile-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-5); margin-bottom: var(--space-6); background: var(--gradient-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.employee-profile-heading { min-width: 0; overflow-wrap: anywhere; }
 .employee-profile-heading h3 { color: var(--text-primary); font-size: var(--font-xl); }
 .employee-profile-heading p { color: var(--text-muted); font-size: var(--font-sm); }
 .employee-profile-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); grid-column: 1 / -1; padding-top: var(--space-4); border-top: 1px solid var(--border-default); }
 .employee-profile-fields > div { display: grid; gap: 2px; min-width: 0; }
 .employee-profile-fields span { color: var(--text-muted); font-size: var(--font-xs); }
 .employee-profile-fields strong { color: var(--text-primary); font-size: var(--font-sm); overflow-wrap: anywhere; }
-.employee-contract-value { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .employee-records-section, .employee-documents-section { margin-bottom: var(--space-6); }
 .calendar-form-card { padding: var(--space-5); border: 1px solid var(--border-default); border-radius: 16px; background: var(--bg-card); }
 .calendar-form-card h3 { margin-bottom: var(--space-4); color: var(--text-primary); font-size: var(--font-xl); }
@@ -1803,6 +1798,8 @@ select.form-input {
 .pj-hours-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-4); color: var(--text-secondary); background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
 .pj-hours-summary strong { color: var(--text-primary); font-size: var(--font-lg); }
 .employee-employment-form { display: grid; gap: var(--space-4); }
+.employee-edit-fields { display: grid; gap: var(--space-4); min-width: 0; padding: 0; border: 0; }
+.employee-edit-fields .form-row { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
 .employee-weekdays { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-secondary); }
 .employee-weekdays legend { padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--font-xs); }
 .employee-weekdays label { display: flex; align-items: center; gap: var(--space-1); }

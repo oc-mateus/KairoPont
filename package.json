@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "test": "node --test",
+    "test:edge": "npx --yes deno@2.9.6 test --allow-env=SUPPORT_ENABLED,SUPPORT_AI_ENABLED,OPENAI_API_KEY,SUPPORT_AI_MODEL,SUPPORT_EMAIL_ENABLED,SUPPORT_EMAIL,SUPPORT_EMAIL_FROM,FERIAS_EMAIL_FROM,RESEND_API_KEY --config supabase/tests/deno.json supabase/tests/edge_security.spec.ts supabase/tests/support-handler.spec.ts",
+    "check:edge": "npx --yes deno@2.9.6 check --config supabase/functions/invite-employee/deno.json supabase/functions/invite-employee/index.ts supabase/functions/vacation-decision-email/index.ts supabase/functions/support-assistant/index.ts",
     "configure:document-bucket": "node scripts/configure-document-bucket.mjs",
     "configure:storage": "node scripts/configure-document-bucket.mjs",
     "build": "vite build",
@@ -21,6 +23,7 @@
     "react-router-dom": "^7.1.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.15",
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.0.0"
   },

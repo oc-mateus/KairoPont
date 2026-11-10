@@ -14,6 +14,8 @@ const RecoverPasswordPage = lazy(() => import('./pages/RecoverPasswordPage'));
 const SetPasswordPage = lazy(() => import('./pages/SetPasswordPage'));
 const LegalPage = lazy(() => import('./pages/LegalPage'));
 const MarketingPage = lazy(() => import('./pages/MarketingPage'));
+const SupportPage = lazy(() => import('./pages/SupportPage'));
+const AdminSupport = lazy(() => import('./pages/admin/AdminSupport'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminEmployees = lazy(() => import('./pages/admin/AdminEmployees'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
@@ -80,6 +82,7 @@ export default function App() {
     <Suspense fallback={<div className="flex flex-center" style={{ minHeight: '100vh' }}><Spinner size="lg" /></div>}>
       <Routes>
         <Route path="/" element={<MarketingPage />} />
+        <Route path="/suporte" element={<SupportPage />} />
         <Route path="/privacidade" element={<LegalPage type="privacy" />} />
         <Route path="/termos" element={<LegalPage type="terms" />} />
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
@@ -98,6 +101,7 @@ export default function App() {
         <Route path="/admin/funcionarios" element={<PrivateRoute requireAdmin><AdminEmployees /></PrivateRoute>} />
         <Route path="/admin/calendario" element={<PrivateRoute requireAdmin><AdminCalendar /></PrivateRoute>} />
         <Route path="/admin/auditoria" element={<PrivateRoute requireAdmin><AdminAudit /></PrivateRoute>} />
+        <Route path="/admin/suporte" element={<PrivateRoute requireAdmin><AdminSupport /></PrivateRoute>} />
 
         <Route path="*" element={<Navigate to="/ponto" replace />} />
       </Routes>

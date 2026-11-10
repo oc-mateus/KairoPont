@@ -29,6 +29,7 @@ export default function MarketingPage() {
         </Link>
         <nav aria-label="Navegação principal">
           <a href="#recursos">Recursos</a>
+          <Link className="marketing-support-link" to="/suporte">Ajuda</Link>
           <Link className="btn btn-primary marketing-login" to="/login">Acessar portal</Link>
         </nav>
       </header>

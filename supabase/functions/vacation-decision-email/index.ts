@@ -1,18 +1,6 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createSupabaseContext } from "npm:@supabase/server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function reply(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+import "jsr:@supabase/functions-js@2.119.0/edge-runtime.d.ts";
+import { createSupabaseContext } from "npm:@supabase/server@1.9.2";
+import { enforceRateLimit, HttpError, readJsonObject, requestSecurity, uuidField } from "../_shared/security.mjs";
 
 function escapeHtml(value: unknown) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -32,20 +20,21 @@ function addIsoDays(value: string, days: number) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return reply({ error: "Método não permitido." }, 405);
-
-  const { data: ctx, error: authError } = await createSupabaseContext(req, { auth: "user" });
-  if (authError || !ctx?.userClaims?.id) return reply({ error: "Sessão inválida." }, 401);
+  const { reply, earlyResponse } = requestSecurity(req);
+  if (earlyResponse) return earlyResponse;
 
   try {
+    const { data: ctx, error: authError } = await createSupabaseContext(req, { auth: "user" });
+    if (authError || !ctx?.userClaims?.id) return reply({ error: "Sessão inválida." }, 401);
     const { data: admin, error: adminError } = await ctx.supabase
       .from("funcionarios").select("id").eq("auth_id", ctx.userClaims.id)
       .eq("role", "admin").eq("ativo", true).maybeSingle();
     if (adminError || !admin) return reply({ error: "Somente um administrador ativo pode enviar este e-mail." }, 403);
 
-    const input = await req.json();
-    const requestId = String(input.solicitacao_id || "");
+    const limited = await enforceRateLimit(ctx.supabaseAdmin, "vacation-decision-email", ctx.userClaims.id, reply);
+    if (limited) return limited;
+    const input = await readJsonObject(req, ["solicitacao_id"]);
+    const requestId = uuidField(input, "solicitacao_id");
     const { data: request, error: requestError } = await ctx.supabaseAdmin
       .from("solicitacoes_ferias")
       .select("id, funcionario_id, periodo_id, data_inicio, data_fim, data_retorno, status, justificativa_recusa, decidida_em, email_enviado_em")
@@ -53,6 +42,9 @@ Deno.serve(async (req) => {
     if (requestError) throw requestError;
     if (!request || !["aprovada", "recusada"].includes(request.status)) {
       return reply({ error: "Decisão finalizada não encontrada." }, 404);
+    }
+    if (request.email_enviado_em) {
+      return reply({ message: "O e-mail desta decisão já foi enviado ao funcionário." });
     }
 
     const [{ data: employee, error: employeeError }, { data: cycle, error: cycleError }] = await Promise.all([
@@ -66,7 +58,7 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("RESEND_API_KEY");
     const from = Deno.env.get("FERIAS_EMAIL_FROM");
     if (!apiKey || !from) {
-      return reply({ error: "E-mail não configurado. Cadastre RESEND_API_KEY e FERIAS_EMAIL_FROM nos secrets da função." }, 503);
+      return reply({ error: "Envio de e-mail indisponível. Contate o administrador." }, 503);
     }
 
     const approved = request.status === "aprovada";
@@ -85,12 +77,13 @@ Deno.serve(async (req) => {
         "Idempotency-Key": `ferias-${request.id}-${request.decidida_em || request.status}`,
       },
       body: JSON.stringify({ from, to: [employee.email], subject, html, text: plainText }),
+      signal: AbortSignal.timeout(15000),
     });
     const resendBody = await resendResponse.json().catch(() => ({}));
     if (!resendResponse.ok) {
       const message = String(resendBody?.message || "Falha do provedor de e-mail").slice(0, 500);
       await ctx.supabaseAdmin.from("solicitacoes_ferias").update({ email_erro: message }).eq("id", request.id);
-      return reply({ error: `Decisão registrada, mas o e-mail não foi enviado: ${message}` }, 502);
+      return reply({ error: "Decisão registrada, mas o provedor não enviou o e-mail. Tente novamente em instantes." }, 502);
     }
 
     const { error: updateError } = await ctx.supabaseAdmin.from("solicitacoes_ferias")
@@ -98,7 +91,8 @@ Deno.serve(async (req) => {
     if (updateError) throw updateError;
     return reply({ message: "E-mail da decisão enviado ao funcionário." });
   } catch (error) {
-    console.error("vacation decision email failed", error);
+    if (error instanceof HttpError) return reply({ error: error.message }, error.status);
+    console.error("vacation decision email failed");
     return reply({ error: "Não foi possível enviar o e-mail da decisão." }, 500);
   }
 });

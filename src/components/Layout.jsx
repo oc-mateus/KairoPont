@@ -6,6 +6,8 @@ import { Avatar } from './ui';
 import InstallAppButton from './InstallAppButton';
 import LegalLinks from './LegalLinks';
 
+const SupportIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/></svg>;
+
 const ClockIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
 const ChartIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 17v-4"/><path d="M12 17V9"/><path d="M17 17v-8"/></svg>;
 const DocIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>;
@@ -22,6 +24,7 @@ const employeeNav = [
   { id: 'documentos', label: 'Documentos', icon: DocIcon, path: '/documentos' },
   { id: 'ferias', label: 'Minhas Férias', icon: VacationIcon, path: '/ferias' },
   { id: 'perfil', label: 'Meu Perfil', icon: UserIcon, path: '/perfil' },
+  { id: 'suporte', label: 'Ajuda e suporte', icon: SupportIcon, path: '/suporte' },
 ];
 
 const adminNav = [
@@ -29,10 +32,11 @@ const adminNav = [
   { id: 'admin-funcionarios', label: 'Funcionários', icon: UsersIcon, path: '/admin/funcionarios' },
   { id: 'admin-calendario', label: 'Calendário de feriados', icon: CalendarIcon, path: '/admin/calendario' },
   { id: 'admin-auditoria', label: 'Auditoria', icon: ChartIcon, path: '/admin/auditoria' },
+  { id: 'admin-suporte', label: 'Atendimentos', icon: SupportIcon, path: '/admin/suporte' },
   { id: 'admin-ferias', label: 'Férias', icon: VacationIcon, path: '/ferias' },
 ];
 
-const adminAccountNav = employeeNav.filter(item => item.id === 'perfil');
+const adminAccountNav = employeeNav.filter(item => ['perfil', 'suporte'].includes(item.id));
 
 export default function Layout({ children }) {
   const { profile, isAdmin, signOut } = useAuth();

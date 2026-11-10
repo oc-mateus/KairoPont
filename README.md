@@ -12,7 +12,7 @@
 
 ---
 
-O KairoPont organiza o registro de jornada, a consulta de históricos e a gestão de funcionários CLT e PJ. A aplicação web fica no GitHub Pages; autenticação, banco de dados e arquivos usam o Supabase. O [Guia do Projeto](docs/GUIA_DO_PROJETO.md) reúne os fluxos, regras de negócio, estrutura técnica e procedimentos de operação. A preparação para pilotos comerciais está documentada em [Comercialização e operação](docs/COMERCIALIZACAO.md).
+O KairoPont organiza o registro de jornada, a consulta de históricos e a gestão de funcionários CLT e PJ. A aplicação web fica no GitHub Pages; autenticação, banco de dados e arquivos usam o Supabase. O [Guia do Projeto](docs/GUIA_DO_PROJETO.md) reúne os fluxos, regras de negócio, estrutura técnica e procedimentos de operação. A preparação para pilotos comerciais está documentada em [Comercialização e operação](docs/COMERCIALIZACAO.md), e os controles e testes de segurança em [Segurança](docs/SEGURANCA.md).
 
 ## Como funciona
 
@@ -42,7 +42,7 @@ O painel de frequência filtra mês atual, mês/ano específico, últimos seis m
 
 A interface mantém os mesmos componentes e espaçamentos nos temas claro e escuro, variando a paleta de cores. O botão de tema fica acessível no cabeçalho sem exigir rolagem horizontal. A navegação e os controles são responsivos para uso equivalente em celular e computador; ícones seguem o estilo do menu, sem emojis, e as páginas evitam títulos duplicados.
 
-Administradores podem corrigir marcações de ponto com uma observação obrigatória, registrada na auditoria junto dos valores alterados. Para funcionários com horários variáveis, também podem desativar a contabilização de atrasos sem alterar os indicadores de faltas ou horas extras. O período administrativo de correção e o fluxo para ajustes históricos são descritos no [Guia do Projeto](docs/GUIA_DO_PROJETO.md).
+Na ficha do funcionário, **Editar cadastro** permite alterar nome, cargo, vínculo CLT/PJ, admissão e horários habituais, com salvamento conjunto e auditoria dos valores anteriores e novos. A opção “Contabilizar atrasos” foi retirada do formulário. Administradores também podem corrigir marcações de ponto com uma observação obrigatória, registrada na auditoria junto dos valores alterados. O período administrativo de correção e o fluxo para ajustes históricos são descritos no [Guia do Projeto](docs/GUIA_DO_PROJETO.md).
 
 Funcionários CLT podem enviar e consultar documentos autorizados e acessar férias. Essas áreas não são exibidas para contas PJ, que usam o ponto apenas para registrar e acompanhar as horas trabalhadas. Na administração, a seção de férias da ficha também é exclusiva para CLT.
 
@@ -54,12 +54,17 @@ O cadastro cria perfis de funcionário. A atribuição do papel de administrador
 
 - As políticas RLS limitam funcionários aos próprios dados; ações administrativas exigem perfil de administrador.
 - O bucket `documentos` é privado. O bucket de fotos de perfil é público para exibir avatares.
-- A tela valida formato e tamanho de arquivo; execute `npm run configure:storage` para impor limites e tipos também no servidor. Forneça `SUPABASE_SERVICE_ROLE_KEY` apenas no ambiente local seguro do terminal.
+- A tela e o servidor validam os tipos e os limites de arquivo: documentos de até 10 MB e fotos de até 5 MB. A migração de segurança aplica essas restrições; `npm run configure:storage` permite reaplicá-las. Forneça `SUPABASE_SERVICE_ROLE_KEY` apenas no ambiente local seguro do terminal.
+- Convites e e-mails de férias têm cotas persistentes por administrador e por projeto, com bloqueio antes de chamar os provedores. Perfil e notificações permitem alterar somente os campos autorizados no banco.
 - O acesso é feito com e-mail e senha, com seleção do vínculo CLT/PJ validada contra o cadastro do funcionário. Administradores podem usar qualquer opção. O CPF é solicitado no cadastro e usado para identificar o funcionário, não para entrar.
 
-O site está publicado. A URL padrão do Supabase Auth e o endereço permitido para redefinição de senha usam `https://oc-mateus.github.io/KairoPont/` e `https://oc-mateus.github.io/KairoPont/definir-senha`. Antes do uso operacional, revise as credenciais da conta administrativa de teste, confirme a entrega de e-mails do Auth e aplique a configuração de limite e tipos do Storage.
+O site está publicado. A URL padrão do Supabase Auth e o endereço permitido para redefinição de senha usam `https://oc-mateus.github.io/KairoPont/` e `https://oc-mateus.github.io/KairoPont/definir-senha`. Antes do uso operacional, revise as credenciais da conta administrativa de teste e confirme a entrega de e-mails do Auth. Os limites e tipos do Storage foram aplicados ao ambiente atual em 8 de novembro de 2026.
 
 ## Desenvolvimento local
+
+### Suporte
+
+A central de ajuda em `/suporte` reúne orientações públicas e abre um chamado ao clicar em **Buscar orientação**. A administração consulta os pedidos em **Atendimentos**, com nome, e-mail do solicitante e opção de resposta por e-mail. O contato de suporte é **mcoliveira@kairoautomacoes.com.br**; o envio depende da chave Resend e de um remetente verificado. A IA permanece desligada. Consulte [Suporte](docs/SUPORTE.md) para configuração, limites e testes.
 
 Requisitos: Node.js 18 ou superior, npm e acesso ao Supabase `KairoPont`.
 
@@ -69,7 +74,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Execute `npm test` para rodar os testes automatizados de cálculos de jornada, datas, escalas e CPF.
+Execute `npm test` para rodar os testes automatizados de cálculos de jornada, datas, escalas, CPF e validação das requisições. `npm run test:edge` verifica autorização, cotas e efeitos dos serviços com provedores simulados. `npm run check:edge` valida os tipos das funções. Os testes de permissões e RLS estão em `supabase/tests/security.sql` e desfazem todos os dados de teste ao terminar.
 
 Preencha no `.env` local `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` com os valores públicos apropriados ao cliente. Não envie `.env`, chaves privilegiadas, senhas ou tokens ao GitHub.
 

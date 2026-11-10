@@ -33,7 +33,7 @@
 | Publicação com aba antiga | Falha de módulo simulada no navegador: uma recarga, carregamento concluído e ausência de ciclo |
 | Teclado | Foco contido na janela de envio, Escape e retorno ao botão de abertura verificados |
 
-Os testes visuais usaram a compilação final local conectada ao Supabase de produção. Falhas de rede e respostas atrasadas foram injetadas somente no navegador de teste. A verificação após a publicação confere também as páginas e o acesso no endereço público.
+Os testes visuais usaram a compilação final local conectada ao Supabase de produção. Falhas de rede e respostas atrasadas foram injetadas somente no navegador de teste. Após a publicação, as 12 páginas públicas passaram novamente pela conferência nas quatro larguras. O login PJ e o histórico foram conferidos também no endereço público, assim como a identificação da empresa e a página de licenças. A [publicação final](https://github.com/oc-mateus/KairoPont/actions/runs/42887879351) terminou com sucesso; o site respondeu HTTP 200 e o código de recuperação de versão foi confirmado no arquivo servido.
 
 ## Pendências e limites
 
@@ -47,4 +47,6 @@ Os avisos sobre funções de banco com privilégios elevados foram revisados jun
 
 ## Limpeza dos testes
 
-A conta foi criada especificamente para esta revisão, sem reutilizar funcionários reais. Ao concluir a conferência da publicação, seus arquivos, sessões, perfil, marcações e demais registros temporários devem estar removidos. A confirmação final dessa limpeza consta na entrega da revisão.
+A conta foi criada especificamente para esta revisão, sem reutilizar funcionários reais. A limpeza foi concluída após a conferência da publicação: documento e foto removidos pelo serviço de armazenamento, sessões revogadas e conta, perfil, marcações, metadados de documento e período de férias temporários apagados. As credenciais locais de teste também foram removidas.
+
+A consulta final confirmou zero contas, perfis, marcações, documentos, períodos de férias, sessões, objetos de armazenamento e políticas temporárias associados à identidade de teste. A base retornou às contagens iniciais de cinco perfis e sete contas de autenticação. Os registros reais não foram apagados.

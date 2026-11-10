@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { SUPPORT_ARTICLES, SUPPORT_CATEGORIES, normalizeSupportText } from '../../shared/support.mjs';
-import { supportEmail, supportRequest } from '../lib/support';
+import { supportRequest } from '../lib/support';
 import LegalLinks from '../components/LegalLinks';
 
 export default function SupportPage() {
@@ -58,7 +58,7 @@ export default function SupportPage() {
           <p className="support-guides-note">As orientações não alteram sua conta ou seus registros. Para corrigir uma informação, fale com a equipe.</p>
         </section>
         <aside className="support-contact" aria-labelledby="support-contact-title">
-          <h2 id="support-contact-title">Descreva sua dúvida</h2><p className="text-muted">Ao buscar orientação, você abre um chamado e envia sua mensagem, nome e e-mail de cadastro à equipe{supportEmail ? ` em ${supportEmail}` : ''}. Não inclua senha, CPF ou informações médicas.</p>
+          <h2 id="support-contact-title">Descreva sua dúvida</h2>
           <form onSubmit={ask} aria-busy={asking}><label className="form-group" htmlFor="support-question"><span className="form-label">O que você precisa resolver?</span><textarea className="form-input" id="support-question" rows={5} required minLength={10} maxLength={3000} value={question} onChange={(event) => setQuestion(event.target.value)} disabled={asking} /></label><button className="btn btn-primary" type="submit" disabled={asking || authLoading}>{asking ? 'Enviando pedido…' : 'Buscar orientação'}</button></form>
           {error && <p role="alert" className="support-error">{error}</p>}
           {!active && !authLoading && <p className="support-guides-note"><Link to="/login">Entre na sua conta</Link> para enviar o pedido.</p>}

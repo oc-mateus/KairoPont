@@ -1,5 +1,6 @@
 export const SITE_NAME = 'KairoPont';
 export const SITE_OWNER = 'Mateus de Campos Oliveira';
+export const SITE_COMPANY = 'Kairo Automações';
 export const CONTACT_EMAIL = 'mcoliveira@kairoautomacoes.com.br';
 export const DEFAULT_SITE_URL = 'https://oc-mateus.github.io/KairoPont/';
 
@@ -11,6 +12,7 @@ export const PAGE_METADATA = {
   '/termos': { title: 'Termos de uso | KairoPont', description: 'Condições de acesso e uso do KairoPont, responsabilidades e limites do serviço.', index: true },
   '/cookies': { title: 'Armazenamento e cookies | KairoPont', description: 'Conheça o armazenamento necessário ao portal. O KairoPont não usa analytics nem cookies publicitários.', index: true },
   '/login': { title: 'Entrar | KairoPont', description: 'Acesse sua conta individual para registrar e consultar a jornada.' },
+  '/licencas': { title: 'Licenças de terceiros | KairoPont', description: 'Consulte as bibliotecas, fontes e licenças de terceiros usadas pelo KairoPont.', index: true },
   '/recuperar-senha': { title: 'Redefinir senha | KairoPont', description: 'Solicite um link para redefinir a senha da sua conta.' },
   '/definir-senha': { title: 'Definir nova senha | KairoPont', description: 'Defina uma nova senha para acessar o portal.' },
   '/suporte/confirmacao': { title: 'Pedido registrado | KairoPont', description: 'Confirmação de abertura de um pedido de suporte.' },

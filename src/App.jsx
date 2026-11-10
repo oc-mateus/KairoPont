@@ -24,6 +24,7 @@ const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const CookiesPage = lazy(() => import('./pages/CookiesPage'));
+const LicensesPage = lazy(() => import('./pages/LicensesPage'));
 const SupportConfirmationPage = lazy(() => import('./pages/SupportConfirmationPage'));
 
 function PrivateRoute({ children, requireAdmin = false, requireSupport = false, requireClt = false }) {
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="/suporte/confirmacao" element={<SupportConfirmationPage />} />
         <Route path="/contato" element={<ContactPage />} />
         <Route path="/cookies" element={<CookiesPage />} />
+        <Route path="/licencas" element={<LicensesPage />} />
         <Route path="/privacidade" element={<LegalPage type="privacy" />} />
         <Route path="/termos" element={<LegalPage type="terms" />} />
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />

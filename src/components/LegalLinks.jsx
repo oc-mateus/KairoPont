@@ -13,7 +13,7 @@ export default function LegalLinks({ className = '' }) {
       <span aria-hidden="true">·</span>
       <Link to="/contato">Contato</Link>
       <span aria-hidden="true">·</span>
-      <a href={`${import.meta.env.BASE_URL}licenses/third-party-notices.txt`}>Licenças</a>
+      <Link to="/licencas">Licenças</Link>
     </nav>
   );
 }

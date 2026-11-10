@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
+import LoadError from '../../components/LoadError';
 import { calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, getCreditedDailyMinutes, getExpectedShiftMinutes, getOvertimeMinutes, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
@@ -119,6 +120,9 @@ export default function AdminEmployees() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [detailError, setDetailError] = useState(false);
+  const [detailAttempt, setDetailAttempt] = useState(0);
   const [detailLoading, setDetailLoading] = useState(false);
   const [records, setRecords] = useState([]);
   const [holidays, setHolidays] = useState([]);
@@ -159,12 +163,13 @@ export default function AdminEmployees() {
 
   const fetchEmployees = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data, error } = await supabase.from('funcionarios').select('*').order('nome');
       if (error) throw error;
       setEmployees(data || []);
     } catch (error) {
-      toast.error('Erro ao carregar funcionários: ' + error.message);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -428,6 +433,7 @@ export default function AdminEmployees() {
       setVacationPeriods([]);
       setVacationRequests([]);
       setDetailLoading(true);
+      setDetailError(false);
       try {
         const isPj = selectedEmp.tipo_contrato === 'pj';
         if (!isPj) {
@@ -450,14 +456,14 @@ export default function AdminEmployees() {
           setVacationRequests(employeeVacations);
         }
       } catch (error) {
-        if (!cancelled) toast.error('Erro ao carregar informações do funcionário: ' + error.message);
+        if (!cancelled) setDetailError(true);
       } finally {
         if (!cancelled) setDetailLoading(false);
       }
     }
     fetchEmployeeDetails();
     return () => { cancelled = true; };
-  }, [selectedEmp, range.start, range.end]);
+  }, [selectedEmp, range.start, range.end, detailAttempt]);
 
   const handleActionClick = (emp, type) => {
     setActionEmployee(emp);
@@ -645,6 +651,8 @@ export default function AdminEmployees() {
   };
 
   if (loading) return <div className="flex flex-center" style={{ minHeight: '40vh' }}><Spinner size="lg" /></div>;
+  if (loadError) return <LoadError message="Não foi possível carregar os funcionários. Confira sua conexão e tente novamente." onRetry={fetchEmployees} />;
+  if (selectedEmp && detailError && !detailLoading) return <div><button type="button" className="btn btn-ghost" onClick={closeEmployee}>Voltar à lista</button><LoadError message="Não foi possível carregar os dados deste funcionário. Confira sua conexão e tente novamente." onRetry={() => setDetailAttempt((value) => value + 1)} /></div>;
 
   return (
     <div className="admin-employees-page">

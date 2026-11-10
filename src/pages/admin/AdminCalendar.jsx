@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadError from '../../components/LoadError';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDate } from '../../lib/utils';
@@ -11,6 +12,7 @@ export default function AdminCalendar() {
   const [holidays, setHolidays] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [holidayToDelete, setHolidayToDelete] = useState(null);
@@ -18,12 +20,13 @@ export default function AdminCalendar() {
 
   const fetchHolidays = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data, error } = await supabase.from('feriados').select('*').order('data');
       if (error) throw error;
       setHolidays(data || []);
     } catch (error) {
-      toast.error('Não foi possível carregar o calendário: ' + error.message);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -79,6 +82,8 @@ export default function AdminCalendar() {
       setHolidayToDelete(null);
     }
   };
+
+  if (loadError && !loading) return <LoadError message="Não foi possível carregar o calendário. Confira sua conexão e tente novamente." onRetry={fetchHolidays} />;
 
   return (
     <div className="admin-calendar-page">

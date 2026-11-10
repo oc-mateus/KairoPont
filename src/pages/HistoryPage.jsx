@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import LoadError from '../components/LoadError';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
@@ -32,6 +33,8 @@ export default function HistoryPage() {
   const toast = useToast();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const latestRequest = useRef(0);
   const [filter, setFilter] = useState('week');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -57,7 +60,10 @@ export default function HistoryPage() {
 
   const fetchRecords = useCallback(async () => {
     if (!profile?.id) return;
+    const requestId = ++latestRequest.current;
     setLoading(true);
+    setLoadError(false);
+    setRecords([]);
     try {
       const { start, end } = getDateRange();
       if (!start || !end) {
@@ -80,16 +86,18 @@ export default function HistoryPage() {
         .order('data', { ascending: true });
 
       if (error) throw error;
+      if (requestId !== latestRequest.current) return;
       setRecords(data || []);
     } catch (err) {
-      toast.error('Erro ao carregar histórico: ' + err.message);
+      if (requestId === latestRequest.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (requestId === latestRequest.current) setLoading(false);
     }
   }, [profile?.id, getDateRange]);
 
   useEffect(() => {
     fetchRecords();
+    return () => { latestRequest.current += 1; };
   }, [fetchRecords]);
 
   const handleExportPDF = async () => {
@@ -342,6 +350,8 @@ export default function HistoryPage() {
         <div className="flex flex-center" style={{ padding: 'var(--space-12)' }}>
           <Spinner size="lg" />
         </div>
+      ) : loadError ? (
+        <LoadError message="Não foi possível carregar o histórico. Confira sua conexão e tente novamente." onRetry={fetchRecords} />
       ) : records.length === 0 ? (
         <EmptyState
           icon="📋"

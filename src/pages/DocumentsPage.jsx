@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import LoadError from '../components/LoadError';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { formatDateTime } from '../lib/utils';
@@ -19,6 +20,7 @@ export default function DocumentsPage() {
   const toast = useToast();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
 
@@ -31,6 +33,7 @@ export default function DocumentsPage() {
   const fetchDocuments = useCallback(async () => {
     if (!profile?.id) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const { data, error } = await supabase
         .from('documentos')
@@ -41,7 +44,7 @@ export default function DocumentsPage() {
       if (error) throw error;
       setDocuments(data || []);
     } catch (err) {
-      toast.error('Erro ao carregar documentos: ' + err.message);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -53,6 +56,7 @@ export default function DocumentsPage() {
 
   const handleUpload = async (e) => {
     e.preventDefault();
+    if (uploading) return;
     if (!docFile) {
       toast.warning('Selecione um arquivo.');
       return;
@@ -69,11 +73,16 @@ export default function DocumentsPage() {
       return;
     }
 
+    if (docPeriodEnd && (!docPeriodStart || docPeriodEnd < docPeriodStart)) {
+      toast.warning('Informe uma data inicial e uma data final igual ou posterior a ela.');
+      return;
+    }
+
     setUploading(true);
     try {
       // Upload do arquivo ao bucket privado
-      const fileExt = docFile.name.split('.').pop();
-      const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
+      const fileExt = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[docFile.type];
+      const fileName = `${profile.id}/${crypto.randomUUID()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('documentos')
@@ -155,12 +164,13 @@ export default function DocumentsPage() {
       </div>
 
       {/* Upload Modal */}
-      <Modal isOpen={showUpload} onClose={() => setShowUpload(false)} title="Enviar Documento">
+      <Modal isOpen={showUpload} onClose={() => { if (!uploading) setShowUpload(false); }} title="Enviar Documento">
         <form onSubmit={handleUpload}>
-          <div className="modal-body">
+          <fieldset className="modal-body document-upload-fields" disabled={uploading}>
             <div className="form-group">
-              <label className="form-label">Tipo de documento *</label>
+              <label className="form-label" htmlFor="document-type">Tipo de documento *</label>
               <select
+                id="document-type"
                 className="form-input"
                 value={docType}
                 onChange={e => setDocType(e.target.value)}
@@ -172,9 +182,10 @@ export default function DocumentsPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Arquivo (PDF ou imagem) *</label>
+              <label className="form-label" htmlFor="document-file">Arquivo (PDF ou imagem) *</label>
               <div className="file-upload">
                 <input
+                  id="document-file"
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png,.webp"
                   onChange={e => setDocFile(e.target.files[0])}
@@ -189,8 +200,9 @@ export default function DocumentsPage() {
 
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">Período início (opcional)</label>
+                <label className="form-label" htmlFor="document-start">Período início (opcional)</label>
                 <input
+                  id="document-start"
                   type="date"
                   className="form-input"
                   value={docPeriodStart}
@@ -198,8 +210,10 @@ export default function DocumentsPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Período fim (opcional)</label>
+                <label className="form-label" htmlFor="document-end">Período fim (opcional)</label>
                 <input
+                  id="document-end"
+                  min={docPeriodStart || undefined}
                   type="date"
                   className="form-input"
                   value={docPeriodEnd}
@@ -207,10 +221,10 @@ export default function DocumentsPage() {
                 />
               </div>
             </div>
-          </div>
+          </fieldset>
 
           <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => setShowUpload(false)}>
+            <button type="button" className="btn btn-secondary" disabled={uploading} onClick={() => setShowUpload(false)}>
               Cancelar
             </button>
             <button type="submit" className="btn btn-primary" disabled={uploading}>
@@ -225,6 +239,8 @@ export default function DocumentsPage() {
         <div className="flex flex-center" style={{ padding: 'var(--space-12)' }}>
           <Spinner size="lg" />
         </div>
+      ) : loadError ? (
+        <LoadError message="Não foi possível carregar seus documentos. Confira sua conexão e tente novamente." onRetry={fetchDocuments} />
       ) : documents.length === 0 ? (
         <EmptyState
           icon="📄"

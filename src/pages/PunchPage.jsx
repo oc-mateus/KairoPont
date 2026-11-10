@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import LoadError from '../components/LoadError';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { formatTime, getTodayInSP, formatDate } from '../lib/utils';
@@ -41,6 +42,7 @@ export default function PunchPage() {
   const toast = useToast();
   const [todayRecord, setTodayRecord] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [punching, setPunching] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [cooldown, setCooldown] = useState(false);
@@ -57,6 +59,7 @@ export default function PunchPage() {
   const fetchTodayRecord = useCallback(async () => {
     if (!profile?.id) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const todayDate = getTodayInSP();
       const { data: todayRecord, error } = await supabase
@@ -82,7 +85,7 @@ export default function PunchPage() {
         setTodayRecord(previous);
       }
     } catch (err) {
-      toast.error('Erro ao carregar registro do dia: ' + err.message);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -187,6 +190,10 @@ export default function PunchPage() {
     month: 'long',
     day: 'numeric',
   });
+
+  if (loadError && !loading) {
+    return <LoadError message="Não foi possível consultar sua jornada. Confira sua conexão e carregue os registros antes de fazer uma nova marcação." onRetry={fetchTodayRecord} />;
+  }
 
   if (loading) {
     return (

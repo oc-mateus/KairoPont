@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from './ui';
 import InstallAppButton from './InstallAppButton';
 import LegalLinks from './LegalLinks';
+import { useToast } from '../contexts/ToastContext';
 
 const SupportIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/></svg>;
 
@@ -41,6 +42,8 @@ const adminAccountNav = employeeNav.filter(item => ['perfil', 'suporte'].include
 
 export default function Layout({ children }) {
   const { profile, isAdmin, isSupport, signOut } = useAuth();
+  const toast = useToast();
+  const [signingOut, setSigningOut] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,8 +59,16 @@ export default function Layout({ children }) {
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/login');
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      navigate('/login');
+    } catch {
+      toast.error('Não foi possível sair. Confira sua conexão e tente novamente.');
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   return (
@@ -135,6 +146,8 @@ export default function Layout({ children }) {
           <button
             className="btn btn-ghost btn-icon"
             onClick={handleSignOut}
+            disabled={signingOut}
+            aria-label="Sair da conta"
             title="Sair"
           >
             {LogoutIcon}
@@ -148,6 +161,8 @@ export default function Layout({ children }) {
           <div className="flex gap-3" style={{ alignItems: 'center' }}>
             <button
               className="menu-toggle"
+              aria-label="Abrir menu de navegação"
+              aria-expanded={sidebarOpen}
               onClick={() => setSidebarOpen(true)}
             >
               ☰

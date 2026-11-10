@@ -88,7 +88,7 @@ export default function App() {
   const { passwordRecoveryPending } = useAuth();
   const location = useLocation();
 
-  if (passwordRecoveryPending && !['/definir-senha', '/privacidade', '/termos'].includes(location.pathname)) {
+  if (passwordRecoveryPending && !['/definir-senha', '/privacidade', '/termos', '/cookies', '/contato', '/licencas', '/suporte'].includes(location.pathname.replace(/\/+$/, ''))) {
     return <Navigate to="/definir-senha" replace />;
   }
 

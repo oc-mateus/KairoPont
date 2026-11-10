@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import LoadError from '../components/LoadError';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,6 +37,7 @@ export default function VacationsPage() {
   const employeeFilter = searchParams.get('funcionario');
   const toast = useToast();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [periods, setPeriods] = useState([]);
   const [requests, setRequests] = useState([]);
   const [employees, setEmployees] = useState({});
@@ -48,6 +50,7 @@ export default function VacationsPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { error: syncError } = await supabase.rpc('sync_current_vacation_periods');
       if (syncError) throw syncError;
@@ -74,7 +77,7 @@ export default function VacationsPage() {
         setEmployees(Object.fromEntries((data || []).map((employee) => [employee.id, employee])));
       }
     } catch (error) {
-      toast.error(`Não foi possível carregar as férias: ${error.message}`);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -153,6 +156,7 @@ export default function VacationsPage() {
   };
 
   if (loading) return <div className="flex flex-center" style={{ minHeight: '40vh' }}><Spinner size="lg" /></div>;
+  if (loadError) return <LoadError message="Não foi possível carregar as férias. Confira sua conexão e tente novamente." onRetry={loadData} />;
 
   return <div className="vacations-page">
     <div className="page-header"><div><h2 className="page-title">{isAdmin ? 'Férias dos funcionários' : 'Minhas férias'}</h2></div><button className="btn btn-secondary btn-sm" onClick={loadData}>Atualizar</button></div>

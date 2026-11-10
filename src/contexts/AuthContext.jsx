@@ -32,12 +32,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function fetchProfile(userId, requestId = ++profileRequestId.current) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
     try {
       const { data, error } = await supabase
         .from('funcionarios')
         .select('id,auth_id,nome,cpf,email,cargo,ativo,role,suporte,foto_url,tipo_contrato,data_admissao,escala_trabalho')
         .eq('auth_id', userId)
-        .single();
+        .single()
+        .abortSignal(controller.signal);
 
       if (error && error.code !== 'PGRST116') {
         console.error('Erro ao buscar perfil:', error);
@@ -48,6 +51,7 @@ export function AuthProvider({ children }) {
       console.error('Erro ao buscar perfil:', err);
       if (requestId === profileRequestId.current) setProfile(null);
     } finally {
+      window.clearTimeout(timeout);
       if (requestId === profileRequestId.current) setLoading(false);
     }
   }
@@ -75,6 +79,7 @@ export function AuthProvider({ children }) {
 
   async function refreshProfile() {
     if (session?.user) {
+      setLoading(true);
       await fetchProfile(session.user.id);
     }
   }

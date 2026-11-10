@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
+import LoadError from '../../components/LoadError';
 import { supabase } from '../../lib/supabase';
-import { useToast } from '../../contexts/ToastContext';
 import { formatDateTime } from '../../lib/utils';
 import { Spinner, Badge } from '../../components/ui';
 
 export default function AdminAudit() {
-  const toast = useToast();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchLogs = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data, error } = await supabase
         .from('auditoria')
@@ -22,7 +23,7 @@ export default function AdminAudit() {
       setLogs(data || []);
     } catch (err) {
       console.error('Erro ao carregar auditoria:', err);
-      toast.error('Não foi possível carregar o histórico de auditoria. Tente novamente.');
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -41,6 +42,8 @@ export default function AdminAudit() {
 
       {loading ? (
         <div className="flex flex-center" style={{ minHeight: '40vh' }}><Spinner size="lg" /></div>
+      ) : loadError ? (
+        <LoadError message="Não foi possível carregar a auditoria. Confira sua conexão e tente novamente." onRetry={fetchLogs} />
       ) : (
         <div className="table-container">
           <table className="table">

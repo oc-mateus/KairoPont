@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import LoadError from '../../components/LoadError';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { formatMinutesAsHours, getCreditedDailyMinutes, getOvertimeMinutes, getTodayInSP } from '../../lib/utils';
@@ -145,6 +146,9 @@ function AttendanceChart({ title, total, unit, values, color, groupLabel, format
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState(false);
+  const [attendanceError, setAttendanceError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [attendanceLoading, setAttendanceLoading] = useState(true);
   const [employees, setEmployees] = useState([]);
   const [records, setRecords] = useState([]);
@@ -168,8 +172,10 @@ export default function AdminDashboard() {
   const monthlyBuckets = period === '6m' || period === '12m';
 
   useEffect(() => {
+    let cancelled = false;
     async function fetchOverview() {
       setLoading(true);
+      setOverviewError(false);
       try {
         const [employeesResult, documentsResult] = await Promise.all([
           supabase.from('funcionarios').select('id,nome,ativo,role,tipo_contrato,data_admissao,escala_trabalho').order('nome'),
@@ -177,21 +183,25 @@ export default function AdminDashboard() {
         ]);
         if (employeesResult.error) throw employeesResult.error;
         if (documentsResult.error) throw documentsResult.error;
+        if (cancelled) return;
         setEmployees(employeesResult.data || []);
         setDocumentsCount(documentsResult.count || 0);
       } catch (error) {
         console.error('Erro ao carregar painel administrativo:', error);
+        if (!cancelled) setOverviewError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     fetchOverview();
-  }, [today]);
+    return () => { cancelled = true; };
+  }, [today, attempt]);
 
   useEffect(() => {
     let cancelled = false;
     async function fetchAttendance() {
       setAttendanceLoading(true);
+      setAttendanceError(false);
       if (!periodStart) {
         setRecords([]);
         setVacations([]);
@@ -217,6 +227,7 @@ export default function AdminDashboard() {
       } catch (error) {
         if (!cancelled) {
           console.error('Erro ao carregar indicadores de ponto:', error);
+          setAttendanceError(true);
           setRecords([]);
           setVacations([]);
           setHolidays([]);
@@ -228,7 +239,7 @@ export default function AdminDashboard() {
     }
     fetchAttendance();
     return () => { cancelled = true; };
-  }, [periodStart, periodEnd, today]);
+  }, [periodStart, periodEnd, today, attempt]);
 
   const cltEmployees = employees.filter(isCltEmployee);
   const activeCltEmployees = cltEmployees.filter((employee) => employee.ativo);
@@ -251,6 +262,7 @@ export default function AdminDashboard() {
   const individualOvertimeTotal = individualChartData.reduce((total, item) => total + item.overtimeMinutes, 0);
 
   if (loading) return <div className="flex flex-center" style={{ minHeight: '60vh' }}><Spinner size="lg" /></div>;
+  if (overviewError || attendanceError) return <LoadError message="Não foi possível carregar os indicadores. Confira sua conexão e tente novamente." onRetry={() => setAttempt((value) => value + 1)} />;
 
   return (
     <div className="admin-dashboard">

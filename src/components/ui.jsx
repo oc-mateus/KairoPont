@@ -1,40 +1,66 @@
-import { useState } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
 import { safeAvatarUrl } from '../lib/avatarUrl';
 
-export function Modal({ isOpen, onClose, title, children, size = 'md' }) {
-  if (!isOpen) return null;
-
-  const sizeClass = size === 'lg' ? 'style' : '';
-
+function DialogFrame({ onClose, titleId, size, children }) {
+  const dialog = useRef(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusTarget = dialog.current.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
+    (focusTarget || dialog.current).focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, []);
+  function handleKeys(event) {
+    if (event.key === 'Escape') { event.preventDefault(); close.current(); }
+    if (event.key !== 'Tab') return;
+    const focusable = [...dialog.current.querySelectorAll('a[href], button, input, textarea, select, [tabindex]')].filter((element) => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length);
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first) { event.preventDefault(); dialog.current.focus(); }
+    else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog.current)) { event.preventDefault(); first.focus(); }
+  }
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal"
-        style={size === 'lg' ? { maxWidth: '700px' } : {}}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="modal-header">
-          <h2 className="modal-title">{title}</h2>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button>
-        </div>
+      <div ref={dialog} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} style={size === 'lg' ? { maxWidth: '700px' } : {}} onKeyDown={handleKeys} onClick={e => e.stopPropagation()}>
         {children}
       </div>
     </div>
   );
 }
 
+export function Modal({ isOpen, onClose, title, children, size = 'md' }) {
+  const titleId = useId();
+  if (!isOpen) return null;
+  return (
+    <DialogFrame onClose={onClose} titleId={titleId} size={size}>
+        <div className="modal-header">
+          <h2 id={titleId} className="modal-title">{title}</h2>
+          <button type="button" className="btn btn-ghost btn-icon" aria-label="Fechar janela" onClick={onClose}>✕</button>
+        </div>
+        {children}
+    </DialogFrame>
+  );
+}
+
 export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirmar', danger = false }) {
+  const titleId = useId();
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+    <DialogFrame onClose={onClose} titleId={titleId}>
         <div className="modal-body">
           <div className="confirm-dialog">
             <div className="confirm-icon">{danger
               ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 2.8 19h18.4L12 3Z"/><path d="M12 9v4m0 3h.01" /></svg>
               : <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 1 1 4.3 1.7c-1.2 1.1-1.9 1.5-1.9 3"/><path d="M12 17h.01" /></svg>}</div>
-            <h3 className="confirm-title">{title}</h3>
+            <h3 id={titleId} className="confirm-title">{title}</h3>
             <p className="confirm-text">{message}</p>
             <div className="confirm-actions">
               <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
@@ -47,8 +73,7 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </DialogFrame>
   );
 }
 

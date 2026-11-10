@@ -22,14 +22,14 @@ Revisão de 10 de novembro de 2026. O escopo desta etapa é o site e a preparaç
 | 16. Termos | Acesso, responsabilidades e condições; não afirma adequação integral a REP-P. |
 | 17. Banner de cookies | Não aplicável nesta configuração: apenas sessão/preferências necessárias e nenhuma categoria opcional de rastreamento. Página de transparência disponível. |
 | 18. Analytics | Não ativado, conforme escolha expressa de Mateus. Nenhum rastreador foi instalado. |
-| 19. Contato real | mcoliveira@kairoautomacoes.com.br e responsável Mateus de Campos Oliveira, pessoa física. |
+| 19. Contato real | mcoliveira@kairoautomacoes.com.br, empresa Kairo Automações e responsável Mateus de Campos Oliveira. |
 | 20. Imagens comprimidas | Ativos web próprios, fontes locais e exclusão de originais pesados somente na publicação. Originais permanecem no repositório. |
 
 ## Medidas de tamanho
 
 Os originais de marca somavam 96.945.334 bytes. A pasta de marca servida passou a 372.963 bytes, redução de 99,62% desse conjunto. O build completo medido tem aproximadamente 3,26 MB, incluindo bibliotecas de exportação carregadas apenas quando necessárias. O ícone usado no cabeçalho passou de 36.731 bytes para 5.766 bytes. Isso não representa uma medição de Core Web Vitals de todos os usuários.
 
-As fontes agora são entregues pelo próprio site. Não há requisição de fontes ao Google durante a navegação normal. Avisos das licenças de terceiros são distribuídos em `licenses/third-party-notices.txt`.
+As fontes agora são entregues pelo próprio site. Não há requisição de fontes ao Google durante a navegação normal. Avisos das licenças de terceiros são consultados em `/licencas`, com busca e seções expansíveis, e distribuídos em `licenses/third-party-notices.txt` para download.
 
 ## Hospedagem e indexação
 

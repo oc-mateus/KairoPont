@@ -25,7 +25,7 @@ export default function LoginPage() {
         toast.warning('Preencha todos os campos.');
         return;
       }
-      const { user } = await signInWithEmail(loginEmail, loginPassword);
+      const { user } = await signInWithEmail(loginEmail.trim().toLowerCase(), loginPassword);
       const { data: profile, error: profileError } = await supabase
         .from('funcionarios')
         .select('role,tipo_contrato')
@@ -45,7 +45,8 @@ export default function LoginPage() {
       toast.success('Login realizado com sucesso!');
       navigate(profile.role === 'admin' ? '/admin' : '/ponto');
     } catch (error) {
-      toast.error(error.message || 'Erro ao fazer login. Verifique suas credenciais.');
+      const invalidCredentials = error.code === 'invalid_credentials' || /invalid login credentials/i.test(error.message || '');
+      toast.error(invalidCredentials ? 'E-mail ou senha incorretos. Confira os dados e tente novamente.' : 'Não foi possível entrar. Confira sua conexão e tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -77,11 +78,11 @@ export default function LoginPage() {
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="login-email">E-mail corporativo</label>
-              <input id="login-email" type="email" className="form-input" placeholder="seu.nome@kairoautomacoes.com.br" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} disabled={loading} autoComplete="email" />
+              <input id="login-email" type="email" required className="form-input" placeholder="seu.nome@kairoautomacoes.com.br" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} disabled={loading} autoComplete="username" />
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="login-password">Senha</label>
-              <input id="login-password" type="password" className="form-input" placeholder="Sua senha" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} disabled={loading} autoComplete="current-password" />
+              <input id="login-password" type="password" required className="form-input" placeholder="Sua senha" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} disabled={loading} autoComplete="current-password" />
               <Link className="password-recovery-link" to="/recuperar-senha">Esqueci minha senha</Link>
             </div>
             <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>{loading ? <Spinner /> : 'Entrar'}</button>

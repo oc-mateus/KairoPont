@@ -23,12 +23,19 @@ export default function ProfilePage() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (loading) return;
+    if (nome.trim().length < 3 || !cargo.trim()) {
+      toast.warning('Informe seu nome completo e seu cargo.');
+      return;
+    }
     setLoading(true);
     try {
       const { error } = await supabase
         .from('funcionarios')
-        .update({ nome, cargo })
-        .eq('id', profile.id);
+        .update({ nome: nome.trim(), cargo: cargo.trim() })
+        .eq('id', profile.id)
+        .select('id')
+        .single();
 
       if (error) throw error;
       await refreshProfile();
@@ -42,6 +49,8 @@ export default function ProfilePage() {
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
+    e.target.value = '';
+    if (uploading) return;
     if (!file) return;
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -77,7 +86,9 @@ export default function ProfilePage() {
       const { error: profileError } = await supabase
         .from('funcionarios')
         .update({ foto_url: finalUrl })
-        .eq('id', profile.id);
+        .eq('id', profile.id)
+        .select('id')
+        .single();
       if (profileError) throw profileError;
 
       await refreshProfile();
@@ -109,6 +120,8 @@ export default function ProfilePage() {
           <div style={{ position: 'relative' }}>
             <Avatar src={profile.foto_url} name={profile.nome} size="xl" />
             <label
+              className="profile-photo-upload"
+              title="Alterar foto de perfil"
               style={{
                 position: 'absolute',
                 bottom: 0,
@@ -127,9 +140,10 @@ export default function ProfilePage() {
               {uploading ? '⏳' : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>}
               <input
                 type="file"
+                aria-label="Alterar foto de perfil"
+                className="sr-only"
                 accept="image/jpeg,image/png,image/webp"
                 onChange={handlePhotoUpload}
-                style={{ display: 'none' }}
                 disabled={uploading}
               />
             </label>
@@ -175,8 +189,12 @@ export default function ProfilePage() {
         <h3 className="card-title mb-4">Editar Perfil</h3>
         <form onSubmit={handleSave}>
           <div className="form-group">
-            <label className="form-label">Nome completo</label>
+            <label className="form-label" htmlFor="profile-name">Nome completo</label>
             <input
+              id="profile-name"
+              required
+              minLength={3}
+              maxLength={160}
               type="text"
               className="form-input"
               value={nome}
@@ -186,8 +204,11 @@ export default function ProfilePage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Cargo</label>
+            <label className="form-label" htmlFor="profile-job">Cargo</label>
             <input
+              id="profile-job"
+              required
+              maxLength={120}
               type="text"
               className="form-input"
               value={cargo}

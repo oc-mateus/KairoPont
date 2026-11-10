@@ -9,6 +9,16 @@ import { ToastProvider } from './contexts/ToastContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import './index.css';
 import './support.css';
+import { recoverFromUpdate } from './lib/updateRecovery.mjs';
+
+window.addEventListener('vite:preloadError', (event) => {
+  recoverFromUpdate(event, {
+    online: navigator.onLine,
+    get storage() { return window.sessionStorage; },
+    location: window.location,
+    buildId: import.meta.url,
+  });
+});
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {

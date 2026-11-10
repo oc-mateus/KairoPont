@@ -7,7 +7,7 @@ import { Spinner } from '../components/ui';
 import LegalLinks from '../components/LegalLinks';
 
 export default function SetPasswordPage() {
-  const { session, loading: authLoading, clearPasswordRecovery } = useAuth();
+  const { session, profile, loading: authLoading, clearPasswordRecovery } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -24,7 +24,7 @@ export default function SetPasswordPage() {
       if (error) throw error;
       clearPasswordRecovery();
       toast.success('Senha atualizada com sucesso.');
-      navigate('/ponto', { replace: true });
+      navigate(profile?.role === 'admin' ? '/admin' : '/ponto', { replace: true });
     } catch (error) {
       toast.error(error.message || 'Não foi possível atualizar sua senha. Solicite um novo link de recuperação.');
     } finally { setSaving(false); }

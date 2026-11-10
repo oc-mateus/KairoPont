@@ -1,6 +1,6 @@
 async function getBrandLogoData(fileName, brandName) {
   const logoUrl = new URL(
-    `${import.meta.env.BASE_URL}assets/brand/${fileName}`,
+    `${import.meta.env.BASE_URL}assets/brand/web/${fileName}`,
     window.location.origin,
   );
   const response = await fetch(logoUrl);

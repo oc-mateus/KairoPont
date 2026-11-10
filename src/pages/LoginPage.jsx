@@ -56,7 +56,7 @@ export default function LoginPage() {
       <div className="login-brand">
         <div className="login-brand-content">
           <div className="brand-lockup">
-            <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" />
+            <img src={`${import.meta.env.BASE_URL}assets/brand/web/mark-96.webp`} width="42" height="42" alt="" />
             <span><strong>KairoPont</strong><small>Controle de ponto</small></span>
           </div>
 

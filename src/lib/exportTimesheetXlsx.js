@@ -20,7 +20,7 @@ function excelTime(timeValue) {
 
 async function loadBrandImage(fileName) {
   const imageUrl = new URL(
-    `${import.meta.env.BASE_URL}assets/brand/${fileName}`,
+    `${import.meta.env.BASE_URL}assets/brand/web/${fileName}`,
     window.location.origin,
   );
   const response = await fetch(imageUrl);

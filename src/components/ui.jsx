@@ -53,13 +53,13 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
 }
 
 export function Spinner({ size = 'md' }) {
-  return <div className={`spinner ${size === 'lg' ? 'spinner-lg' : ''}`} />;
+  return <div className={`spinner ${size === 'lg' ? 'spinner-lg' : ''}`} role="status" aria-label="Carregando" />;
 }
 
 export function LoadingScreen() {
   return (
     <div className="loading-screen">
-      <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-logo-3d.png`} alt="KairoPont — Controle de Ponto" />
+      <img src={`${import.meta.env.BASE_URL}assets/brand/web/kairopont-logo-3d.png`} alt="KairoPont — Controle de Ponto" />
       <Spinner size="lg" />
       <p className="text-muted">Carregando...</p>
     </div>

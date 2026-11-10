@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { SUPPORT_ARTICLES, SUPPORT_CATEGORIES, normalizeSupportText } from '../../shared/support.mjs';
 import { supportRequest } from '../lib/support';
 import LegalLinks from '../components/LegalLinks';
 
 export default function SupportPage() {
+  const navigate = useNavigate();
   const { session, profile, loading: authLoading } = useAuth();
   const active = Boolean(session && profile?.ativo);
   const [category, setCategory] = useState('acesso');
@@ -13,7 +14,6 @@ export default function SupportPage() {
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState('');
-  const [confirmation, setConfirmation] = useState(null);
   const request = useRef(null);
   const sending = useRef(false);
   const filtered = SUPPORT_ARTICLES.filter((article) => (!search ? article.category === category : normalizeSupportText(`${article.title} ${article.answer}`).includes(normalizeSupportText(search))));
@@ -22,7 +22,6 @@ export default function SupportPage() {
     event.preventDefault();
     if (sending.current) return;
     setError('');
-    setConfirmation(null);
     if (!active) { setError('Entre na sua conta para enviar o pedido com seu nome e e-mail.'); return; }
     const description = question.trim();
     if (Array.from(description).length < 10) { setError('Descreva o que aconteceu com pelo menos 10 caracteres.'); return; }
@@ -35,15 +34,15 @@ export default function SupportPage() {
       const result = await supportRequest({ ...body, request_id: request.current.id });
       if (!result?.ticket?.id) throw new Error('Não foi possível confirmar o chamado. Tente novamente.');
       request.current = null;
-      setConfirmation(result);
       setQuestion('');
+      navigate('/suporte/confirmacao', { state: { supportProtocol: result.ticket.protocol } });
     } catch (err) { setError(err.message); }
     finally { sending.current = false; setAsking(false); }
   }
 
   return <div className="support-page">
     <header className="support-header">
-      <Link className="marketing-brand" to="/" aria-label="KairoPont, início"><img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" /><span><strong>KairoPont</strong><small>Central de ajuda</small></span></Link>
+      <Link className="marketing-brand" to="/" aria-label="KairoPont, início"><img src={`${import.meta.env.BASE_URL}assets/brand/web/mark-96.webp`} width="42" height="42" alt="" /><span><strong>KairoPont</strong><small>Central de ajuda</small></span></Link>
       <Link className="btn btn-secondary" to={active ? (profile.role === 'admin' ? '/admin' : '/ponto') : '/login'}>{active ? 'Voltar ao portal' : 'Acessar minha conta'}</Link>
     </header>
     <main className="support-main">
@@ -62,7 +61,6 @@ export default function SupportPage() {
           <form onSubmit={ask} aria-busy={asking}><label className="form-group" htmlFor="support-question"><span className="form-label">O que você precisa resolver?</span><textarea className="form-input" id="support-question" rows={5} required minLength={10} maxLength={3000} value={question} onChange={(event) => setQuestion(event.target.value)} disabled={asking} /></label><button className="btn btn-primary" type="submit" disabled={asking || authLoading}>{asking ? 'Enviando pedido…' : 'Buscar orientação'}</button></form>
           {error && <p role="alert" className="support-error">{error}</p>}
           {!active && !authLoading && <p className="support-guides-note"><Link to="/login">Entre na sua conta</Link> para enviar o pedido.</p>}
-          {confirmation && <p role="status" className="support-confirmation">Chamado #{confirmation.ticket.protocol} registrado.</p>}
         </aside>
       </div>
     </main>

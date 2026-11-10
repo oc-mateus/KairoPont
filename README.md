@@ -14,6 +14,8 @@
 
 O KairoPont organiza o registro de jornada, a consulta de históricos e a gestão de funcionários CLT e PJ. A aplicação web fica no GitHub Pages; autenticação, banco de dados e arquivos usam o Supabase. O [Guia do Projeto](docs/GUIA_DO_PROJETO.md) reúne os fluxos, regras de negócio, estrutura técnica e procedimentos de operação. A preparação para pilotos comerciais está documentada em [Comercialização e operação](docs/COMERCIALIZACAO.md), e os controles e testes de segurança em [Segurança](docs/SEGURANCA.md).
 
+A revisão de lançamento está no [checklist do site](docs/CHECKLIST_LANCAMENTO.md): páginas públicas com metadados próprios, contato, confirmação, 404, sitemap, ícones e imagens otimizadas. O responsável pelo projeto é **Mateus de Campos Oliveira**, pessoa física. O site permanece sem Analytics ou rastreamento de visitantes. A [preparação dos pedidos ao INPI](docs/REGISTROS_INPI.md) não representa registro concedido; a adequação trabalhista foi adiada pelo responsável.
+
 ## Como funciona
 
 ```mermaid

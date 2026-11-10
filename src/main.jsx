@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+import AppErrorBoundary from './components/AppErrorBoundary';
+import '@fontsource-variable/dm-sans/wght.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -22,7 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
-            <App />
+            <AppErrorBoundary><App /></AppErrorBoundary>
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>

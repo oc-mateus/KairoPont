@@ -11,9 +11,11 @@
     "configure:document-bucket": "node scripts/configure-document-bucket.mjs",
     "configure:storage": "node scripts/configure-document-bucket.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepare:web-assets": "node scripts/prepare-web-assets.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/dm-sans": "5.3.0",
     "@supabase/supabase-js": "^2.49.0",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
@@ -25,6 +27,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "0.5.15",
     "@vitejs/plugin-react": "^4.3.4",
+    "sharp": "0.35.5",
     "vite": "^6.0.0"
   },
   "overrides": {

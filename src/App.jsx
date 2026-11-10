@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import { Spinner } from './components/ui';
+import PageMetadata from './components/PageMetadata';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const PunchPage = lazy(() => import('./pages/PunchPage'));
@@ -20,9 +21,13 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminEmployees = lazy(() => import('./pages/admin/AdminEmployees'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+const CookiesPage = lazy(() => import('./pages/CookiesPage'));
+const SupportConfirmationPage = lazy(() => import('./pages/SupportConfirmationPage'));
 
 function PrivateRoute({ children, requireAdmin = false, requireSupport = false, requireClt = false }) {
-  const { session, profile, loading, signOut } = useAuth();
+  const { session, profile, loading, signOut, refreshProfile } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -31,6 +36,10 @@ function PrivateRoute({ children, requireAdmin = false, requireSupport = false, 
 
   if (!session) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (!profile) {
+    return <main className="public-state-page"><h1>Não foi possível carregar seu cadastro</h1><p>Tente novamente ou entre em contato com o suporte.</p><div className="public-state-actions"><button className="btn btn-primary" onClick={refreshProfile}>Tentar novamente</button><button className="btn btn-secondary" onClick={() => signOut().catch(() => {})}>Sair</button></div></main>;
   }
 
   if (profile?.ativo === false) {
@@ -83,10 +92,13 @@ export default function App() {
   }
 
   return (
-    <Suspense fallback={<div className="flex flex-center" style={{ minHeight: '100vh' }}><Spinner size="lg" /></div>}>
+    <><PageMetadata /><Suspense fallback={<div className="flex flex-center" style={{ minHeight: '100vh' }}><Spinner size="lg" /></div>}>
       <Routes>
         <Route path="/" element={<MarketingPage />} />
         <Route path="/suporte" element={<SupportPage />} />
+        <Route path="/suporte/confirmacao" element={<SupportConfirmationPage />} />
+        <Route path="/contato" element={<ContactPage />} />
+        <Route path="/cookies" element={<CookiesPage />} />
         <Route path="/privacidade" element={<LegalPage type="privacy" />} />
         <Route path="/termos" element={<LegalPage type="terms" />} />
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
@@ -107,8 +119,8 @@ export default function App() {
         <Route path="/admin/auditoria" element={<PrivateRoute requireAdmin><AdminAudit /></PrivateRoute>} />
         <Route path="/admin/suporte" element={<PrivateRoute requireSupport><AdminSupport /></PrivateRoute>} />
 
-        <Route path="*" element={<Navigate to="/ponto" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </Suspense>
+    </Suspense></>
   );
 }

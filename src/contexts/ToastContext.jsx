@@ -40,10 +40,10 @@ export function ToastProvider({ children }) {
       {children}
       <div className="toast-container">
         {toasts.map(t => (
-          <div key={t.id} className={`toast toast-${t.type}`}>
+          <div key={t.id} className={`toast toast-${t.type}`} role={t.type === 'error' ? 'alert' : 'status'}>
             <span className="toast-icon">{icons[t.type]}</span>
             <span className="toast-message">{t.message}</span>
-            <button className="toast-close" onClick={() => removeToast(t.id)}>✕</button>
+            <button className="toast-close" aria-label="Fechar aviso" onClick={() => removeToast(t.id)}>✕</button>
           </div>
         ))}
       </div>

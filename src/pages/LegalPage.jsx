@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import LegalLinks from '../components/LegalLinks';
+import { CONTACT_EMAIL, SITE_OWNER } from '../../shared/site.mjs';
 
 const lastUpdated = '10 de novembro de 2026';
 
@@ -9,7 +10,7 @@ function PrivacyPolicy() {
       <p>Esta política explica como o KairoPont usa dados para autenticar usuários e apoiar o registro e a gestão de jornadas da Kairo Automações.</p>
 
       <h2>Quem administra o tratamento</h2>
-      <p>A Kairo Automações administra o KairoPont. Nas informações relacionadas ao vínculo de trabalho, a empresa responsável pelo vínculo define as finalidades e os prazos de guarda. Para dúvidas ou exercício de direitos, procure a equipe administrativa da Kairo Automações pelo canal corporativo usado para assuntos de RH.</p>
+      <p>O responsável pelo projeto KairoPont é {SITE_OWNER}, pessoa física. Nas informações relacionadas ao vínculo de trabalho, a empresa responsável pelo vínculo define as finalidades e os prazos de guarda. As responsabilidades de operação são definidas na implantação. Para dúvidas, solicitações sobre seus dados ou encaminhamento à empresa responsável, escreva para <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
 
       <h2>Dados usados e para quê</h2>
       <ul>
@@ -27,7 +28,7 @@ function PrivacyPolicy() {
       <p>Os dados são usados para autenticação, registro e gestão de jornada, administração de férias e documentos, segurança e auditoria. O tratamento de dados de trabalho não depende de uma caixa genérica de consentimento: a empresa responsável deve usar a base legal adequada à relação e às obrigações aplicáveis. O uso opcional de foto de perfil pode ser interrompido removendo ou substituindo a imagem pelo canal administrativo.</p>
 
       <h2>Serviços que apoiam o aplicativo</h2>
-      <p>O KairoPont usa Supabase para autenticação, banco de dados e armazenamento; o projeto de banco está hospedado na região US East (N. Virginia). E-mails de acesso, recuperação de senha e notificações podem ser enviados por Supabase e Resend. A fonte tipográfica DM Sans é carregada do Google Fonts. O aplicativo também é servido pelo GitHub Pages. Esses serviços recebem os dados técnicos necessários às respectivas solicitações; não usamos Google Analytics, pixels de publicidade ou scripts de rastreamento no código do aplicativo.</p>
+      <p>O KairoPont usa Supabase para autenticação, banco de dados e armazenamento; o projeto de banco está hospedado na região US East (N. Virginia). E-mails de acesso, recuperação de senha e notificações podem ser enviados por Supabase e Resend. O aplicativo é servido pelo GitHub Pages; as fontes tipográficas são servidas pelo próprio site. Esses serviços recebem os dados técnicos necessários às solicitações. Não usamos Google Analytics, pixels de publicidade ou scripts de rastreamento de visitantes.</p>
 
       <h2>Compartilhamento e segurança</h2>
       <p>Os links de localização abrem o Google Maps somente quando você clica em “Ver no mapa”; nesse momento, as coordenadas são enviadas ao serviço de mapas. Nenhum mapa externo é carregado automaticamente na consulta dos registros.</p>
@@ -36,6 +37,7 @@ function PrivacyPolicy() {
 
       <h2>Cookies e armazenamento no navegador</h2>
       <p>O aplicativo não usa cookies de publicidade ou de analytics. Ele armazena localmente a sessão necessária para manter o usuário conectado e preferências de interface. Esses itens são necessários ao funcionamento da conta; não há banner de consentimento para cookies de rastreamento porque esses cookies não são usados.</p>
+      <p>Consulte os detalhes e as opções de remoção em <Link to="/cookies">Armazenamento e cookies</Link>.</p>
 
       <h2>Guarda, correção e exclusão</h2>
       <p>Os dados são mantidos enquanto a conta e as finalidades de trabalho exigirem. Registros de jornada, documentos e auditorias podem precisar ser conservados por prazos legais, regulatórios ou para exercício regular de direitos. Por isso, encerrar o acesso não significa apagar imediatamente todos os registros. A solicitação de acesso, correção, informação, bloqueio ou eliminação pode ser feita à equipe administrativa pelo canal corporativo de RH; pedidos serão avaliados considerando as obrigações de guarda aplicáveis.</p>
@@ -67,7 +69,10 @@ function TermsOfUse() {
       <p>Recursos podem ser ajustados para manter a operação e a segurança do sistema. O aplicativo depende de conexão com a internet e de serviços externos de hospedagem, autenticação, armazenamento e envio de e-mails.</p>
 
       <h2>Condições de contratação</h2>
+      <p>O responsável pelo projeto é {SITE_OWNER}. Contato: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
       <p>O acesso comercial ao KairoPont depende de proposta e contrato próprios, que devem apresentar o escopo do serviço, os valores, as condições de pagamento, o suporte e as regras de tratamento e encerramento dos dados antes de qualquer contratação.</p>
+      <h2>Uso como registro oficial de ponto</h2>
+      <p>Esta versão não é apresentada como integralmente adequada aos requisitos de REP-P. O uso como único registro trabalhista oficial depende de validação e adequação específicas, incluindo documentos e requisitos técnicos aplicáveis. A existência de relatórios e de auditoria não substitui essa verificação.</p>
 
       <p className="legal-note">Estes termos descrevem o uso do aplicativo e não substituem políticas internas, acordos de trabalho ou direitos previstos em lei.</p>
     </>
@@ -82,7 +87,7 @@ export default function LegalPage({ type }) {
       <article className="legal-document">
         <header className="legal-header">
           <div className="legal-brand-lockup">
-            <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" />
+            <img src={`${import.meta.env.BASE_URL}assets/brand/web/mark-96.webp`} width="42" height="42" alt="" />
             <span><strong>KairoPont</strong><small>Controle de ponto</small></span>
           </div>
           <p className="legal-updated">Atualizado em {lastUpdated}</p>

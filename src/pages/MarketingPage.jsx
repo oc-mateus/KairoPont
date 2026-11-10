@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import LegalLinks from '../components/LegalLinks';
+import { CONTACT_EMAIL, SITE_OWNER } from '../../shared/site.mjs';
 
 const features = [
   {
@@ -24,7 +25,7 @@ export default function MarketingPage() {
     <main className="marketing-page">
       <header className="marketing-header">
         <Link className="marketing-brand" to="/" aria-label="KairoPont, início">
-          <img src={`${import.meta.env.BASE_URL}assets/brand/kairopont-pwa-192.png`} alt="" />
+          <img src={`${import.meta.env.BASE_URL}assets/brand/web/mark-96.webp`} width="42" height="42" alt="" />
           <span><strong>KairoPont</strong><small>Controle de jornada</small></span>
         </Link>
         <nav aria-label="Navegação principal">
@@ -36,9 +37,8 @@ export default function MarketingPage() {
 
       <section className="marketing-hero">
         <div className="marketing-hero-copy">
-          <span className="marketing-eyebrow"><span aria-hidden="true" /> Jornada de trabalho, organizada</span>
-          <h1>Um lugar claro para registrar e acompanhar a jornada.</h1>
-          <p>O KairoPont reúne marcações de ponto, histórico de jornada e rotinas administrativas em uma experiência simples para celular e computador.</p>
+          <h1>Registre e acompanhe sua jornada.</h1>
+          <p>Entrada, saída, histórico e administração em um portal para celular e computador.</p>
           <div className="marketing-actions">
             <Link className="btn btn-primary" to="/login">Acessar portal <span aria-hidden="true">→</span></Link>
             <a className="marketing-text-link" href="#recursos">Conhecer recursos <span aria-hidden="true">↓</span></a>
@@ -59,13 +59,11 @@ export default function MarketingPage() {
 
       <section className="marketing-features" id="recursos">
         <div className="marketing-section-heading">
-          <span className="marketing-eyebrow">Recursos do portal</span>
           <h2>Rotinas conectadas do registro ao acompanhamento.</h2>
         </div>
         <div className="marketing-feature-grid">
           {features.map((feature) => (
             <article className="marketing-feature" key={feature.number}>
-              <span>{feature.number}</span>
               <h3>{feature.title}</h3>
               <p>{feature.text}</p>
             </article>
@@ -75,17 +73,19 @@ export default function MarketingPage() {
 
       <section className="marketing-access">
         <div>
-          <span className="marketing-eyebrow">Acesso protegido</span>
           <h2>As informações de cada funcionário são acessadas pela conta autorizada.</h2>
           <p>O sistema usa autenticação, permissões no banco e registro de ações administrativas. A implantação e os parâmetros de jornada devem ser avaliados para cada empresa.</p>
         </div>
         <Link className="btn btn-secondary" to="/login">Entrar no KairoPont <span aria-hidden="true">→</span></Link>
       </section>
 
+      <section className="marketing-contact"><div><h2>Precisa falar com a gente?</h2><p>Suporte, implantação e privacidade.</p></div><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></section>
+
       <footer className="marketing-footer">
-        <span>© {new Date().getFullYear()} Kairo Automações · KairoPont</span>
+        <span>© {new Date().getFullYear()} {SITE_OWNER} · KairoPont</span>
         <LegalLinks />
       </footer>
+      <div className="marketing-mobile-cta"><Link className="btn btn-primary" to="/login">Acessar portal</Link></div>
     </main>
   );
 }

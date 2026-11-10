@@ -43,7 +43,7 @@ jobs:
           VITE_SUPPORT_ENABLED: 'true'
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://preview.invalid' }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'preview-build-only' }}
-      - run: cp dist/index.html dist/404.html
+      - run: node scripts/verify-launch-build.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

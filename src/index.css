@@ -89,7 +89,7 @@
   --shadow-glow: 0 3px 8px rgba(23, 90, 50, 0.12);
 
   /* Tipografia */
-  --font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  --font-family: 'DM Sans Variable', 'Segoe UI', sans-serif;
   --font-xs: 0.75rem;
   --font-sm: 0.875rem;
   --font-base: 1rem;
@@ -1912,12 +1912,31 @@ select.form-input {
 .marketing-footer { width: min(100% - 3rem, 1160px); min-height: 76px; margin: 0 auto; border-top: 1px solid var(--border-default); display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); color: var(--text-muted); font-size: var(--font-sm); }
 .marketing-footer .legal-links { display: flex; align-items: center; gap: var(--space-4); }
 .marketing-footer .legal-links a { color: var(--text-secondary); }
+.marketing-footer .legal-links, .legal-footer .legal-links { flex-wrap: wrap; }
+.marketing-mobile-cta { display: none; }
+.marketing-contact { width: min(100% - 3rem, 1160px); margin: 0 auto; padding: var(--space-6) 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-4); border-top: 1px solid var(--border-default); }
+.marketing-contact h2 { font-size: var(--font-lg); }
+.marketing-contact p { color: var(--text-secondary); margin-top: var(--space-1); }
+.marketing-contact a, .contact-email { color: var(--text-primary); overflow-wrap: anywhere; text-underline-offset: 4px; }
+.public-state-page { width: min(100% - 2rem, 620px); min-height: 100svh; margin: 0 auto; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-5); padding: var(--space-8) 0; color: var(--text-primary); }
+.public-state-page h1 { font-size: clamp(1.75rem, 5vw, 2.5rem); line-height: 1.15; }
+.public-state-page > p { color: var(--text-secondary); max-width: 52ch; }
+.public-state-page .public-state-code { font-size: 3rem; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.public-state-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.public-state-page .legal-links { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-5); font-size: var(--font-sm); }
+.public-state-page a { text-underline-offset: 3px; }
+.support-confirmation-protocol { font-weight: 700; font-size: var(--font-lg); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (max-width: 760px) {
+  .marketing-page { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .marketing-mobile-cta { display: flex; position: fixed; z-index: 30; inset: auto 0 0; justify-content: center; padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom)); background: var(--bg-primary); border-top: 1px solid var(--border-default); }
+  .marketing-mobile-cta .btn { width: 100%; min-height: 48px; max-width: 460px; }
+  .marketing-contact { width: calc(100% - 2rem); }
   .marketing-header, .marketing-hero, .marketing-access, .marketing-footer { width: min(100% - 2rem, 1160px); }
   .marketing-header { min-height: 68px; }
   .marketing-header nav { gap: var(--space-4); }
   .marketing-header nav > a:first-child { display: none; }
-  .marketing-hero { grid-template-columns: 1fr; gap: var(--space-10); padding-top: var(--space-16); }
+  .marketing-hero { grid-template-columns: 1fr; gap: var(--space-10); padding-top: var(--space-8); }
   .marketing-hero h1 { max-width: 13ch; }
   .marketing-preview { max-width: 520px; width: 100%; }
   .marketing-preview::before { right: 0; }

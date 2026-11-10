@@ -420,8 +420,6 @@ input, select, textarea {
 :root[data-theme='dark'] .attendance-chart-card,
 :root[data-theme='dark'] .table-container,
 :root[data-theme='dark'] .employee-punch-edit-form,
-:root[data-theme='dark'] .employee-records-section,
-:root[data-theme='dark'] .employee-documents-section,
 :root[data-theme='dark'] .modal,
 :root[data-theme='dark'] .install-app-button { background-color: var(--bg-secondary); color: var(--text-primary); }
 :root[data-theme='dark'] .form-input,
@@ -430,9 +428,7 @@ input, select, textarea {
 :root[data-theme='dark'] textarea { background-color: var(--bg-input); color: var(--text-primary); border-color: var(--border-default); }
 :root[data-theme='dark'] .table th { background: #1d2b22; color: var(--text-secondary); }
 :root[data-theme='dark'] .table td { border-color: var(--border-default); }
-:root[data-theme='dark'] .employee-empty-state,
-:root[data-theme='dark'] .employee-records-section,
-:root[data-theme='dark'] .employee-documents-section { border-color: var(--border-default); }
+:root[data-theme='dark'] .employee-empty-state { border-color: var(--border-default); }
 :root[data-theme='dark'] .login-contract-options button.active,
 :root[data-theme='dark'] .attendance-period-switch button.active { background: #203329; color: #bfe4c5; border-color: #45654e; }
 :root[data-theme='dark'] body,
@@ -1914,6 +1910,7 @@ select.form-input {
   .marketing-hero { grid-template-columns: 1fr; gap: var(--space-10); padding-top: var(--space-16); }
   .marketing-hero h1 { max-width: 13ch; }
   .marketing-preview { max-width: 520px; width: 100%; }
+  .marketing-preview::before { right: 0; }
   .marketing-features { padding-inline: 1rem; }
   .marketing-feature-grid { grid-template-columns: 1fr; gap: var(--space-4); }
   .marketing-feature { padding: var(--space-4) 0; }

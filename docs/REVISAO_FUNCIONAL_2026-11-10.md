@@ -13,12 +13,13 @@
 - Janelas têm nome acessível, navegação por Tab restrita ao conteúdo, fechamento por Escape e devolução do foco ao controle que as abriu.
 - Erros de credenciais aparecem em português; a saída da conta trata falhas. A consulta do perfil deixa de aguardar indefinidamente após 15 segundos.
 - Administradores voltam ao painel após salvar uma nova senha. As páginas de ajuda e informações públicas continuam disponíveis durante a recuperação de senha.
+- Novos horários de criação de cadastros, documentos e auditoria usam o instante correto do servidor. A conversão anterior retirava três horas ao gravar e provocava uma segunda conversão na exibição. A correção não altera marcações de jornada nem reescreve datas históricas.
 
 ## Evidências
 
 | Verificação | Resultado |
 | --- | --- |
-| Testes automatizados locais | 80 aprovados |
+| Testes automatizados locais | 81 aprovados, incluindo horários em UTC e São Paulo e preservação dos metadados históricos |
 | Funções de servidor | Verificação de tipos aprovada; 2 testes com 20 etapas aprovados |
 | Dependências de produção | Zero vulnerabilidades conhecidas na auditoria executada |
 | Compilação de produção | Aprovada, incluindo o subdiretório `/KairoPont/` |
@@ -40,6 +41,7 @@ Os testes visuais usaram a compilação final local conectada ao Supabase de pro
 2. **Proteções de acesso adicionais:** o verificador do Supabase ainda aponta proteção contra senhas vazadas desabilitada. MFA para administradores e CAPTCHA precisam de configuração e validação do fluxo; não foram impostos de forma que pudesse bloquear as contas atuais. Consulte a [documentação de senhas do Supabase](https://supabase.com/docs/guides/auth/password-security).
 3. **Recuperação operacional:** executar e documentar um ensaio de restauração de backup, com responsável e prazo definido. Esse procedimento não foi realizado nesta revisão.
 4. **Cobertura contínua:** repetir os testes de aceitação quando regras de jornada, permissões, integrações ou serviços externos mudarem. Os testes atuais são evidência dos cenários exercitados, não uma garantia de ausência de qualquer erro futuro, de disponibilidade dos provedores ou de acessibilidade integral.
+5. **Metadados históricos:** os horários antigos de criação de cadastros, documentos e auditoria podem conservar o desvio de três horas. Uma eventual correção exige conferir quais registros vieram do valor padrão defeituoso e quais foram importados ou informados explicitamente. Nenhum ajuste em massa foi aplicado a registros reais nesta revisão.
 
 Os avisos sobre funções de banco com privilégios elevados foram revisados junto das verificações de autorização. Essas funções fazem parte dos fluxos controlados e não foram removidas apenas para eliminar um aviso do verificador. Nenhuma tabela pública foi encontrada com RLS desligada; documentos continuam privados e avatares continuam públicos conforme o produto atual.
 

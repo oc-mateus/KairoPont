@@ -4,7 +4,9 @@ export function getSupportReplyUrl(ticket) {
   const email = String(ticket?.employee?.email || '').trim();
   if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)) return null;
   const subject = `Re: KairoPont · Chamado #${ticket.protocol} — ${ticket.subject || ''}`.replace(/[\r\n\u0000]/g, ' ');
-  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}`;
+  const name = String(ticket.employee?.nome || '').replace(/[\r\n\u0000]/g, ' ').trim();
+  const body = `${name ? `Olá, ${name}.` : 'Olá.'}\n\nSobre o chamado #${ticket.protocol}:\n\nProblema relatado:\n${ticket.description || ''}\n\nResposta:\n`;
+  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 export const SUPPORT_CATEGORIES = [

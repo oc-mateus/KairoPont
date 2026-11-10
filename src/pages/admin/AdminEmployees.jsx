@@ -233,6 +233,7 @@ export default function AdminEmployees() {
       dias_semana: schedule.dias_semana?.length ? schedule.dias_semana : [1, 2, 3, 4, 5, 6],
       horarios_habituais: habitualSchedules.length ? habitualSchedules : [makeHabitualSchedule(shiftId)],
       contabilizar_atrasos: schedule.contabilizar_atrasos !== false,
+      suporte: employee.suporte === true,
     };
   };
 
@@ -280,6 +281,7 @@ export default function AdminEmployees() {
         p_data_admissao: employeeForm.data_admissao || null,
         p_escala_trabalho: employeeForm.tipo_contrato === 'clt' ? scheduleFromForm(employeeForm) : null,
         p_tipo_contrato: employeeForm.tipo_contrato,
+        p_suporte: employeeForm.suporte === true,
       });
       if (error) throw error;
       setEmployees((current) => current.map((employee) => employee.id === data.id ? data : employee));
@@ -303,6 +305,7 @@ export default function AdminEmployees() {
       <label className="form-group">Tipo de vínculo<select className="form-input" value={employeeForm.tipo_contrato} onChange={(event) => setFormField('tipo_contrato', event.target.value)}><option value="clt">CLT</option><option value="pj">PJ</option></select></label>
       <label className="form-group">Data de admissão{employeeForm.tipo_contrato === 'pj' && <small> (opcional para PJ)</small>}<input className="form-input" required={employeeForm.tipo_contrato === 'clt'} type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>
       </div>
+      {editingEmployee && <label className="employee-support-access"><input type="checkbox" checked={employeeForm.suporte === true} onChange={(event) => setFormField('suporte', event.target.checked)} /><span><strong>Acesso ao suporte</strong><small>Permite consultar e responder em Atendimentos, com ou sem perfil de administrador.</small></span></label>}
       {employeeForm.tipo_contrato === 'pj' && <p className="vacation-form-note">O vínculo PJ usa apenas entrada e saída para apurar horas trabalhadas, sem horários habituais nem gestão de férias.</p>}
       {employeeForm.tipo_contrato === 'clt' && <>
         <fieldset className="employee-habitual-schedule-editor"><legend>Horários habituais</legend><p>Adicione todos os horários que este trabalhador costuma cumprir.</p>
@@ -669,6 +672,7 @@ export default function AdminEmployees() {
               <div><span>CPF</span><strong>{formatCPF(selectedEmp.cpf)}</strong></div>
               <div><span>Cargo</span><strong>{selectedEmp.cargo || 'Não informado'}</strong></div>
               <div><span>Perfil de acesso</span><strong>{selectedEmp.role === 'admin' ? 'Administrador' : 'Funcionário'}</strong></div>
+              <div><span>Acesso ao suporte</span><strong>{selectedEmp.suporte ? 'Habilitado' : 'Não habilitado'}</strong></div>
               <div><span>Tipo de vínculo</span><strong>{selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</strong></div>
               <div><span>Data de admissão</span><strong>{selectedEmp.data_admissao ? formatDate(`${selectedEmp.data_admissao}T12:00:00`) : 'Não informada'}</strong></div>
               {selectedEmp.tipo_contrato !== 'pj' && <div><span>Horário habitual</span><strong>{selectedEmp.escala_trabalho ? getRegisteredScheduleLabel(selectedEmp.escala_trabalho) : 'Não informado'}</strong></div>}

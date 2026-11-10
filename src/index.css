@@ -1795,6 +1795,10 @@ select.form-input {
 .pj-hours-summary strong { color: var(--text-primary); font-size: var(--font-lg); }
 .employee-employment-form { display: grid; gap: var(--space-4); }
 .employee-edit-fields { display: grid; gap: var(--space-4); min-width: 0; padding: 0; border: 0; }
+.employee-support-access { display: flex; align-items: flex-start; gap: var(--space-3); cursor: pointer; }
+.employee-support-access input { margin-top: var(--space-1); flex-shrink: 0; }
+.employee-support-access span { display: grid; gap: var(--space-1); }
+.employee-support-access small { color: var(--text-secondary); }
 .employee-edit-fields .form-row { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
 .employee-weekdays { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-secondary); }
 .employee-weekdays legend { padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--font-xs); }

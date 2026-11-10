@@ -10,7 +10,7 @@ export default function SupportTickets({ state, onSelect, selectedId }) {
       {onSelect ? <button className="support-ticket-select" onClick={() => onSelect(ticket)} aria-pressed={selectedId === ticket.id}>{ticket.subject}</button> : <h3>{ticket.subject}</h3>}
       {ticket.employee?.nome && <p className="text-muted">{ticket.employee.nome}</p>}
       {ticket.employee?.email && <p className="support-requester-email">{ticket.employee.email}</p>}
-      {!onSelect && <><p className="support-preserve-text">{ticket.description}</p>{ticket.response && <div className="support-team-response"><strong>Resposta da equipe</strong><p className="support-preserve-text">{ticket.response}</p></div>}</>}
+      {!onSelect && <p className="support-preserve-text">{ticket.description}</p>}
     </article>)}
     {(state.page > 0 || state.hasMore) && <nav className="support-pagination" aria-label="Páginas de chamados">
       <button className="btn btn-secondary" disabled={state.page === 0 || state.loading} onClick={() => state.setPage((value) => value - 1)}>Anterior</button>

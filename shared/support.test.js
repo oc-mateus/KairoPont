@@ -64,11 +64,14 @@ function mailClient(rpc, requester = { nome: 'Pessoa de Teste', email: 'pessoa@e
 }
 
 test('reply links address the requester and encode the ticket subject safely', () => {
-  const link = new URL(getSupportReplyUrl({ protocol: 42, subject: 'Ponto & horário?\r\nBcc: attacker@example.invalid', employee: { email: 'pessoa+suporte@example.invalid' } }));
+  const description='Preciso de ajuda com o ponto.\nO problema ocorreu na saída.';
+  const link = new URL(getSupportReplyUrl({ protocol: 42, subject: 'Ponto & horário?\r\nBcc: attacker@example.invalid', description, employee: { nome:'Pessoa de Teste',email: 'pessoa+suporte@example.invalid' } }));
   assert.equal(decodeURIComponent(link.pathname), 'pessoa+suporte@example.invalid');
   assert.match(link.searchParams.get('subject'), /Chamado #42/);
   assert.doesNotMatch(link.searchParams.get('subject'), /[\r\n]/);
-  assert.deepEqual([...link.searchParams.keys()], ['subject']);
+  assert.deepEqual([...link.searchParams.keys()], ['subject','body']);
+  assert.ok(link.searchParams.get('body').includes(description));
+  assert.match(link.searchParams.get('body'),/Olá, Pessoa de Teste\.[\s\S]*chamado #42/);
   for (const email of ['', 'invalid', 'pessoa@example.invalid\r\nBcc:evil@example.invalid']) assert.equal(getSupportReplyUrl({ employee: { email } }), null);
   assert.equal(getSupportReplyUrl(null), null);
 });

@@ -21,7 +21,7 @@ const AdminEmployees = lazy(() => import('./pages/admin/AdminEmployees'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
 
-function PrivateRoute({ children, requireAdmin = false, requireClt = false }) {
+function PrivateRoute({ children, requireAdmin = false, requireSupport = false, requireClt = false }) {
   const { session, profile, loading, signOut } = useAuth();
   const location = useLocation();
 
@@ -47,6 +47,10 @@ function PrivateRoute({ children, requireAdmin = false, requireClt = false }) {
 
   if (requireAdmin && profile?.role !== 'admin') {
     return <Navigate to="/ponto" replace />;
+  }
+
+  if (requireSupport && profile?.suporte !== true) {
+    return <Navigate to={profile?.role === 'admin' ? '/admin' : '/ponto'} replace />;
   }
 
   if (requireClt && profile?.role !== 'admin' && profile?.tipo_contrato !== 'clt') {
@@ -101,7 +105,7 @@ export default function App() {
         <Route path="/admin/funcionarios" element={<PrivateRoute requireAdmin><AdminEmployees /></PrivateRoute>} />
         <Route path="/admin/calendario" element={<PrivateRoute requireAdmin><AdminCalendar /></PrivateRoute>} />
         <Route path="/admin/auditoria" element={<PrivateRoute requireAdmin><AdminAudit /></PrivateRoute>} />
-        <Route path="/admin/suporte" element={<PrivateRoute requireAdmin><AdminSupport /></PrivateRoute>} />
+        <Route path="/admin/suporte" element={<PrivateRoute requireSupport><AdminSupport /></PrivateRoute>} />
 
         <Route path="*" element={<Navigate to="/ponto" replace />} />
       </Routes>

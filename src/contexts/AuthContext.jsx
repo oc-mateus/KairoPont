@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
     try {
       const { data, error } = await supabase
         .from('funcionarios')
-        .select('id,auth_id,nome,cpf,email,cargo,ativo,role,foto_url,tipo_contrato,data_admissao,escala_trabalho')
+        .select('id,auth_id,nome,cpf,email,cargo,ativo,role,suporte,foto_url,tipo_contrato,data_admissao,escala_trabalho')
         .eq('auth_id', userId)
         .single();
 
@@ -85,6 +85,7 @@ export function AuthProvider({ children }) {
     profile,
     loading,
     isAdmin: profile?.role === 'admin',
+    isSupport: profile?.ativo === true && profile?.suporte === true,
     isActive: profile?.ativo === true,
     passwordRecoveryPending,
     clearPasswordRecovery,

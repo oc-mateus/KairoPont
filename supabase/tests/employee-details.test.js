@@ -30,6 +30,7 @@ test('administrative registration edits preserve identity and audit atomic chang
       await db.exec(source.slice(start, source.indexOf('$$;', start) + 3));
     }
     await db.exec(await readFile(new URL('../migrations/20261110125841_admin_employee_details.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../migrations/20261110140710_support_account_access.sql', import.meta.url), 'utf8'));
     for (const [id, role, active] of [[admin, 'admin', true], [employee, 'employee', true], [inactiveAdmin, 'admin', false]]) {
       await db.query('insert into funcionarios values($1,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [id, 'Pessoa original', 'Assistente', role, active, 'clt', '2026-01-02', schedule, `cpf-${id}`, `${id}@example.invalid`]);
     }
@@ -93,6 +94,19 @@ test('administrative registration edits preserve identity and audit atomic chang
       const original = (await db.query('select * from funcionarios where id=$1', [employee])).rows[0];
       assert.equal(original.tipo_contrato, 'clt');
       assert.equal(original.cargo, 'Assistente');
+    });
+    await db.exec('ALTER TABLE auditoria DROP CONSTRAINT reject_test_audit');
+    await t.test('only admins grant independent support access through the audited editor',async()=>{
+      const args=[employee,'Pessoa atualizada','Analista','2026-01-02',schedule,'clt',true];
+      const query='select admin_update_employee_details($1,$2,$3,$4,$5,$6,$7) as employee';
+      await as('authenticated',employee,()=>assert.rejects(db.query(query,args),/restrita a administradores/));
+      await as('authenticated',admin,async()=>{
+        const result=(await db.query(query,args)).rows[0].employee;
+        assert.equal(result.suporte,true);
+        assert.equal(result.role,'employee');
+        const audit=(await db.query("select * from auditoria where acao='alterar_acesso_suporte'")).rows[0];
+        assert.deepEqual(audit.detalhes,{antes:false,depois:true});
+      });
     });
   } finally { await db.close(); }
 });

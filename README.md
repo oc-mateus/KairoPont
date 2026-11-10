@@ -64,7 +64,7 @@ O site está publicado. A URL padrão do Supabase Auth e o endereço permitido p
 
 ### Suporte
 
-A central de ajuda em `/suporte` reúne orientações públicas e abre um chamado ao clicar em **Buscar orientação**. A administração consulta os pedidos em **Atendimentos**, com nome, e-mail do solicitante e opção de resposta por e-mail. O contato de suporte é **mcoliveira@kairoautomacoes.com.br**; o envio depende da chave Resend e de um remetente verificado. A IA permanece desligada. Consulte [Suporte](docs/SUPORTE.md) para configuração, limites e testes.
+A central de ajuda em `/suporte` reúne orientações públicas e abre um chamado ao clicar em **Buscar orientação**. Somente contas com **Acesso ao suporte**, sendo administradoras ou não, consultam os pedidos em **Atendimentos**. A resposta é por e-mail, com destinatário, protocolo e problema completo preenchidos no rascunho; no portal o operador acompanha e atualiza o status. Administradores concedem o acesso em **Funcionários → Editar cadastro**. O contato de suporte é **mcoliveira@kairoautomacoes.com.br**; os avisos automáticos dependem da chave Resend e de um remetente verificado. A IA permanece desligada. Consulte [Suporte](docs/SUPORTE.md) para configuração, limites e testes.
 
 Requisitos: Node.js 18 ou superior, npm e acesso ao Supabase `KairoPont`.
 

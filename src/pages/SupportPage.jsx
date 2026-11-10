@@ -62,7 +62,7 @@ export default function SupportPage() {
           <form onSubmit={ask} aria-busy={asking}><label className="form-group" htmlFor="support-question"><span className="form-label">O que você precisa resolver?</span><textarea className="form-input" id="support-question" rows={5} required minLength={10} maxLength={3000} value={question} onChange={(event) => setQuestion(event.target.value)} disabled={asking} /></label><button className="btn btn-primary" type="submit" disabled={asking || authLoading}>{asking ? 'Enviando pedido…' : 'Buscar orientação'}</button></form>
           {error && <p role="alert" className="support-error">{error}</p>}
           {!active && !authLoading && <p className="support-guides-note"><Link to="/login">Entre na sua conta</Link> para enviar o pedido.</p>}
-          {confirmation && <p role="status" className="support-confirmation">Chamado #{confirmation.ticket.protocol} registrado.{confirmation.delivery === 'sent' ? ' Sua mensagem foi enviada por e-mail à equipe.' : ' Seu pedido está salvo para a equipe, mas o envio por e-mail ainda não foi confirmado.'}</p>}
+          {confirmation && <p role="status" className="support-confirmation">Chamado #{confirmation.ticket.protocol} registrado. A equipe vai analisar seu pedido.</p>}
         </aside>
       </div>
     </main>

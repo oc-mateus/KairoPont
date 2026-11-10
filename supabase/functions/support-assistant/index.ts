@@ -5,6 +5,23 @@ import { answerSupportQuestion } from "../_shared/support-answer.mjs";
 import { notifySupportTeam } from "../_shared/support-email.mjs";
 import { DEFAULT_SUPPORT_EMAIL, SUPPORT_CATEGORIES } from "../../../shared/support.mjs";
 
+function readEmailConfig() {
+  return {
+    enabled: Deno.env.get("SUPPORT_EMAIL_ENABLED") !== "false",
+    apiKey: Deno.env.get("RESEND_API_KEY") || "",
+    to: Deno.env.get("SUPPORT_EMAIL") || DEFAULT_SUPPORT_EMAIL,
+    from: Deno.env.get("SUPPORT_EMAIL_FROM") || Deno.env.get("FERIAS_EMAIL_FROM") || "",
+  };
+}
+
+// Log readiness only. Never include keys, addresses or ticket content in logs.
+const startupEmailConfig = readEmailConfig();
+console.info("support_email_configuration", JSON.stringify({
+  enabled: startupEmailConfig.enabled,
+  providerConfigured: Boolean(startupEmailConfig.apiKey),
+  senderConfigured: Boolean(startupEmailConfig.from),
+}));
+
 Deno.serve(async (req) => {
   const { reply, earlyResponse } = requestSecurity(req);
   if (earlyResponse) return earlyResponse;
@@ -14,20 +31,15 @@ Deno.serve(async (req) => {
     const { data: ctx, error: authError } = await createSupabaseContext(req, { auth: "user" });
     if (authError || !ctx?.userClaims?.id) return reply({ error: "Entre na sua conta para falar com o suporte." }, 401);
     const { data: employee, error: employeeError } = await ctx.supabase.from("funcionarios")
-      .select("id,role,ativo").eq("auth_id", ctx.userClaims.id).eq("ativo", true).maybeSingle();
+      .select("id,role,ativo,suporte").eq("auth_id", ctx.userClaims.id).eq("ativo", true).maybeSingle();
     if (employeeError || !employee) return reply({ error: "É necessária uma conta ativa." }, 403);
     const input = await readJsonObject(req, ["action", "category", "question", "subject", "description", "request_id", "ticket_id"]);
     const action = stringField(input, "action", 20);
     if (!["ask", "create_ticket", "notify_ticket"].includes(action)) throw new HttpError(400, "Ação de suporte inválida.");
 
-    const emailConfig = {
-      enabled: Deno.env.get("SUPPORT_EMAIL_ENABLED") !== "false",
-      apiKey: Deno.env.get("RESEND_API_KEY") || "",
-      to: Deno.env.get("SUPPORT_EMAIL") || DEFAULT_SUPPORT_EMAIL,
-      from: Deno.env.get("SUPPORT_EMAIL_FROM") || Deno.env.get("FERIAS_EMAIL_FROM") || "",
-    };
+    const emailConfig = readEmailConfig();
     if (action === "notify_ticket") {
-      if (employee.role !== "admin") return reply({ error: "Somente a equipe pode reenviar avisos." }, 403);
+      if (employee.suporte !== true) return reply({ error: "Acesso ao suporte necessário para reenviar avisos." }, 403);
       const id = uuidField(input, "ticket_id");
       const { data: ticket, error } = await ctx.supabase.from("support_tickets").select("id,protocol,category,funcionario_id,description").eq("id", id).maybeSingle();
       if (error) throw error;

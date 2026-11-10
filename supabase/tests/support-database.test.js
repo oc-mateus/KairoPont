@@ -11,7 +11,7 @@ test('support database permissions, idempotency and quotas in local PostgreSQL',
     CREATE SCHEMA auth; CREATE SCHEMA private;
     GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
-    CREATE TABLE public.funcionarios(id uuid PRIMARY KEY,auth_id uuid UNIQUE,nome text,role text,ativo boolean);
+    CREATE TABLE public.funcionarios(id uuid PRIMARY KEY,auth_id uuid UNIQUE,nome text,email text,role text,ativo boolean);
     CREATE TABLE public.auditoria(admin_id uuid,acao text,alvo_id uuid,detalhes jsonb);
     CREATE TABLE private.edge_rate_limits(action text,subject text,window_seconds integer,window_started_at timestamptz,requests integer,PRIMARY KEY(action,subject,window_seconds));
     CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$SELECT EXISTS(SELECT 1 FROM public.funcionarios WHERE auth_id=auth.uid() AND role='admin' AND ativo=true)$$;
@@ -21,9 +21,10 @@ test('support database permissions, idempotency and quotas in local PostgreSQL',
   `);
   const migration = await readFile(new URL('../migrations/20261108044641_support_center_and_private_ticket_queue.sql', import.meta.url), 'utf8');
   await db.exec(migration);
-  const ids = ['10000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000004'];
+  for (const filename of ['20261110140710_support_account_access.sql','20261110140712_enforce_support_ticket_access.sql']) await db.exec(await readFile(new URL(`../migrations/${filename}`,import.meta.url),'utf8'));
+  const ids = ['10000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000005'];
   for (let index = 0; index < ids.length; index++) {
-    await db.query('insert into funcionarios(id,auth_id,nome,role,ativo) values($1,$1,$2,$3,$4)', [ids[index], `Test ${index}`, index === 2 ? 'admin' : 'employee', index !== 3]);
+    await db.query('insert into funcionarios(id,auth_id,nome,email,role,ativo,suporte) values($1,$1,$2,$3,$4,$5,$6)', [ids[index], `Test ${index}`, `test${index}@example.invalid`, [2,4].includes(index) ? 'admin' : 'employee', index !== 3, [1,2,3].includes(index)]);
   }
   const fixture = (await db.query("insert into support_tickets(funcionario_id,request_id,category,subject,description) values($1,gen_random_uuid(),'acesso','Test ticket','Description for local testing') returning id", [ids[0]])).rows[0];
   await db.query("insert into support_tickets(funcionario_id,request_id,category,subject,description) values($1,gen_random_uuid(),'ponto','Other ticket','Description for another employee')", [ids[1]]);
@@ -71,17 +72,40 @@ test('support database permissions, idempotency and quotas in local PostgreSQL',
       });
     });
     await t.test('employees cannot respond or run server-only quota RPCs', async () => {
-      await as('authenticated', ids[0], async () => assert.rejects(db.query("select admin_respond_support_ticket($1,'Forged reply','respondido')", [fixture.id]), /Administrador ativo/));
+      await as('authenticated', ids[0], async () => assert.rejects(db.query("select support_update_ticket_status($1,'respondido')", [fixture.id]), /Acesso ao suporte/));
       await as('authenticated', ids[0], async () => assert.rejects(db.query("select consume_support_quota('support-question',$1)", [ids[0]]), /permission denied/));
     });
-    await t.test('administrative response is visible and audited', async () => {
+    await t.test('support status update is audited without storing a portal reply', async () => {
       await as('authenticated', ids[2], async () => {
         assert.equal((await db.query('select * from support_tickets')).rows.length, 2);
-        const result = (await db.query("select * from admin_respond_support_ticket($1,'Reviewed response','respondido')", [fixture.id])).rows[0];
+        const result = (await db.query("select * from support_update_ticket_status($1,'respondido')", [fixture.id])).rows[0];
         assert.equal(result.responded_by, ids[2]); assert.equal(result.status, 'respondido');
+        assert.equal(result.response,null);
         await db.exec(`SET LOCAL ROLE ${owner}`);
         assert.equal((await db.query('select * from auditoria')).rows.length, 1);
       });
+    });
+    await t.test('support staff can read requester contacts and respond without becoming admins', async () => {
+      await as('authenticated', ids[1], async () => {
+        assert.equal((await db.query('select is_admin() as admin')).rows[0].admin,false);
+        assert.equal((await db.query('select is_support() as support')).rows[0].support,true);
+        assert.equal((await db.query('select * from funcionarios')).rows.length,1);
+        const tickets=(await db.query("select list_support_tickets('todos',0) as ticket")).rows;
+        assert.equal(tickets.length,2);
+        assert.deepEqual(tickets.find(row=>row.ticket.id===fixture.id).ticket.employee,{nome:'Test 0',email:'test0@example.invalid'});
+        const result=(await db.query("select * from support_update_ticket_status($1,'respondido')",[fixture.id])).rows[0];
+        assert.equal(result.responded_by,ids[1]);
+        assert.equal('response' in tickets[0].ticket,false);
+      });
+    });
+    await t.test('admin without support and inactive support cannot list the queue or respond', async () => {
+      for(const id of [ids[4],ids[3]]) {
+        await as('authenticated',id,()=>assert.rejects(db.query("select list_support_tickets('todos',0)"),/Acesso ao suporte/));
+        await as('authenticated',id,()=>assert.rejects(db.query("select support_update_ticket_status($1,'respondido')",[fixture.id]),/Acesso ao suporte/));
+      }
+      await as('authenticated',ids[0],()=>assert.rejects(db.query('update funcionarios set suporte=true where id=$1',[ids[0]]),/permission denied/));
+      await as('anon',null,()=>assert.rejects(db.query("select list_support_tickets('todos',0)"),/permission denied/));
+      await as('authenticated',ids[1],()=>assert.rejects(db.query("select admin_respond_support_ticket($1,'Resposta antiga','respondido')",[fixture.id]),/permission denied/));
     });
     await t.test('AI quota blocks the sixth request and is shared project-wide', async () => {
       await as('service_role', null, async () => {

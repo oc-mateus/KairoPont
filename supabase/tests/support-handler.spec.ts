@@ -10,6 +10,7 @@ Deno.test("support handler keeps providers and permissions behind explicit gates
   const actor = "10000000-0000-0000-0000-000000000001";
   const requesterId = "10000000-0000-0000-0000-000000000002";
   let role = "employee";
+  let supportAccess = false;
   let allowed = true;
   let effects = 0;
   let failQuota = false;
@@ -20,7 +21,7 @@ Deno.test("support handler keeps providers and permissions behind explicit gates
       return { select() { return this; }, eq(field: string, id: string) { if (field === 'id') lookupId = id; return this; }, maybeSingle() {
         const data = table === 'support_tickets'
           ? { id: actor, protocol: 42, category: 'ponto', funcionario_id: requesterId, description: 'Mensagem completa do chamado para responder' }
-          : { id: actor, role, ativo: true, nome: 'Pessoa Solicitante', email: lookupId === requesterId ? 'solicitante@example.invalid' : 'actor@example.invalid' };
+          : { id: actor, role, ativo: true, suporte: supportAccess, nome: 'Pessoa Solicitante', email: lookupId === requesterId ? 'solicitante@example.invalid' : 'actor@example.invalid' };
         return Promise.resolve({ data, error: null });
       } };
     },
@@ -81,13 +82,16 @@ Deno.test("support handler keeps providers and permissions behind explicit gates
       assert(response.status === 201 && body.ticket.protocol === 42 && body.delivery === "not_configured", "Ticket must survive absent mail configuration");
       assert(effects === 1, "Expected one saved ticket");
     });
-    await t.step("only administrators can retry email notifications", async () => {
+    await t.step("only support accounts can retry email notifications, independently of admin role", async () => {
       assert((await handler(req({ action: "notify_ticket", ticket_id: actor }))).status === 403, "Employee retried protected mail");
       role = "admin";
+      assert((await handler(req({ action: "notify_ticket", ticket_id: actor }))).status === 403, "Admin without support access retried mail");
+      role = "employee";
+      supportAccess = true;
       const response = await handler(req({ action: "notify_ticket", ticket_id: actor }));
       assert(response.status === 200 && (await response.json()).delivery === "not_configured", "Missing mail configuration should be explicit");
     });
-    await t.step('admin retry sends the stored message and requester reply address, not the admin identity', async () => {
+    await t.step('support retry sends the stored message and requester reply address, not the operator identity', async () => {
       Deno.env.set('SUPPORT_EMAIL_ENABLED', 'true');
       Deno.env.set('SUPPORT_EMAIL_FROM', 'sender@example.invalid');
       Deno.env.set('RESEND_API_KEY', 'test');

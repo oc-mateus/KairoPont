@@ -25,6 +25,7 @@ const employeeNav = [
   { id: 'ferias', label: 'Minhas Férias', icon: VacationIcon, path: '/ferias' },
   { id: 'perfil', label: 'Meu Perfil', icon: UserIcon, path: '/perfil' },
   { id: 'suporte', label: 'Ajuda e suporte', icon: SupportIcon, path: '/suporte' },
+  { id: 'atendimentos', label: 'Atendimentos', icon: SupportIcon, path: '/admin/suporte' },
 ];
 
 const adminNav = [
@@ -39,14 +40,15 @@ const adminNav = [
 const adminAccountNav = employeeNav.filter(item => ['perfil', 'suporte'].includes(item.id));
 
 export default function Layout({ children }) {
-  const { profile, isAdmin, signOut } = useAuth();
+  const { profile, isAdmin, isSupport, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const visibleEmployeeNav = profile?.tipo_contrato === 'pj'
-    ? employeeNav.filter(item => !['documentos', 'ferias'].includes(item.id))
-    : employeeNav;
+  const visibleEmployeeNav = employeeNav.filter(item =>
+    (item.id !== 'atendimentos' || isSupport)
+    && (profile?.tipo_contrato !== 'pj' || !['documentos', 'ferias'].includes(item.id)));
+  const visibleAdminNav = adminNav.filter(item => item.id !== 'admin-suporte' || isSupport);
 
   const handleNav = (path) => {
     navigate(path);
@@ -106,7 +108,7 @@ export default function Layout({ children }) {
           {isAdmin && (
             <div className="sidebar-nav-group">
               <div className="sidebar-nav-group-title">Administração</div>
-              {adminNav.map(item => (
+              {visibleAdminNav.map(item => (
                 <button
                   key={item.id}
                   className={`sidebar-nav-item ${location.pathname === item.path ? 'active' : ''}`}
@@ -128,7 +130,7 @@ export default function Layout({ children }) {
           />
           <div className="sidebar-user-info">
             <div className="user-name">{profile?.nome || 'Usuário'}</div>
-            <div className="user-role">{isAdmin ? 'Administrador' : 'Funcionário'}</div>
+            <div className="user-role">{isSupport ? (isAdmin ? 'Administrador · Suporte' : 'Suporte') : isAdmin ? 'Administrador' : 'Funcionário'}</div>
           </div>
           <button
             className="btn btn-ghost btn-icon"

@@ -271,31 +271,25 @@ function clockMinutes(value) {
   return parsed.every(Number.isFinite) ? parsed[0] * 60 + parsed[1] + parsed[2] / 60 : null;
 }
 
-function dateDayNumber(value) {
-  if (!value) return null;
-  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number);
-  return Date.UTC(year, month - 1, day) / 86400000;
+function elapsedClockMilliseconds(startDate, startTime, endDate, endTime) {
+  const start = toUtcTimestamp(startDate, startTime);
+  const end = toUtcTimestamp(endDate, endTime);
+  return start == null || end == null ? 0 : Math.max(0, end - start);
 }
 
-function elapsedClockMinutes(startDate, startTime, endDate, endTime) {
-  const startMinute = clockMinutes(startTime);
-  const endMinute = clockMinutes(endTime);
-  const startDay = dateDayNumber(startDate);
-  const endDay = dateDayNumber(endDate || startDate);
-  if ([startMinute, endMinute, startDay, endDay].some((value) => value == null)) return 0;
-  return Math.max(0, (endDay - startDay) * 1440 + endMinute - startMinute);
-}
-
-// Horas corridas efetivamente registradas, sem conversão de adicional noturno CLT.
+// Horas PJ com intervalo mínimo de 1h quando a jornada passa de 6h.
 export function getElapsedWorkMinutes(record) {
   if (!record?.entrada || !record?.saida) return 0;
   const endDate = record.saida_data || record.data;
-  let minutes = elapsedClockMinutes(record.data, record.entrada, endDate, record.saida);
+  const duration = elapsedClockMilliseconds(record.data, record.entrada, endDate, record.saida);
+  const hour = 3600000;
+  let recordedBreak = 0;
   if (record.saida_almoco && record.retorno_almoco) {
     const { lunchDate, returnDate } = getRecordedLunchDates(record);
-    minutes -= elapsedClockMinutes(lunchDate, record.saida_almoco, returnDate, record.retorno_almoco);
+    recordedBreak = elapsedClockMilliseconds(lunchDate, record.saida_almoco, returnDate, record.retorno_almoco);
   }
-  return Math.max(0, minutes);
+  const breakDuration = Math.max(recordedBreak, duration > 6 * hour ? hour : 0);
+  return Math.max(0, duration - breakDuration) / 60000;
 }
 
 export function calcElapsedDailyTotal(record) {

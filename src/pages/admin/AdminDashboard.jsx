@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import LoadError from '../../components/LoadError';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { formatMinutesAsHours, getCreditedDailyMinutes, getOvertimeMinutes, getTodayInSP } from '../../lib/utils';
+import { formatMinutesAsHours, getCreditedDailyMinutes, getElapsedWorkMinutes, getOvertimeMinutes, getTodayInSP } from '../../lib/utils';
 import { Spinner } from '../../components/ui';
 import { getAssignedShiftId, getNearestRegisteredSchedule, inferShiftFromEntry } from '../../lib/workShifts';
 
@@ -58,22 +58,32 @@ function isCltEmployee(employee) {
   return employee.tipo_contrato === 'clt' && employee.role !== 'admin';
 }
 
-function buildAttendanceChartData({ employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets }) {
+function buildChartBuckets(periodStartMonth, periodMonthCount, monthlyBuckets) {
   if (!periodStartMonth) return [];
   const [startYear, startMonth] = periodStartMonth.split('-').map(Number);
-  const startMonthIndex = startYear * 12 + startMonth - 1;
-  const bucketCount = monthlyBuckets ? periodMonthCount : Math.ceil(new Date(startYear, startMonth, 0).getDate() / 7);
-  const buckets = Array.from({ length: bucketCount }, (_, index) => {
+  const daysInMonth = new Date(startYear, startMonth, 0).getDate();
+  const bucketCount = monthlyBuckets ? periodMonthCount : Math.ceil(daysInMonth / 7);
+  return Array.from({ length: bucketCount }, (_, index) => {
     const bucketMonth = monthOffset(periodStartMonth, index);
-    const daysInMonth = new Date(startYear, startMonth, 0).getDate();
     return {
       label: monthlyBuckets ? formatMonthShort(bucketMonth) : `${index * 7 + 1}–${Math.min((index + 1) * 7, daysInMonth)}`,
       fullLabel: monthlyBuckets ? new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(startYear, startMonth - 1 + index, 1))) : `Dias ${index * 7 + 1} a ${Math.min((index + 1) * 7, daysInMonth)}`,
-      absences: 0,
-      delays: 0,
-      overtimeMinutes: 0,
     };
   });
+}
+
+function chartBucketIndex(date, periodStartMonth, monthlyBuckets) {
+  if (!monthlyBuckets) return Math.floor((Number(date.slice(8, 10)) - 1) / 7);
+  const [year, month] = date.slice(0, 7).split('-').map(Number);
+  const [startYear, startMonth] = periodStartMonth.split('-').map(Number);
+  return (year - startYear) * 12 + month - startMonth;
+}
+
+function buildAttendanceChartData({ employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets }) {
+  if (!periodStartMonth) return [];
+  const [startYear, startMonth] = periodStartMonth.split('-').map(Number);
+  const buckets = buildChartBuckets(periodStartMonth, periodMonthCount, monthlyBuckets)
+    .map((bucket) => ({ ...bucket, absences: 0, delays: 0, overtimeMinutes: 0 }));
   const scheduledEmployees = employees.filter((employee) => isCltEmployee(employee) && employee.ativo && getAssignedShiftId(employee.escala_trabalho));
   const recordByEmployeeDay = new Map(records.map((record) => [`${record.funcionario_id}:${record.data}`, record]));
   const holidayDates = new Set(holidays.map((holiday) => holiday.data));
@@ -85,11 +95,7 @@ function buildAttendanceChartData({ employees, records, vacations, holidays, tod
   for (let offset = 0; offset < daysToScan; offset += 1) {
     const date = isoDate(startYear, startMonth - 1, offset + 1);
     if (monthlyBuckets && date > today) break;
-    const monthNumber = Number(date.slice(5, 7));
-    const bucketIndex = monthlyBuckets
-      ? (Number(date.slice(0, 4)) * 12 + monthNumber - 1) - startMonthIndex
-      : Math.floor((Number(date.slice(8, 10)) - 1) / 7);
-    const bucket = buckets[bucketIndex];
+    const bucket = buckets[chartBucketIndex(date, periodStartMonth, monthlyBuckets)];
     if (!bucket) continue;
     const weekday = new Date(`${date}T12:00:00`).getDay() || 7;
     if (date < today && date >= ATTENDANCE_TRACKING_START) {
@@ -108,9 +114,7 @@ function buildAttendanceChartData({ employees, records, vacations, holidays, tod
     if (!record.entrada) return;
     const employee = employeeById.get(record.funcionario_id);
     if (!employee) return;
-    const recordMonthIndex = Number(record.data.slice(0, 4)) * 12 + Number(record.data.slice(5, 7)) - 1;
-    const bucketIndex = monthlyBuckets ? recordMonthIndex - startMonthIndex : Math.floor((Number(record.data.slice(8, 10)) - 1) / 7);
-    const bucket = buckets[bucketIndex];
+    const bucket = buckets[chartBucketIndex(record.data, periodStartMonth, monthlyBuckets)];
     if (!bucket) return;
     const nearestSchedule = getNearestRegisteredSchedule(employee.escala_trabalho, record.entrada);
     const expectedEntry = nearestSchedule?.expected ?? null;
@@ -129,10 +133,11 @@ function buildAttendanceChartData({ employees, records, vacations, holidays, tod
 
 function AttendanceChart({ title, total, unit, values, color, groupLabel, formatValue = (value) => String(value) }) {
   const maximum = Math.max(1, ...values.map((item) => item.value));
+  const chartDescription = values.map((item) => `${item.fullLabel || item.label}: ${formatValue(item.value)}`).join(', ');
   return (
     <article className="attendance-chart-card">
       <header><div><h4>{title}</h4><p>{groupLabel}</p></div><strong>{total}<small>{unit}</small></strong></header>
-      <div className="attendance-chart-bars" style={{ gridTemplateColumns: `repeat(${values.length}, minmax(0, 1fr))` }} role="img" aria-label={`${title}, ${groupLabel}`}>
+      <div className="attendance-chart-bars" style={{ gridTemplateColumns: `repeat(${values.length}, minmax(0, 1fr))` }} role="img" aria-label={`${title}. ${groupLabel}. ${chartDescription}`}>
         {values.map((item) => (
           <div className="attendance-chart-column" key={item.label} title={`${item.fullLabel || item.label}: ${formatValue(item.value)}`}>
             <div className="attendance-chart-track"><span className="attendance-chart-bar" style={{ height: `${Math.max(item.value > 0 ? 4 : 0, (item.value / maximum) * 100)}%`, background: color }} /></div>
@@ -141,6 +146,70 @@ function AttendanceChart({ title, total, unit, values, color, groupLabel, format
         ))}
       </div>
     </article>
+  );
+}
+
+function PjHoursChart({ title, records, periodStartMonth, periodMonthCount, monthlyBuckets }) {
+  if (!records.length) return <p className="attendance-loading">Nenhuma jornada PJ concluída neste período.</p>;
+  const values = buildChartBuckets(periodStartMonth, periodMonthCount, monthlyBuckets)
+    .map((bucket) => ({ ...bucket, value: 0 }));
+  records.forEach((record) => {
+    const bucket = values[chartBucketIndex(record.data, periodStartMonth, monthlyBuckets)];
+    if (bucket) bucket.value += getElapsedWorkMinutes(record);
+  });
+  const totalMinutes = values.reduce((total, bucket) => total + bucket.value, 0);
+  return <AttendanceChart
+    title={title}
+    total={formatMinutesAsHours(totalMinutes)}
+    unit="no período"
+    values={values}
+    groupLabel={monthlyBuckets ? 'Por mês' : 'Por semana'}
+    color="var(--kairo-green-400, #35b76a)"
+    formatValue={formatMinutesAsHours}
+  />;
+}
+
+function PjAttendance({ employees, records, loading, periodStartMonth, periodMonthCount, monthlyBuckets }) {
+  const [selectedPjId, setSelectedPjId] = useState('');
+  const pjEmployees = employees.filter((employee) => employee.tipo_contrato === 'pj' && employee.role !== 'admin');
+  const pjIds = new Set(pjEmployees.map((employee) => employee.id));
+  const completedRecords = records.filter((record) => record.entrada && record.saida && pjIds.has(record.funcionario_id));
+  const selectedPj = pjEmployees.find((employee) => employee.id === selectedPjId);
+  const chartPeriod = { periodStartMonth, periodMonthCount, monthlyBuckets };
+
+  return (
+    <section className="admin-people-section attendance-employee-section" aria-labelledby="pj-attendance-title">
+      <div className="section-heading">
+        <div>
+          <h3 id="pj-attendance-title">Jornada PJ</h3>
+          <p>Horas computadas com desconto de almoço nas jornadas acima de 6h.</p>
+        </div>
+      </div>
+      {loading ? <p className="attendance-loading" role="status">Carregando indicadores PJ…</p>
+        : !periodStartMonth ? <p className="attendance-loading">Selecione um mês para consultar as horas PJ.</p>
+          : <PjHoursChart title="Horas da equipe PJ" records={completedRecords} {...chartPeriod} />}
+      {pjEmployees.length > 0 && (
+        <div className="attendance-employee-section">
+          <div className="section-heading attendance-section-heading">
+            <h3>Horas por funcionário PJ</h3>
+            <label className="attendance-employee-control">
+              <span>Funcionário PJ</span>
+              <select value={selectedPjId} onChange={(event) => setSelectedPjId(event.target.value)}>
+                <option value="">Selecione um funcionário</option>
+                {pjEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.nome}</option>)}
+              </select>
+            </label>
+          </div>
+          {!loading && periodStartMonth && selectedPj && (
+            <PjHoursChart
+              title={selectedPj.nome}
+              records={completedRecords.filter((record) => record.funcionario_id === selectedPj.id)}
+              {...chartPeriod}
+            />
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -267,7 +336,7 @@ export default function AdminDashboard() {
   return (
     <div className="admin-dashboard">
       <div className="page-header admin-page-heading">
-        <div><h2 className="page-title">Visão geral</h2><p className="page-subtitle">Frequência e jornada CLT.</p></div>
+        <div><h2 className="page-title">Visão geral</h2><p className="page-subtitle">Frequência CLT e horas trabalhadas PJ.</p></div>
         <span className="admin-date">Hoje, {new Date(`${today}T12:00:00`).toLocaleDateString('pt-BR')}</span>
       </div>
 
@@ -279,11 +348,11 @@ export default function AdminDashboard() {
 
       <section className="admin-people-section attendance-insights-section">
         <div className="section-heading attendance-section-heading">
-          <div><h3>Absenteísmo e jornada</h3></div>
+          <div><h3>Absenteísmo e jornada CLT</h3></div>
           <div className="attendance-heading-actions">
             <div className="attendance-period-control">
-              <span>Período</span>
-              <div className="attendance-period-switch" role="group" aria-label="Período dos gráficos">
+              <span>Período dos gráficos CLT e PJ</span>
+              <div className="attendance-period-switch" role="group" aria-label="Período dos gráficos CLT e PJ">
                 <button type="button" className={period === 'current' ? 'active' : ''} aria-pressed={period === 'current'} onClick={() => setPeriod('current')}>Este mês</button>
                 <button type="button" className={period === 'specific' ? 'active' : ''} aria-pressed={period === 'specific'} onClick={() => setPeriod('specific')}>Escolher mês</button>
                 <button type="button" className={period === '6m' ? 'active' : ''} aria-pressed={period === '6m'} onClick={() => setPeriod('6m')}>6 meses</button>
@@ -328,6 +397,14 @@ export default function AdminDashboard() {
                 </div>
               </>}
       </section>
+      <PjAttendance
+        employees={employees}
+        records={records}
+        loading={attendanceLoading}
+        periodStartMonth={periodStartMonth}
+        periodMonthCount={periodMonthCount}
+        monthlyBuckets={monthlyBuckets}
+      />
     </div>
   );
 }

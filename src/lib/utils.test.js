@@ -76,6 +76,18 @@ test('computes PJ elapsed hours across midnight and subtracts a marked break', (
   };
   assert.equal(getElapsedWorkMinutes(record), 7 * 60);
   assert.equal(calcElapsedDailyTotal(record), '7h');
+  assert.equal(calcElapsedDailyTotal({ ...record, saida_almoco: null, retorno_almoco: null }), '7h');
+  assert.equal(calcElapsedDailyTotal({ ...record, retorno_almoco: '03:30:00' }), '6h 30min');
+});
+
+test('deducts one hour only when the PJ elapsed shift exceeds six hours', () => {
+  const record = { data: '2026-10-15', entrada: '08:00:24' };
+  assert.equal(calcElapsedDailyTotal({ ...record, saida: '14:00:24' }), '6h');
+  assert.equal(calcElapsedDailyTotal({ ...record, saida: '14:01:24' }), '5h 1min');
+  assert.equal(calcElapsedDailyTotal({ ...record, saida: '17:00:24' }), '8h');
+  assert.equal(calcElapsedDailyTotal({
+    ...record, saida: '14:01:24', saida_almoco: '12:00:00', retorno_almoco: '12:30:00',
+  }), '5h 1min');
 });
 
 test('all configured shifts expect eight hours on weekdays and four on Saturday', () => {

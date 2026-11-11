@@ -25,9 +25,9 @@ export function locationLabel(location, punched = true) {
   return `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (precisão aproximada: ${Math.ceil(location.accuracy)} m)`;
 }
 
-// One fresh reading per punch. The independent deadline also covers a browser
-// permission prompt that remains unanswered, which the API timeout may exclude.
-export function capturePunchLocation({ geolocation = globalThis.navigator?.geolocation, timeoutMs = 10000 } = {}) {
+// The browser's acquisition timeout starts after permission is granted.
+// Keep a separate, longer deadline so an unanswered prompt cannot block the punch.
+export function capturePunchLocation({ geolocation = globalThis.navigator?.geolocation, timeoutMs = 20000 } = {}) {
   if (!geolocation) return Promise.resolve({ status: 'unsupported' });
   return new Promise((resolve) => {
     let settled = false;
@@ -45,7 +45,7 @@ export function capturePunchLocation({ geolocation = globalThis.navigator?.geolo
           finish(hasCoordinates(value) ? value : { status: 'unavailable' });
         },
         (error) => finish({ status: ({ 1: 'denied', 3: 'timeout' })[error?.code] || 'unavailable' }),
-        { enableHighAccuracy: true, maximumAge: 0, timeout: timeoutMs },
+        { enableHighAccuracy: false, maximumAge: 30000, timeout: Math.min(12000, timeoutMs) },
       );
     } catch { finish({ status: 'unavailable' }); }
   });

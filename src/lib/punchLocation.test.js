@@ -4,16 +4,24 @@ import { capturePunchLocation, hasCoordinates, locationLabel, locationMapUrl, lo
 
 const captured = { status: 'captured', latitude: -23.55052, longitude: -46.633308, accuracy: 12.2 };
 
-test('each capture requests a fresh high-accuracy reading and keeps only coordinates', async () => {
+test('each punch requests standard accuracy and accepts a position up to 30 seconds old', async () => {
   let calls = 0;
   const geolocation = { getCurrentPosition(success, failure, options) {
     calls++;
-    assert.deepEqual(options, { maximumAge: 0, enableHighAccuracy: true, timeout: 10000 });
+    assert.deepEqual(options, { maximumAge: 30000, enableHighAccuracy: false, timeout: 12000 });
     success({ coords: { ...captured, altitude: 900 } });
   } };
   assert.deepEqual(await capturePunchLocation({ geolocation }), captured);
   assert.deepEqual(await capturePunchLocation({ geolocation }), captured);
   assert.equal(calls, 2);
+});
+
+test('a position received after the overall deadline is ignored', async () => {
+  let receivePosition;
+  const geolocation = { getCurrentPosition(ok) { receivePosition = ok; } };
+  const result = await capturePunchLocation({ geolocation, timeoutMs: 5 });
+  receivePosition({ coords: captured });
+  assert.deepEqual(result, { status: 'timeout' });
 });
 
 test('capture failures and unanswered prompts resolve without blocking the punch', async () => {

@@ -165,7 +165,10 @@ export default function PunchPage() {
 
       if (error) throw error;
 
-      toast.success(`${step.label} registrada com sucesso!${collectLocation && location.status !== 'captured' ? ` ${locationLabel(location)}.` : ''}`);
+      const locationMessage = collectLocation && location.status !== 'captured'
+        ? ` Ponto salvo sem localização. ${locationLabel(location)}.`
+        : '';
+      toast.success(`${step.label} registrada com sucesso!${locationMessage}`);
       await fetchTodayRecord();
     } catch (err) {
       toast.error('Erro ao registrar ponto: ' + err.message);
@@ -226,7 +229,7 @@ export default function PunchPage() {
       <section className="punch-action-panel">
         <h3>{isComplete ? 'Sua jornada foi concluída' : 'Sua próxima marcação'}</h3>
         {punching && <p className="punch-action-intro" role="status">{locating ? 'Obtendo localização… Permita o acesso no navegador.' : 'Registrando ponto…'}</p>}
-        {!isComplete && <p className="punch-policy-note">Localização enviada à administração só na entrada e na saída. Sem permissão, o ponto será salvo sem localização.</p>}
+        {!isComplete && <p className="punch-policy-note">A entrada e a saída enviam a localização à administração quando ela está disponível.</p>}
         <button
           className="btn-punch"
           onClick={() => handlePunch()}

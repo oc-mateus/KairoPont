@@ -34,6 +34,8 @@ Essas cotas protegem os dois serviços de e-mail. Login e recuperação de senha
 - E-mail, nome, CPF, cargo, data e identificadores têm validação de tipo, formato e comprimento.
 - Documentos aceitam PDF, JPEG, PNG e WebP de até 10 MiB; avatares aceitam JPEG, PNG e WebP de até 5 MiB. Os limites valem também para chamadas diretas à API de Storage.
 - O registro de documento exige arquivo existente na pasta do próprio funcionário. O cliente não pode escolher o horário de criação, o identificador ou atualizar metadados existentes.
+- A API e o bucket `documentos` exigem CLT ativo para consultar ou enviar documentos próprios. Administradores ativos continuam consultando os documentos autorizados e podem enviar para a própria pasta. A mudança de CLT para PJ retira acesso sem apagar arquivos ou metadados. URLs já assinadas expiram no prazo em que foram emitidas; o aplicativo usa 60 segundos.
+- CLT e administradores ativos podem limpar uploads órfãos da própria pasta. Se o vínculo mudar durante o envio e o portal não confirmar a remoção, um operador autorizado do Storage deve verificar a ausência de metadados e remover somente o arquivo órfão pelo Storage. Não apague linhas da tabela de objetos para tentar remover arquivos.
 - O envio ao Resend tem prazo de 15 segundos e mantém a chave de idempotência da decisão, inclusive em chamadas simultâneas. O sucesso é registrado no banco para evitar reenvios posteriores.
 - Dependências das funções estão fixadas e os arquivos `deno.lock` registram suas integridades.
 

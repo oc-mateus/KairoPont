@@ -106,12 +106,11 @@ export default function DocumentsPage() {
         });
 
       if (dbError) {
-        const { error: cleanupError } = await supabase.storage
+        const { data: removedFiles, error: cleanupError } = await supabase.storage
           .from('documentos')
           .remove([fileName]);
-        if (cleanupError) {
-          console.error('Não foi possível remover o arquivo sem metadados:', cleanupError);
-          throw new Error(`${dbError.message} O arquivo enviado pode precisar de limpeza administrativa.`);
+        if (cleanupError || !removedFiles?.some((file) => file.name === fileName)) {
+          throw new Error('Não foi possível cadastrar o documento nem confirmar a remoção do arquivo. Procure a administração.');
         }
         throw dbError;
       }

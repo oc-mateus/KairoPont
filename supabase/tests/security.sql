@@ -32,6 +32,7 @@ BEGIN
   SELECT id INTO v_other FROM public.funcionarios WHERE auth_id = v_ids[2];
   SELECT id INTO v_admin FROM public.funcionarios WHERE auth_id = v_ids[3];
   SELECT id INTO v_inactive FROM public.funcionarios WHERE auth_id = v_ids[4];
+  UPDATE public.funcionarios SET tipo_contrato = 'clt' WHERE id = v_employee;
   UPDATE public.funcionarios SET role = 'admin' WHERE id = v_admin;
   UPDATE public.funcionarios SET ativo = false WHERE id = v_inactive;
 
@@ -120,6 +121,11 @@ BEGIN
   IF NOT public.is_admin() THEN RAISE EXCEPTION 'Administrator access stopped working.'; END IF;
   SELECT count(*) INTO v_count FROM public.funcionarios WHERE id = ANY(ARRAY[v_employee,v_other,v_admin,v_inactive]);
   IF v_count <> 4 THEN RAISE EXCEPTION 'Admin cannot read managed profiles.'; END IF;
+  SELECT count(*) INTO v_count FROM public.documentos WHERE funcionario_id IN (v_employee, v_other);
+  IF v_count <> 2 THEN RAISE EXCEPTION 'Admin cannot read documents across contracts.'; END IF;
+  SELECT count(*) INTO v_count FROM storage.objects
+  WHERE bucket_id = 'documentos' AND name IN (v_employee::text || '/test.pdf', v_other::text || '/test.pdf');
+  IF v_count <> 2 THEN RAISE EXCEPTION 'Admin cannot read the managed private objects.'; END IF;
   PERFORM public.admin_update_employee(v_other, false, 'employee');
 
   SET LOCAL ROLE anon;

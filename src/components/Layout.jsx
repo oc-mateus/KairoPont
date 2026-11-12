@@ -40,8 +40,9 @@ const adminNav = [
 
 const adminAccountNav = employeeNav.filter(item => ['perfil', 'suporte'].includes(item.id));
 
-export default function Layout({ children }) {
-  const { profile, isAdmin, isSupport, signOut } = useAuth();
+export default function Layout({ children, offlineProfile }) {
+  const { profile: liveProfile, isAdmin, isSupport, signOut } = useAuth();
+  const profile = offlineProfile ?? liveProfile;
   const toast = useToast();
   const [signingOut, setSigningOut] = useState(false);
   const { theme, toggleTheme } = useTheme();
@@ -49,7 +50,8 @@ export default function Layout({ children }) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const visibleEmployeeNav = employeeNav.filter(item =>
-    (item.id !== 'atendimentos' || isSupport)
+    (!offlineProfile || item.id === 'ponto')
+    && (item.id !== 'atendimentos' || isSupport)
     && (profile?.tipo_contrato !== 'pj' || !['documentos', 'ferias'].includes(item.id)));
   const visibleAdminNav = adminNav.filter(item => item.id !== 'admin-suporte' || isSupport);
 

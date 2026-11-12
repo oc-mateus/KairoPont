@@ -8,12 +8,82 @@ test('each punch requests standard accuracy and accepts a position up to 30 seco
   let calls = 0;
   const geolocation = { getCurrentPosition(success, failure, options) {
     calls++;
-    assert.deepEqual(options, { maximumAge: 30000, enableHighAccuracy: false, timeout: 12000 });
+    assert.deepEqual(options, { maximumAge: 30000, enableHighAccuracy: false, timeout: 5000 });
     success({ coords: { ...captured, altitude: 900 } });
   } };
   assert.deepEqual(await capturePunchLocation({ geolocation }), captured);
   assert.deepEqual(await capturePunchLocation({ geolocation }), captured);
   assert.equal(calls, 2);
+});
+
+test('a mobile browser can capture with high accuracy after standard accuracy fails', async () => {
+  for (const code of [2, 3]) {
+    const attempts = [];
+    const geolocation = { getCurrentPosition(ok, fail, options) {
+      attempts.push(options.enableHighAccuracy);
+      if (options.enableHighAccuracy) ok({ coords: captured });
+      else fail({ code });
+    } };
+    assert.deepEqual(await capturePunchLocation({ geolocation }), captured);
+    assert.deepEqual(attempts, [false, true]);
+  }
+});
+
+test('a denied permission does not trigger another location request', async () => {
+  let attempts = 0;
+  const geolocation = { getCurrentPosition(ok, fail) {
+    attempts++;
+    fail({ code: 1 });
+  } };
+  assert.deepEqual(await capturePunchLocation({ geolocation }), { status: 'denied' });
+  assert.equal(attempts, 1);
+});
+
+test('the precise fallback also runs if the browser never answers the standard request', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const attempts = [];
+  const geolocation = { getCurrentPosition(ok, fail, options) {
+    attempts.push(options.enableHighAccuracy);
+    if (options.enableHighAccuracy) ok({ coords: captured });
+  } };
+  const pending = capturePunchLocation({ geolocation });
+  t.mock.timers.tick(5000);
+  assert.deepEqual(await pending, captured);
+  assert.deepEqual(attempts, [false, true]);
+});
+
+test('a GPS watch can improve a coarse fix and stops after an accurate result', async () => {
+  const coarse = { ...captured, accuracy: 800 };
+  const candidates = [];
+  const cleared = [];
+  let receive;
+  const geolocation = {
+    getCurrentPosition(ok) { ok({ coords: coarse }); },
+    watchPosition(ok, fail, options) {
+      assert.equal(options.enableHighAccuracy, true);
+      assert.equal(options.maximumAge, 0);
+      receive = ok;
+      fail({ code: 2 }); // A temporary failure can be followed by a GPS fix.
+      return 12;
+    },
+    clearWatch(id) { cleared.push(id); },
+  };
+  const pending = capturePunchLocation({ geolocation, preferPrecise: true, onCandidate: (position) => candidates.push(position) });
+  receive({ coords: { ...coarse, accuracy: 1500 } });
+  receive({ coords: captured });
+  assert.deepEqual(await pending, captured);
+  assert.deepEqual(candidates, [coarse]);
+  assert.deepEqual(cleared, [12]);
+});
+
+test('an approximate fix survives a GPS timeout', async () => {
+  const coarse = { ...captured, accuracy: 600 };
+  const geolocation = {
+    getCurrentPosition(ok) { ok({ coords: coarse }); },
+    watchPosition() { return 1; },
+    clearWatch() {},
+  };
+  assert.deepEqual(await capturePunchLocation({ geolocation, timeoutMs: 5 }), coarse);
 });
 
 test('a position received after the overall deadline is ignored', async () => {

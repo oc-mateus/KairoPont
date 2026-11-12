@@ -27,9 +27,13 @@ const CookiesPage = lazy(() => import('./pages/CookiesPage'));
 const LicensesPage = lazy(() => import('./pages/LicensesPage'));
 const SupportConfirmationPage = lazy(() => import('./pages/SupportConfirmationPage'));
 
-function PrivateRoute({ children, requireAdmin = false, requireSupport = false, requireClt = false }) {
-  const { session, profile, loading, signOut, refreshProfile } = useAuth();
+function PrivateRoute({ children, requireAdmin = false, requireSupport = false, requireClt = false, allowOfflinePunch = false }) {
+  const { session, profile, loading, signOut, refreshProfile, offlinePunchProfile } = useAuth();
   const location = useLocation();
+
+  if (allowOfflinePunch && offlinePunchProfile) {
+    return <Layout offlineProfile={offlinePunchProfile}>{children}</Layout>;
+  }
 
   if (loading) {
     return <div className="flex flex-center" style={{ minHeight: '100vh' }}><Spinner size="lg" /></div>;
@@ -71,8 +75,9 @@ function PrivateRoute({ children, requireAdmin = false, requireSupport = false, 
 }
 
 function PublicRoute({ children }) {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, offlinePunchProfile } = useAuth();
 
+  if (offlinePunchProfile) return <Navigate to="/ponto" replace />;
   if (loading) {
     return <div className="flex flex-center" style={{ minHeight: '100vh' }}><Spinner size="lg" /></div>;
   }
@@ -85,7 +90,7 @@ function PublicRoute({ children }) {
 }
 
 export default function App() {
-  const { passwordRecoveryPending } = useAuth();
+  const { passwordRecoveryPending, offlinePunchProfile } = useAuth();
   const location = useLocation();
 
   if (passwordRecoveryPending && !['/definir-senha', '/privacidade', '/termos', '/cookies', '/contato', '/licencas', '/suporte'].includes(location.pathname.replace(/\/+$/, ''))) {
@@ -95,7 +100,7 @@ export default function App() {
   return (
     <><PageMetadata /><Suspense fallback={<div className="flex flex-center" style={{ minHeight: '100vh' }}><Spinner size="lg" /></div>}>
       <Routes>
-        <Route path="/" element={<MarketingPage />} />
+        <Route path="/" element={offlinePunchProfile ? <Navigate to="/ponto" replace /> : <MarketingPage />} />
         <Route path="/suporte" element={<SupportPage />} />
         <Route path="/suporte/confirmacao" element={<SupportConfirmationPage />} />
         <Route path="/contato" element={<ContactPage />} />
@@ -108,7 +113,7 @@ export default function App() {
         <Route path="/definir-senha" element={<SetPasswordPage />} />
 
         {/* Rotas de Funcionário */}
-        <Route path="/ponto" element={<PrivateRoute><PunchPage /></PrivateRoute>} />
+        <Route path="/ponto" element={<PrivateRoute allowOfflinePunch><PunchPage /></PrivateRoute>} />
         <Route path="/historico" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
         <Route path="/documentos" element={<PrivateRoute requireClt><DocumentsPage /></PrivateRoute>} />
         <Route path="/perfil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />

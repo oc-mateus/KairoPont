@@ -5,6 +5,9 @@
 import { getFixedLunchLabel, getFixedLunchSchedule, inferShiftForRecord, WORK_SHIFTS } from './workShifts.js';
 
 const TIMEZONE = 'America/Sao_Paulo';
+const saoPauloDate = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+});
 
 export function addIsoDays(value, days) {
   if (!value) return '';
@@ -76,14 +79,8 @@ export function formatPunchExitDate(record) {
 /**
  * Retorna a data atual no fuso de São Paulo (formato YYYY-MM-DD)
  */
-export function getTodayInSP() {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
+export function getTodayInSP(now = new Date()) {
+  const parts = saoPauloDate.formatToParts(now);
   const year = parts.find(p => p.type === 'year').value;
   const month = parts.find(p => p.type === 'month').value;
   const day = parts.find(p => p.type === 'day').value;

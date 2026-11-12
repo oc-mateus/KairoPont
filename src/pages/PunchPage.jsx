@@ -3,10 +3,15 @@ import { useAuth } from '../contexts/AuthContext';
 import LoadError from '../components/LoadError';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
-import { formatTime, getTodayInSP, formatDate } from '../lib/utils';
+import { addIsoDays, formatTime, getTodayInSP } from '../lib/utils';
 import { Spinner, Badge } from '../components/ui';
 import { getAssignedShiftId, getFixedLunchLabel, getShiftLabel } from '../lib/workShifts';
-import { capturePunchLocation, locationLabel } from '../lib/punchLocation';
+import { capturePunchLocation, PUNCH_LOCATION_TIMEOUT_MS } from '../lib/punchLocation';
+import {
+  cachePunchRecords, projectPunchRecords, punchAccountKey, queuePunch, readPunchState,
+  retryQueuedPunches, subscribeToPunchQueue, updateQueuedPunch,
+} from '../lib/offlinePunches';
+import { getIntershiftRestWarning } from '../lib/intershiftRest';
 import PunchLocation from '../components/PunchLocation';
 
 export const PunchInIcon = <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>;
@@ -24,30 +29,27 @@ const PUNCH_STEPS = [
 ];
 
 function timestampForClock(date, clock, referenceClock) {
-  const [hours, minutes] = String(clock).slice(0, 5).split(':').map(Number);
-  const [referenceHours, referenceMinutes] = String(referenceClock).slice(0, 5).split(':').map(Number);
-  let timestamp = Date.parse(`${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00-03:00`);
-  if (hours * 60 + minutes < referenceHours * 60 + referenceMinutes) timestamp += 24 * 60 * 60 * 1000;
-  return timestamp;
-}
-
-function previousIsoDate(date) {
-  const value = new Date(`${date}T12:00:00`);
-  value.setDate(value.getDate() - 1);
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  const timestamp = Date.parse(`${date}T${clock}-03:00`);
+  const reference = Date.parse(`${date}T${referenceClock}-03:00`);
+  return timestamp < reference ? timestamp + 86400000 : timestamp;
 }
 
 export default function PunchPage() {
-  const { profile } = useAuth();
+  const { profile: liveProfile, offlinePunchProfile, online } = useAuth();
+  const profile = offlinePunchProfile ?? liveProfile;
+  const account = punchAccountKey(profile);
   const toast = useToast();
-  const [todayRecord, setTodayRecord] = useState(null);
+  const [punchState, setPunchState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [remoteUnavailable, setRemoteUnavailable] = useState(false);
   const [punching, setPunching] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [cooldown, setCooldown] = useState(false);
-  const [locating, setLocating] = useState(false);
   const punchInFlight = useRef(false);
+  const latestFetch = useRef(0);
+  const todayDate = getTodayInSP(currentTime);
+  const offlineMode = !online || Boolean(offlinePunchProfile) || remoteUnavailable;
 
   // Atualiza relógio a cada segundo
   useEffect(() => {
@@ -55,46 +57,73 @@ export default function PunchPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Busca o registro do dia
+  useEffect(() => {
+    if (!account) return;
+    let active = true;
+    const refresh = () => readPunchState(account).then(
+      (state) => { if (active) setPunchState(state); },
+      () => { if (active) setLoadError(true); },
+    );
+    const unsubscribe = subscribeToPunchQueue(account, refresh);
+    void refresh();
+    return () => { active = false; unsubscribe(); };
+  }, [account]);
+
   const fetchTodayRecord = useCallback(async () => {
-    if (!profile?.id) return;
-    setLoading(true);
+    if (!account || todayDate !== getTodayInSP()) return;
+    const request = ++latestFetch.current;
     setLoadError(false);
     try {
-      const todayDate = getTodayInSP();
-      const { data: todayRecord, error } = await supabase
-        .from('registros_ponto')
-        .select('*')
-        .eq('funcionario_id', profile.id)
-        .eq('data', todayDate)
-        .maybeSingle();
+      const state = await readPunchState(account);
+      if (request !== latestFetch.current) return;
+      setPunchState(state);
+      if (!online || offlinePunchProfile) return;
 
-      if (error) throw error;
-      if (todayRecord) {
-        setTodayRecord(todayRecord);
-      } else {
-        let previousQuery = supabase
-          .from('registros_ponto')
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(), 5000);
+      try {
+        const { data: records, error } = await supabase.from('registros_ponto')
           .select('*')
           .eq('funcionario_id', profile.id)
-          .eq('data', previousIsoDate(todayDate))
-          .is('saida', null);
-        if (profile.tipo_contrato !== 'pj') previousQuery = previousQuery.eq('turno_trabalhado', 'turno3');
-        const { data: previous, error: previousError } = await previousQuery.maybeSingle();
-        if (previousError) throw previousError;
-        setTodayRecord(previous);
+          .gte('data', addIsoDays(todayDate, -3))
+          .lte('data', todayDate)
+          .abortSignal(controller.signal);
+        if (request !== latestFetch.current) return;
+        if (error) throw error;
+        await cachePunchRecords(account, records, state.revision);
+        if (request === latestFetch.current) setRemoteUnavailable(false);
+      } catch {
+        if (request === latestFetch.current) setRemoteUnavailable(true);
+      } finally {
+        clearTimeout(deadline);
       }
-    } catch (err) {
-      setLoadError(true);
+    } catch {
+      if (request === latestFetch.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (request === latestFetch.current) setLoading(false);
     }
-  }, [profile?.id, profile?.tipo_contrato]);
+  }, [account, profile?.id, todayDate, online, offlinePunchProfile]);
 
   useEffect(() => {
     fetchTodayRecord();
+    return () => { latestFetch.current += 1; };
   }, [fetchTodayRecord]);
 
+  useEffect(() => {
+    if (!online || !remoteUnavailable) return;
+    const timer = setInterval(fetchTodayRecord, 15000);
+    return () => clearInterval(timer);
+  }, [online, remoteUnavailable, fetchTodayRecord]);
+
+  const state = punchState?.key === account ? punchState : null;
+  const recentRecords = state ? projectPunchRecords(state, profile, todayDate) : [];
+  const yesterday = addIsoDays(todayDate, -1);
+  const todayRecord = recentRecords.find((record) => record.data === todayDate)
+    ?? recentRecords.find((record) => record.data === yesterday && !record.saida
+      && (profile?.tipo_contrato === 'pj' || record.turno_trabalhado === 'turno3'))
+    ?? null;
+  const pendingCount = state?.events.filter((event) => !event.serverSaved && !event.error).length ?? 0;
+  const rejected = state?.events.filter((event) => event.error) ?? [];
   const assignedShiftId = getAssignedShiftId(profile?.escala_trabalho);
   const recordShiftId = todayRecord?.turno_trabalhado || assignedShiftId;
   const hasFixedLunch = todayRecord
@@ -102,7 +131,7 @@ export default function PunchPage() {
     : false;
   const needsDynamicLunch = profile?.tipo_contrato !== 'pj' && Boolean(todayRecord) && !hasFixedLunch;
   const entryTimestamp = todayRecord?.entrada
-    ? Date.parse(`${todayRecord.data}T${String(todayRecord.entrada).slice(0, 5)}:00-03:00`)
+    ? Date.parse(`${todayRecord.data}T${todayRecord.entrada}-03:00`)
     : null;
   const elapsedSinceEntryMinutes = entryTimestamp == null ? 0 : (currentTime.getTime() - entryTimestamp) / 60000;
   const breakStartTimestamp = todayRecord?.saida_almoco
@@ -132,10 +161,19 @@ export default function PunchPage() {
 
   const nextStepIndex = getNextStep();
   const isComplete = Boolean(todayRecord?.saida);
+  const intershiftRest = getIntershiftRestWarning(
+    recentRecords, todayRecord?.data ?? todayDate, todayRecord?.entrada, currentTime,
+  );
+  const restUntil = intershiftRest && !todayRecord?.entrada
+    ? intershiftRest.availableAt.toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      ...(getTodayInSP(intershiftRest.availableAt) !== todayDate && { day: '2-digit', month: '2-digit' }),
+    })
+    : null;
 
-  // Registra o ponto usando RPC no servidor (horário gerado no Supabase)
   const handlePunch = async (fieldOverride = null) => {
-    if (isComplete || punchInFlight.current || punching || cooldown || waitingForLunchReturn) return;
+    if (!account || !state || !profile.ativo || isComplete || punchInFlight.current || punching || cooldown || waitingForLunchReturn) return;
     punchInFlight.current = true;
 
     // Prevenção de clique duplo
@@ -151,30 +189,28 @@ export default function PunchPage() {
         : punchSteps[nextStepIndex];
       if (!step) throw new Error('Não foi possível identificar a próxima etapa do registro. Atualize a página e tente novamente.');
       const collectLocation = step.field === 'entrada' || step.field === 'saida';
-      let location = null;
+      const id = crypto.randomUUID();
+      const at = new Date();
+      const saved = queuePunch(account, {
+        id, field: step.field, at: at.toISOString(),
+        recordId: step.field === 'entrada' ? id : todayRecord.id,
+        offline: offlineMode || !navigator.onLine,
+        locationDeadline: collectLocation ? at.getTime() + PUNCH_LOCATION_TIMEOUT_MS : null,
+      }, profile);
       if (collectLocation) {
-        setLocating(true);
-        location = await capturePunchLocation();
-        setLocating(false);
+        const storeLocation = (location, locationDone) => {
+          void saved.then(() => updateQueuedPunch(account, id, { location, locationDone })).catch(() => {});
+        };
+        void capturePunchLocation({
+          onCandidate: (location) => storeLocation(location, false),
+        }).then((location) => storeLocation(location, true), () => storeLocation({ status: 'unavailable' }, true));
       }
-      const { error } = await supabase.rpc('registrar_ponto', {
-        p_funcionario_id: profile.id,
-        p_tipo: step.field,
-        p_localizacao: location,
-      });
-
-      if (error) throw error;
-
-      const locationMessage = collectLocation && location.status !== 'captured'
-        ? ` Ponto salvo sem localização. ${locationLabel(location)}.`
-        : '';
-      toast.success(`${step.label} registrada com sucesso!${locationMessage}`);
-      await fetchTodayRecord();
+      await saved;
+      toast.success(`${step.label} salva neste aparelho.`);
     } catch (err) {
       toast.error('Erro ao registrar ponto: ' + err.message);
     } finally {
       punchInFlight.current = false;
-      setLocating(false);
       setPunching(false);
     }
   };
@@ -195,10 +231,10 @@ export default function PunchPage() {
   });
 
   if (loadError && !loading) {
-    return <LoadError message="Não foi possível consultar sua jornada. Confira sua conexão e carregue os registros antes de fazer uma nova marcação." onRetry={fetchTodayRecord} />;
+    return <LoadError message="Não foi possível acessar os registros neste aparelho. Tente carregar a tela de ponto novamente." onRetry={fetchTodayRecord} />;
   }
 
-  if (loading) {
+  if (loading || !state) {
     return (
       <div className="flex flex-col flex-center" style={{ minHeight: '60vh' }}>
         <Spinner size="lg" />
@@ -228,7 +264,33 @@ export default function PunchPage() {
       <div className="punch-workspace">
       <section className="punch-action-panel">
         <h3>{isComplete ? 'Sua jornada foi concluída' : 'Sua próxima marcação'}</h3>
-        {punching && <p className="punch-action-intro" role="status">{locating ? 'Obtendo localização… Permita o acesso no navegador.' : 'Registrando ponto…'}</p>}
+        {(offlineMode || pendingCount > 0) && (
+          <div className="alert alert-info" role="status">
+            <strong>{offlineMode ? 'Modo offline' : 'Sincronizando marcações'}</strong>
+            <p>{pendingCount === 1 ? '1 marcação salva neste aparelho. ' : pendingCount > 1 ? `${pendingCount} marcações salvas neste aparelho. ` : ''}
+              {offlineMode ? 'Os pontos serão enviados quando a conexão voltar e o app estiver aberto.' : 'Aguarde a confirmação do servidor.'}</p>
+          </div>
+        )}
+        {rejected.length > 0 && (
+          <div className="alert alert-warning" role="status">
+            <strong>Marcações aguardando revisão</strong>
+            <ul>{rejected.map((event) => (
+              <li key={event.id}>{PUNCH_STEPS.find((step) => step.field === event.field)?.label} em {new Date(event.at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}. {event.error}</li>
+            ))}</ul>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={offlineMode}
+              onClick={() => retryQueuedPunches(account).catch(() => toast.error('Não foi possível tentar novamente.'))}>Tentar sincronizar</button>
+          </div>
+        )}
+        {intershiftRest && (
+          <div className="alert alert-warning" role="status">
+            <strong>Descanso entre jornadas inferior a 11 horas</strong>
+            <p>{restUntil
+              ? `Aguarde até ${restUntil} (horário de Brasília) para completar as 11 horas de descanso.`
+              : `Você teve ${intershiftRest.duration} de descanso entre a última saída e esta entrada. O mínimo é de 11 horas.`}
+            </p>
+          </div>
+        )}
+        {punching && <p className="punch-action-intro" role="status">Registrando ponto…</p>}
         {!isComplete && <p className="punch-policy-note">A entrada e a saída enviam a localização à administração quando ela está disponível.</p>}
         <button
           className="btn-punch"
@@ -293,6 +355,7 @@ export default function PunchPage() {
             const value = todayRecord?.[step.field];
             const isCompleted = !!value;
             const isCurrent = index === nextStepIndex;
+            const queued = state.events.find((event) => event.recordId === todayRecord?.id && event.field === step.field && !event.error);
 
             let statusClass = 'pending';
             if (isCompleted) statusClass = 'completed';
@@ -307,8 +370,17 @@ export default function PunchPage() {
                   <div className="punch-step-label">{step.label}</div>
                   <div className="punch-step-time">
                     {isCompleted ? formatTime(value) : isCurrent ? 'Aguardando registro' : '—'}
+                    {queued && !queued.serverSaved && ' · Pendente de envio'}
                   </div>
-                  {(step.field === 'entrada' || step.field === 'saida') && <PunchLocation location={todayRecord?.[`${step.field}_localizacao`]} punched={isCompleted} label={step.field === 'entrada' ? 'entrada' : 'saída'} />}
+                  {(step.field === 'entrada' || step.field === 'saida') && (
+                    <PunchLocation
+                      location={todayRecord?.[`${step.field}_localizacao`]}
+                      punched={isCompleted}
+                      label={step.field === 'entrada' ? 'entrada' : 'saída'}
+                      now={currentTime}
+                      pending={queued && !queued.locationDone && currentTime.getTime() < queued.locationDeadline}
+                    />
+                  )}
                 </div>
               </div>
             );

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import LegalLinks from '../components/LegalLinks';
 import { CONTACT_EMAIL, SITE_OWNER } from '../../shared/site.mjs';
 
-const lastUpdated = '10 de novembro de 2026';
+const lastUpdated = '12 de novembro de 2026';
 
 function PrivacyPolicy() {
   return (
@@ -36,7 +36,7 @@ function PrivacyPolicy() {
       <p>Os registros de funcionários são limitados por regras de acesso no banco: funcionários consultam os próprios dados e administradores autorizados gerenciam os registros necessários à operação. Documentos enviados ficam em armazenamento privado; fotos de perfil são públicas, como explicado acima. As chaves privilegiadas do banco não são usadas no navegador. O sistema aplica controles técnicos, mas nenhum serviço conectado à internet pode prometer risco zero.</p>
 
       <h2>Cookies e armazenamento no navegador</h2>
-      <p>O aplicativo não usa cookies de publicidade ou de analytics. Ele armazena localmente a sessão necessária para manter o usuário conectado e preferências de interface. Esses itens são necessários ao funcionamento da conta; não há banner de consentimento para cookies de rastreamento porque esses cookies não são usados.</p>
+      <p>O aplicativo não usa cookies de publicidade ou de analytics. O navegador guarda a sessão de acesso, preferências de interface e os dados necessários para o ponto offline. O aparelho mantém os registros recentes da jornada e as marcações que ainda aguardam envio, incluindo a localização quando capturada. Esses dados ficam no navegador usado para registrar o ponto.</p>
       <p>Consulte os detalhes e as opções de remoção em <Link to="/cookies">Armazenamento e cookies</Link>.</p>
 
       <h2>Guarda, correção e exclusão</h2>
@@ -66,7 +66,7 @@ function TermsOfUse() {
       <p>A <Link to="/suporte">central de ajuda</Link> reúne orientações de uso. Quando habilitado, o suporte permite abrir e acompanhar chamados pelo portal. A ajuda automática é limitada aos temas publicados; correções de jornada, férias e solicitações sobre dados pessoais dependem da equipe. A disponibilidade da base de ajuda não implica atendimento humano imediato.</p>
 
       <h2>Disponibilidade e mudanças</h2>
-      <p>Recursos podem ser ajustados para manter a operação e a segurança do sistema. O aplicativo depende de conexão com a internet e de serviços externos de hospedagem, autenticação, armazenamento e envio de e-mails.</p>
+      <p>Recursos podem ser ajustados para manter a operação e a segurança do sistema. O acesso inicial e o envio ao servidor exigem internet. Após entrar na conta com conexão, o ponto pode ser registrado offline no mesmo aparelho. O app envia as marcações pendentes quando está aberto e a conexão está disponível.</p>
 
       <h2>Condições de contratação</h2>
       <p>O responsável pelo projeto é {SITE_OWNER}. Contato: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>

@@ -10,6 +10,7 @@ import {
   formatMinutesAsHours,
   getElapsedWorkMinutes,
   getExpectedShiftMinutes,
+  getTodayInSP,
   isValidDateRange,
   getMonthRangeForDateInSP,
   getWeekRangeForDateInSP,
@@ -25,6 +26,11 @@ test('validates CPF check digits and rejects repeated digits', () => {
 test('formats calendar dates in São Paulo without shifting the day', () => {
   assert.equal(formatDate('2026-10-15'), '15/10/2026');
   assert.equal(formatDate('2026-10-15T00:00:00'), '15/10/2026');
+});
+
+test('uses the São Paulo date on both sides of midnight', () => {
+  assert.equal(getTodayInSP(new Date('2026-11-12T02:59:59Z')), '2026-11-11');
+  assert.equal(getTodayInSP(new Date('2026-11-12T03:00:00Z')), '2026-11-12');
 });
 
 test('advances calendar days across leap days and year boundaries', () => {

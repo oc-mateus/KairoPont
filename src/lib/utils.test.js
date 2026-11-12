@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  addIsoDays,
   calcDailyTotal,
   calcElapsedDailyTotal,
   calcNightAdjustedMilliseconds,
   formatDate,
+  formatPunchExitDate,
   formatMinutesAsHours,
   getElapsedWorkMinutes,
   getExpectedShiftMinutes,
@@ -23,6 +25,20 @@ test('validates CPF check digits and rejects repeated digits', () => {
 test('formats calendar dates in São Paulo without shifting the day', () => {
   assert.equal(formatDate('2026-10-15'), '15/10/2026');
   assert.equal(formatDate('2026-10-15T00:00:00'), '15/10/2026');
+});
+
+test('advances calendar days across leap days and year boundaries', () => {
+  assert.equal(addIsoDays('2024-02-28', 1), '2024-02-29');
+  assert.equal(addIsoDays('2024-02-28', 2), '2024-03-01');
+  assert.equal(addIsoDays('2026-12-31', 1), '2027-01-01');
+  assert.equal(addIsoDays('2027-01-01', -1), '2026-12-31');
+});
+
+test('exports an exit date only for a recorded exit', () => {
+  const record = { data: '2026-12-31', saida: null, saida_data: null };
+  assert.equal(formatPunchExitDate(record), '');
+  assert.equal(formatPunchExitDate({ ...record, saida: '18:00:00' }), 'Mesmo dia');
+  assert.equal(formatPunchExitDate({ ...record, saida: '01:00:00', saida_data: '2027-01-01' }), '01/01/2027');
 });
 
 test('builds Monday-to-Sunday ranges across month and year boundaries', () => {

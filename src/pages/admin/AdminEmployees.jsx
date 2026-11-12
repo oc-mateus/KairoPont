@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import LoadError from '../../components/LoadError';
-import { calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, getCreditedDailyMinutes, getExpectedShiftMinutes, getOvertimeMinutes, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatTime, getTodayInSP, maskCPF } from '../../lib/utils';
+import { addIsoDays, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, getCreditedDailyMinutes, getExpectedShiftMinutes, getOvertimeMinutes, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatPunchExitDate, formatTime, getTodayInSP, isValidDateRange, maskCPF } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader } from '../../lib/pdfBranding';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
@@ -32,14 +32,6 @@ function canEditPunch(record) {
 
 function timeInputValue(value) {
   return value ? String(value).slice(0, 5) : '';
-}
-
-function addIsoDays(value, days) {
-  if (!value) return '';
-  const [year, month, day] = value.split('-').map(Number);
-  const result = new Date(Date.UTC(year, month - 1, day));
-  result.setUTCDate(result.getUTCDate() + days);
-  return result.toISOString().slice(0, 10);
 }
 
 function getRange(filter, selectedDay, customStart, customEnd, referenceDate) {
@@ -128,7 +120,7 @@ export default function AdminEmployees() {
   const [holidays, setHolidays] = useState([]);
   const [editingPunchId, setEditingPunchId] = useState(null);
   const [creatingPunch, setCreatingPunch] = useState(false);
-  const [punchCreateDate, setPunchCreateDate] = useState('2026-10-03');
+  const [punchCreateDate, setPunchCreateDate] = useState('');
   const [punchEditReason, setPunchEditReason] = useState('');
   const [punchToDelete, setPunchToDelete] = useState(null);
   const [deletingPunch, setDeletingPunch] = useState(false);
@@ -332,6 +324,16 @@ export default function AdminEmployees() {
   );
 
   const range = useMemo(() => getRange(filter, selectedDay, customStart, customEnd, referenceDate), [filter, selectedDay, customStart, customEnd, referenceDate]);
+  const hasValidRange = isValidDateRange(range.start, range.end);
+  const editingRecord = records.find((record) => record.id === editingPunchId);
+
+  const startHistoricalPunch = () => {
+    setEditingPunchId(null);
+    setCreatingPunch(true);
+    setPunchCreateDate(range.start === range.end ? range.start : '');
+    setPunchEditReason('');
+    setPunchEditForm({ entrada: '', saida_almoco: '', retorno_almoco: '', saida: '', saida_data: '' });
+  };
 
   const startPunchEdit = (record) => {
     setCreatingPunch(false);
@@ -348,10 +350,13 @@ export default function AdminEmployees() {
 
   const savePunchEdit = async (event) => {
     event.preventDefault();
-    if ((!editingPunchId && !creatingPunch) || savingPunch) return;
+    if ((!editingRecord && !creatingPunch) || savingPunch) return;
+    if (creatingPunch && !isValidDateRange(punchCreateDate, punchCreateDate)) {
+      toast.warning('Informe uma data válida para o registro.');
+      return;
+    }
     setSavingPunch(true);
     try {
-      const editingRecord = records.find((record) => record.id === editingPunchId);
       const historical = creatingPunch || !canEditPunch(editingRecord);
       let savedId = editingPunchId;
       if (historical) {
@@ -382,9 +387,11 @@ export default function AdminEmployees() {
       }
       const { data, error: fetchError } = await supabase.from('registros_ponto').select('*').eq('id', savedId).single();
       if (fetchError) throw fetchError;
-      setRecords((current) => creatingPunch
-        ? [...current, data].sort((a, b) => a.data.localeCompare(b.data))
-        : current.map((record) => record.id === editingPunchId ? data : record));
+      setRecords((current) => {
+        if (!creatingPunch) return current.map((record) => record.id === editingPunchId ? data : record);
+        if (data.data < range.start || data.data > range.end) return current;
+        return [...current, data].sort((a, b) => a.data.localeCompare(b.data));
+      });
       setEditingPunchId(null);
       setCreatingPunch(false);
       setPunchEditReason('');
@@ -426,7 +433,6 @@ export default function AdminEmployees() {
         setVacationRequests([]);
         return;
       }
-      const hasValidRange = Boolean(range.start && range.end && range.start <= range.end);
       setRecords([]);
       setHolidays([]);
       setDocuments([]);
@@ -463,7 +469,7 @@ export default function AdminEmployees() {
     }
     fetchEmployeeDetails();
     return () => { cancelled = true; };
-  }, [selectedEmp, range.start, range.end, detailAttempt]);
+  }, [selectedEmp, range.start, range.end, hasValidRange, detailAttempt]);
 
   const handleActionClick = (emp, type) => {
     setActionEmployee(emp);
@@ -506,7 +512,7 @@ export default function AdminEmployees() {
         extraColumns: [
           ...locationExportColumns(includeLocationInReport),
           { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT' },
-          { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
+          { key: 'exitDate', header: 'Data da saída', width: 17, value: formatPunchExitDate },
           ...(selectedEmp.tipo_contrato === 'pj' ? [] : [
             { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).expected },
             { key: 'balance', header: 'Saldo diário', width: 17, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).balance },
@@ -579,7 +585,7 @@ export default function AdminEmployees() {
         body: records.map((record) => [
           formatDate(`${record.data}T12:00:00`),
           ...(selectedEmp.tipo_contrato === 'pj' ? [formatTime(record.entrada)] : [getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), formatTime(record.entrada), getLunchLabelForRecord(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada))]),
-          formatTime(record.saida), record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia', employeeDailyTotal(record),
+          record.saida ? formatTime(record.saida) : '', formatPunchExitDate(record), employeeDailyTotal(record),
           ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).expected, getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).balance]),
           record.saida ? 'Completo' : 'Incompleto',
         ]),
@@ -751,19 +757,13 @@ export default function AdminEmployees() {
               {filter === 'custom' && <div className="employee-custom-range"><label className="employee-date-filter">De<input className="form-input" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label className="employee-date-filter">Até<input className="form-input" type="date" min={customStart} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
             </div>
             {selectedEmp.tipo_contrato === 'pj' && <div className="pj-hours-summary"><span>Total de horas trabalhadas no período</span><strong>{formatMinutesAsHours(employeePeriodMinutes)}</strong></div>}
-            {detailLoading ? <div className="flex flex-center" style={{ minHeight: '160px' }}><Spinner /></div> : records.length ? (
+            {detailLoading ? <div className="flex flex-center" style={{ minHeight: '160px' }}><Spinner /></div> : (
               <>
-                <button className="btn btn-secondary btn-sm employee-add-historical" onClick={() => {
-                  setEditingPunchId(null);
-                  setCreatingPunch(true);
-                  setPunchCreateDate('2026-10-03');
-                  setPunchEditReason('');
-                  setPunchEditForm({ entrada: '06:00', saida_almoco: '', retorno_almoco: '', saida: '10:00', saida_data: '2026-10-03' });
-                }}>Adicionar registro histórico</button>
-                {(editingPunchId || creatingPunch) && <form className="employee-punch-edit-form" onSubmit={savePunchEdit}>
+                {hasValidRange && <button className="btn btn-secondary btn-sm employee-add-historical" disabled={savingPunch} onClick={startHistoricalPunch}>Adicionar registro histórico</button>}
+                {(editingRecord || (creatingPunch && hasValidRange)) && <form className="employee-punch-edit-form" onSubmit={savePunchEdit}>
                   {(() => {
-                    const oldRecord = records.find((record) => record.id === editingPunchId);
-                    const needsReason = creatingPunch || !canEditPunch(oldRecord);
+                    const recordDate = creatingPunch ? punchCreateDate : editingRecord.data;
+                    const needsReason = creatingPunch || !canEditPunch(editingRecord);
                     return <>
                       <div><h4>{creatingPunch ? 'Novo registro histórico' : 'Corrigir horários do ponto'}</h4><p>{creatingPunch ? 'A inclusão ficará registrada na auditoria.' : needsReason ? 'Após 96h: justificativa obrigatória e correção auditada.' : 'Correção disponível por 96h após a criação.'}</p></div>
                       {creatingPunch && <label className="form-group historical-record-date">Data do registro<input className="form-input" required type="date" value={punchCreateDate} onChange={(event) => { setPunchCreateDate(event.target.value); setPunchEditForm((current) => ({ ...current, saida_data: current.saida ? event.target.value : '' })); }} /></label>}
@@ -772,16 +772,16 @@ export default function AdminEmployees() {
                         <label className="form-group">Saída para almoço<input className="form-input" type="time" value={punchEditForm.saida_almoco} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida_almoco: event.target.value }))} /></label>
                         <label className="form-group">Retorno do almoço<input className="form-input" type="time" value={punchEditForm.retorno_almoco} onChange={(event) => setPunchEditForm((current) => ({ ...current, retorno_almoco: event.target.value }))} /></label>
                         <label className="form-group">Saída<input className="form-input" type="time" value={punchEditForm.saida} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida: event.target.value }))} /></label>
-                        {punchEditForm.saida && <label className="form-group">Data da saída<input className="form-input" required type="date" min={creatingPunch ? punchCreateDate : oldRecord?.data} max={addIsoDays(creatingPunch ? punchCreateDate : oldRecord?.data || '', 1)} value={punchEditForm.saida_data} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida_data: event.target.value }))} /></label>}
+                        {punchEditForm.saida && <label className="form-group">Data da saída<input className="form-input" required type="date" min={recordDate} max={addIsoDays(recordDate, 1)} value={punchEditForm.saida_data} onChange={(event) => setPunchEditForm((current) => ({ ...current, saida_data: event.target.value }))} /></label>}
                       </div>
                       <label className="form-group historical-record-reason">Observação do administrador<textarea className="form-input" required minLength={10} rows={3} value={punchEditReason} onChange={(event) => setPunchEditReason(event.target.value)} placeholder="Registre o motivo e o contexto desta alteração." /></label>
                       <div className="employee-punch-edit-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => { setEditingPunchId(null); setCreatingPunch(false); }} disabled={savingPunch}>Cancelar</button><button className="btn btn-primary btn-sm" disabled={savingPunch || punchEditReason.trim().length < 10}>{savingPunch ? 'Salvando…' : creatingPunch ? 'Criar registro' : 'Salvar horários'}</button></div>
                     </>;
                   })()}
                 </form>}
-                <div className="table-container"><table className="table"><thead><tr><th>Data</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Horário do dia</th>}<th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Intervalo de almoço</th>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ações</th></tr></thead><tbody>{records.map((record) => { const isHoliday = holidays.some((holiday) => holiday.data === record.data); const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho, isHoliday); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}{isHoliday && <div className="employee-punch-locked">Feriado</div>}</td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getShiftLabel(shiftId)}</td>}<td>{formatTime(record.entrada)}<PunchLocation location={record.entrada_localizacao} punched={Boolean(record.entrada)} label="entrada" /></td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getLunchLabelForRecord(record, shiftId)}</td>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}<PunchLocation location={record.saida_localizacao} punched={Boolean(record.saida)} label="saída" /></td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td><div className="employee-punch-actions"><button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Corrigir horários</button><button className="btn btn-danger btn-sm" onClick={() => setPunchToDelete(record)}>Excluir</button></div></td></tr>; })}</tbody></table></div>
+                {records.length ? <div className="table-container"><table className="table"><thead><tr><th>Data</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Horário do dia</th>}<th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Intervalo de almoço</th>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ações</th></tr></thead><tbody>{records.map((record) => { const isHoliday = holidays.some((holiday) => holiday.data === record.data); const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho, isHoliday); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}{isHoliday && <div className="employee-punch-locked">Feriado</div>}</td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getShiftLabel(shiftId)}</td>}<td>{formatTime(record.entrada)}<PunchLocation location={record.entrada_localizacao} punched={Boolean(record.entrada)} label="entrada" /></td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getLunchLabelForRecord(record, shiftId)}</td>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}<PunchLocation location={record.saida_localizacao} punched={Boolean(record.saida)} label="saída" /></td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td><div className="employee-punch-actions"><button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Corrigir horários</button><button className="btn btn-danger btn-sm" onClick={() => setPunchToDelete(record)}>Excluir</button></div></td></tr>; })}</tbody></table></div> : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
               </>
-            ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
+            )}
           </section>
 
           <section className="employee-documents-section">

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import {
-  formatTime, formatDate, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, formatMinutesAsHours,
+  formatTime, formatDate, formatPunchExitDate, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, formatMinutesAsHours,
   getOvertimeMinutes, getTodayInSP, getCurrentWeekRange, getCurrentMonthRange,
   isValidDateRange,
 } from '../lib/utils';
@@ -227,7 +227,7 @@ export default function HistoryPage() {
         summary: isPj ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(pjPeriodMinutes) } : null,
         extraColumns: [
           { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => isPj ? 'PJ' : 'CLT' },
-          { key: 'exitDate', header: 'Data da saída', width: 17, value: (record) => record.saida_data && record.saida_data !== record.data ? formatDate(`${record.saida_data}T12:00:00`) : 'Mesmo dia' },
+          { key: 'exitDate', header: 'Data da saída', width: 17, value: formatPunchExitDate },
         ],
       });
       toast.success('Planilha Excel exportada com sucesso!');

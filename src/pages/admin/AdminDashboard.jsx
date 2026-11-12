@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import LoadError from '../../components/LoadError';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { formatMinutesAsHours, getCreditedDailyMinutes, getElapsedWorkMinutes, getOvertimeMinutes, getTodayInSP } from '../../lib/utils';
+import { addIsoDays, formatMinutesAsHours, getCreditedDailyMinutes, getElapsedWorkMinutes, getOvertimeMinutes, getTodayInSP } from '../../lib/utils';
 import { Spinner } from '../../components/ui';
 import { getAssignedShiftId, getNearestRegisteredSchedule, inferShiftFromEntry } from '../../lib/workShifts';
 
@@ -16,10 +16,6 @@ const UsersIcon = () => <Icon><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2
 const ClockIcon = () => <Icon><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></Icon>;
 const FileIcon = () => <Icon><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></Icon>;
 const ArrowIcon = () => <Icon size={16}><polyline points="9 18 15 12 9 6"/></Icon>;
-
-function isoDate(year, monthIndex, day) {
-  return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
 
 function monthOffset(yearMonth, offset) {
   const [year, month] = yearMonth.split('-').map(Number);
@@ -79,9 +75,8 @@ function chartBucketIndex(date, periodStartMonth, monthlyBuckets) {
   return (year - startYear) * 12 + month - startMonth;
 }
 
-function buildAttendanceChartData({ employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets }) {
+function buildAttendanceChartData({ employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodEnd, periodMonthCount, monthlyBuckets }) {
   if (!periodStartMonth) return [];
-  const [startYear, startMonth] = periodStartMonth.split('-').map(Number);
   const buckets = buildChartBuckets(periodStartMonth, periodMonthCount, monthlyBuckets)
     .map((bucket) => ({ ...bucket, absences: 0, delays: 0, overtimeMinutes: 0 }));
   const scheduledEmployees = employees.filter((employee) => isCltEmployee(employee) && employee.ativo && getAssignedShiftId(employee.escala_trabalho));
@@ -89,25 +84,19 @@ function buildAttendanceChartData({ employees, records, vacations, holidays, tod
   const holidayDates = new Set(holidays.map((holiday) => holiday.data));
   const employeeById = new Map(employees.filter(isCltEmployee).map((employee) => [employee.id, employee]));
 
-  const daysToScan = monthlyBuckets
-    ? Math.max(0, Math.floor((new Date(`${today}T12:00:00Z`) - new Date(`${periodStart}T12:00:00Z`)) / 86400000) + 1)
-    : new Date(startYear, startMonth, 0).getDate();
-  for (let offset = 0; offset < daysToScan; offset += 1) {
-    const date = isoDate(startYear, startMonth - 1, offset + 1);
-    if (monthlyBuckets && date > today) break;
+  const firstTrackedDate = periodStart < ATTENDANCE_TRACKING_START ? ATTENDANCE_TRACKING_START : periodStart;
+  for (let date = firstTrackedDate; date && date <= periodEnd && date < today; date = addIsoDays(date, 1)) {
     const bucket = buckets[chartBucketIndex(date, periodStartMonth, monthlyBuckets)];
     if (!bucket) continue;
-    const weekday = new Date(`${date}T12:00:00`).getDay() || 7;
-    if (date < today && date >= ATTENDANCE_TRACKING_START) {
-      scheduledEmployees.forEach((employee) => {
-        if (employee.data_admissao && employee.data_admissao > date) return;
-        const schedule = employee.escala_trabalho;
-        if (!schedule?.dias_semana?.includes(weekday)) return;
-        if (holidayDates.has(date) || isVacationDay(vacations, employee.id, date)) return;
-        const record = recordByEmployeeDay.get(`${employee.id}:${date}`);
-        if (!record?.entrada) bucket.absences += 1;
-      });
-    }
+    if (holidayDates.has(date)) continue;
+    const weekday = new Date(`${date}T12:00:00Z`).getUTCDay() || 7;
+    scheduledEmployees.forEach((employee) => {
+      if (employee.data_admissao && employee.data_admissao > date) return;
+      if (!employee.escala_trabalho?.dias_semana?.includes(weekday)) return;
+      if (isVacationDay(vacations, employee.id, date)) return;
+      const record = recordByEmployeeDay.get(`${employee.id}:${date}`);
+      if (!record?.entrada) bucket.absences += 1;
+    });
   }
 
   records.forEach((record) => {
@@ -315,8 +304,8 @@ export default function AdminDashboard() {
   const activeCltEmployeeIds = new Set(activeCltEmployees.map((employee) => employee.id));
   const todayRecords = todayPunches.filter((record) => activeCltEmployeeIds.has(record.funcionario_id)).length;
   const chartData = useMemo(() => buildAttendanceChartData({
-    employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets,
-  }), [employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets]);
+    employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodEnd, periodMonthCount, monthlyBuckets,
+  }), [employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodEnd, periodMonthCount, monthlyBuckets]);
 
   const absenceTotal = chartData.reduce((total, item) => total + item.absences, 0);
   const delayTotal = chartData.reduce((total, item) => total + item.delays, 0);
@@ -324,8 +313,8 @@ export default function AdminDashboard() {
   const hasSpecificCltRecords = records.some((record) => activeCltEmployeeIds.has(record.funcionario_id));
   const selectedEmployee = activeCltEmployees.find((employee) => employee.id === selectedEmployeeId) || null;
   const individualChartData = useMemo(() => selectedEmployee ? buildAttendanceChartData({
-    employees: [selectedEmployee], records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets,
-  }) : [], [selectedEmployee, records, vacations, holidays, today, periodStartMonth, periodStart, periodMonthCount, monthlyBuckets]);
+    employees: [selectedEmployee], records, vacations, holidays, today, periodStartMonth, periodStart, periodEnd, periodMonthCount, monthlyBuckets,
+  }) : [], [selectedEmployee, records, vacations, holidays, today, periodStartMonth, periodStart, periodEnd, periodMonthCount, monthlyBuckets]);
   const individualAbsenceTotal = individualChartData.reduce((total, item) => total + item.absences, 0);
   const individualDelayTotal = individualChartData.reduce((total, item) => total + item.delays, 0);
   const individualOvertimeTotal = individualChartData.reduce((total, item) => total + item.overtimeMinutes, 0);

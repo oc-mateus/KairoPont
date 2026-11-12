@@ -6,6 +6,14 @@ import { getFixedLunchLabel, getFixedLunchSchedule, inferShiftForRecord, WORK_SH
 
 const TIMEZONE = 'America/Sao_Paulo';
 
+export function addIsoDays(value, days) {
+  if (!value) return '';
+  const date = new Date(`${value}T12:00:00Z`);
+  if (!Number.isFinite(date.getTime())) return '';
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 /** Confere se duas datas ISO representam um intervalo de calendário válido. */
 export function isValidDateRange(start, end) {
   const isCalendarDate = (value) => {
@@ -57,6 +65,12 @@ export function formatDate(isoString) {
     ? new Date(`${value.slice(0, 10)}T12:00:00Z`)
     : new Date(value);
   return date.toLocaleDateString('pt-BR', { timeZone: TIMEZONE });
+}
+
+export function formatPunchExitDate(record) {
+  if (!record.saida) return '';
+  if (record.saida_data && record.saida_data !== record.data) return formatDate(record.saida_data);
+  return 'Mesmo dia';
 }
 
 /**

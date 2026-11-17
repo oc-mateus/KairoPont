@@ -55,3 +55,43 @@ export async function addKairoPdfHeader(pdf, { title, details = [] }) {
 
   return 49 + (details.length * 6);
 }
+
+export function addPjSignatureFields(pdf, afterTableY) {
+  const margin = 14;
+  const fieldGap = 10;
+  const fieldWidth = (pdf.internal.pageSize.getWidth() - 2 * margin - fieldGap) / 2;
+  const fieldHeight = 18;
+  let y = afterTableY + 10;
+
+  if (y + 40 > pdf.internal.pageSize.getHeight() - 18) {
+    pdf.addPage();
+    y = 20;
+  }
+
+  pdf.setFont('helvetica', 'bold').setFontSize(10).setTextColor(60);
+  pdf.text('Assinaturas digitais', margin, y);
+  pdf.setFont('helvetica', 'normal').setFontSize(8);
+  pdf.text('Abra o PDF em um leitor compatível e assine com seu certificado digital.', margin, y + 5);
+
+  const fields = [
+    ['Prestador PJ', 'Assinatura_Prestador_PJ'],
+    ['Responsável pela empresa', 'Assinatura_Responsavel_Empresa'],
+  ];
+  fields.forEach(([label, fieldName], index) => {
+    const x = margin + index * (fieldWidth + fieldGap);
+    const top = y + 14;
+    pdf.text(label, x, top - 2);
+    pdf.setDrawColor(160).setLineWidth(0.25).rect(x, top, fieldWidth, fieldHeight);
+
+    // jsPDF provides the widget and form registration. Use a signature field type
+    // with no value so each signer can append their own digital signature.
+    const field = new pdf.AcroFormTextField();
+    field.FT = '/Sig';
+    field.fieldName = fieldName;
+    field.Rect = [x, top, fieldWidth, fieldHeight];
+    pdf.addField(field);
+  });
+
+  // The AcroForm serializer emits additional non-configurable PDF dictionary keys.
+  Object.defineProperty(pdf.internal.acroformPlugin.acroFormDictionaryRoot, 'SigFlags', { value: 3 });
+}

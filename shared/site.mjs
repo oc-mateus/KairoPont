@@ -23,6 +23,7 @@ export const PAGE_METADATA = {
   '/ferias': { title: 'Férias | KairoPont', description: 'Acompanhe períodos e solicitações de férias.' },
   '/admin': { title: 'Painel administrativo | KairoPont', description: 'Indicadores administrativos de frequência e jornada.' },
   '/admin/funcionarios': { title: 'Funcionários | KairoPont', description: 'Consulte cadastros e registros dos funcionários.' },
+  '/admin/contratos-pj': { title: 'Contratos PJ | KairoPont', description: 'Gerencie contratos PJ e equipes por projeto.' },
   '/admin/calendario': { title: 'Calendário | KairoPont', description: 'Gerencie os feriados do calendário da empresa.' },
   '/admin/auditoria': { title: 'Auditoria | KairoPont', description: 'Consulte o histórico de alterações administrativas.' },
   '/admin/suporte': { title: 'Atendimentos | KairoPont', description: 'Consulte e acompanhe chamados de suporte autorizados.' },

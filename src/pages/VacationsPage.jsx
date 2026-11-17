@@ -82,6 +82,7 @@ export default function VacationsPage() {
 
   const requestsByPeriod = useMemo(() => Object.groupBy ? Object.groupBy(requests, (request) => request.periodo_id) : requests.reduce((grouped, request) => ({ ...grouped, [request.periodo_id]: [...(grouped[request.periodo_id] || []), request] }), {}), [requests]);
   const pendingRequests = requests.filter((request) => request.status === 'pendente');
+  const activePeriods = periods.filter((period) => !period.substituido_em);
   const submitSaleIntention = async (period, choice, selectedDays) => {
     const days = choice === 'yes' ? Number(selectedDays) : 0;
     if (choice === 'yes' && (!Number.isInteger(days) || days < 1 || days > 10)) {
@@ -160,9 +161,9 @@ export default function VacationsPage() {
 
     {!isAdmin && !profile?.data_admissao && <div className="alert alert-warning">Peça ao administrador para informar sua data de admissão.</div>}
 
-    {!isAdmin && getActiveVacationNotices(notifications, requests).map((notification) => <div className={`alert ${notification.tipo === 'ferias_vencidas' ? 'alert-danger' : 'alert-warning'}`} key={notification.id}><strong>{notification.titulo}</strong><p>{notification.mensagem}</p><button className="btn btn-ghost btn-sm" onClick={() => markNotificationRead(notification)}>Marcar como lido</button></div>)}
+    {!isAdmin && getActiveVacationNotices(notifications, requests, periods).map((notification) => <div className={`alert ${notification.tipo === 'ferias_vencidas' ? 'alert-danger' : 'alert-warning'}`} key={notification.id}><strong>{notification.titulo}</strong><p>{notification.mensagem}</p><button className="btn btn-ghost btn-sm" onClick={() => markNotificationRead(notification)}>Marcar como lido</button></div>)}
 
-    {!isAdmin && periods.map((period) => {
+    {!isAdmin && activePeriods.map((period) => {
       const existing = requestsByPeriod[period.id] || [];
       const requested = existing.find((request) => ['pendente', 'aprovada'].includes(request.status));
       const pending = existing.filter((request) => request.status === 'pendente');
@@ -210,7 +211,7 @@ export default function VacationsPage() {
       </section>;
     })}
 
-    {!isAdmin && periods.length === 0 && profile?.data_admissao && <div className="empty-state"><h3 className="empty-state-title">Ainda não há período aquisitivo disponível.</h3></div>}
+    {!isAdmin && activePeriods.length === 0 && profile?.data_admissao && <div className="empty-state"><h3 className="empty-state-title">Ainda não há período aquisitivo disponível.</h3></div>}
 
     {isAdmin && <section className="vacation-admin-queue"><h3>Solicitações pendentes</h3>{pendingRequests.length === 0 && <p className="employee-no-results">Nenhuma solicitação aguardando decisão.</p>}{pendingRequests.map((request) => { const employee = employees[request.funcionario_id]; return <article className="vacation-admin-request" key={request.id}><div className="vacation-cycle-heading"><div><h4>{employee?.nome || 'Funcionário'} · {employee?.cargo || 'Cargo não informado'}</h4><p>{employee?.email}</p></div><Badge variant="warning">Pendente</Badge></div><p>Saída: <strong>{dateLabel(request.data_inicio)}</strong> · Retorno ao trabalho: <strong>{dateLabel(request.data_retorno || addIsoDays(request.data_fim, 1))}</strong></p><label className="form-group">Justificativa (obrigatória para recusa)<textarea className="form-input" rows="3" value={reasons[request.id] || ''} onChange={(event) => setReasons((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="Explique o motivo caso a solicitação seja recusada" /></label><div className="vacation-admin-actions"><button className="btn btn-primary" disabled={busyId === request.id} onClick={() => decide(request, true)}>Aprovar e enviar e-mail</button><button className="btn btn-secondary" disabled={busyId === request.id} onClick={() => decide(request, false)}>Recusar e enviar e-mail</button></div></article>; })}
       <h3 className="vacation-history-title">Histórico de decisões</h3>{requests.filter((request) => request.status !== 'pendente').map((request) => <article className="vacation-request-row" key={request.id}><div><strong>{employees[request.funcionario_id]?.nome || 'Funcionário'} · Saída: {dateLabel(request.data_inicio)} · Retorno: {dateLabel(request.data_retorno || addIsoDays(request.data_fim, 1))}</strong><small>{statusLabel(request.status)} · {request.email_enviado_em ? `E-mail enviado ${dateLabel(request.email_enviado_em.slice(0, 10))}` : request.email_erro ? `Erro no e-mail: ${request.email_erro}` : 'E-mail pendente'}</small>{request.status === 'recusada' && <small>Motivo: {request.justificativa_recusa}</small>}</div>{!request.email_enviado_em && <button className="btn btn-secondary btn-sm" disabled={busyId === request.id} onClick={() => sendDecisionEmail(request)}>Reenviar e-mail</button>}</article>)}</section>}

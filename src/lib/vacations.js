@@ -10,13 +10,11 @@ export function getVacationRequestWindow(period, today) {
   };
 }
 
-export function getActiveVacationNotices(notifications, requests) {
-  const resolved = new Set();
-  for (const request of requests) {
-    if (request.status === 'aprovada') {
-      resolved.add(`ferias-prazo:${request.periodo_id}`);
-      resolved.add(`ferias-vencidas:${request.periodo_id}`);
-    }
-  }
+export function getActiveVacationNotices(notifications, requests, periods = []) {
+  const resolvedPeriods = [
+    ...requests.filter(({ status }) => status === 'aprovada').map(({ periodo_id }) => periodo_id),
+    ...periods.filter(({ substituido_em }) => substituido_em).map(({ id }) => id),
+  ];
+  const resolved = new Set(resolvedPeriods.flatMap((id) => [`ferias-prazo:${id}`, `ferias-vencidas:${id}`]));
   return notifications.filter((notification) => !notification.lida_em && !resolved.has(notification.referencia));
 }

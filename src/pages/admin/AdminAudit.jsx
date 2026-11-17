@@ -50,7 +50,7 @@ export default function AdminAudit() {
             <thead>
               <tr>
                 <th>Data/Hora</th>
-                <th>Administrador</th>
+                <th>Responsável</th>
                 <th>Ação</th>
                 <th>Alvo</th>
                 <th>Detalhes</th>
@@ -60,7 +60,7 @@ export default function AdminAudit() {
               {logs.map(log => (
                 <tr key={log.id}>
                   <td>{formatDateTime(log.created_at)}</td>
-                  <td style={{ fontWeight: 500 }}>{log.admin?.nome || 'Sistema'}</td>
+                  <td style={{ fontWeight: 500 }}>{log.admin?.nome || log.detalhes?.ator_nome || 'Sistema'}</td>
                   <td>
                     <Badge variant="neutral">{log.acao}</Badge>
                   </td>

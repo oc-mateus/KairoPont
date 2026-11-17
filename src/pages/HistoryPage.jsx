@@ -2,14 +2,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import LoadError from '../components/LoadError';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { supabase } from '../lib/supabase';
+import { fetchTimesheetReport, fetchTimesheetRows, supabase } from '../lib/supabase';
 import {
   formatTime, formatDate, formatPunchExitDate, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, formatMinutesAsHours,
-  getOvertimeMinutes, getTodayInSP, getCurrentWeekRange, getCurrentMonthRange,
+  getOvertimeMinutes, getPunchContract, getTodayInSP, getCurrentWeekRange, getCurrentMonthRange,
   isValidDateRange,
 } from '../lib/utils';
 import { Spinner, EmptyState, Badge, Tabs } from '../components/ui';
-import { addKairoPdfHeader } from '../lib/pdfBranding';
+import { addKairoPdfHeader, addPjSignatureFields } from '../lib/pdfBranding';
+import { getPjTimesheetSnapshot, pjPdfHoursDetails } from '../lib/pjTimesheet';
 import { downloadTimesheetXlsx } from '../lib/exportTimesheetXlsx';
 import { getLunchLabelForRecord, getRegisteredScheduleLabel, getShiftLabel, inferShiftForRecord, summarizeWorkedShifts } from '../lib/workShifts';
 
@@ -24,12 +25,19 @@ function ExportIcon({ kind }) {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icons[kind]}</svg>;
 }
 
+function timesheetColumns(hasClt, mixedContracts) {
+  return ['Data', ...(mixedContracts ? ['Vínculo'] : []), ...(hasClt ? ['Horário'] : []),
+    'Entrada', ...(hasClt ? ['Intervalo de almoço'] : []), 'Saída', 'Horas computadas', 'Status'];
+}
+
 export default function HistoryPage() {
   const { profile } = useAuth();
-  const isPj = profile?.tipo_contrato === 'pj';
-  const dailyTotal = (record) => isPj ? calcElapsedDailyTotal(record) : calcDailyTotal(record);
-  const shiftFor = (record) => getShiftLabel(inferShiftForRecord(record, profile?.escala_trabalho?.turno_id));
-  const lunchFor = (record) => getLunchLabelForRecord(record, inferShiftForRecord(record, profile?.escala_trabalho?.turno_id));
+  const contractFor = (record) => getPunchContract(record, profile?.tipo_contrato);
+  const recordIsPj = (record) => contractFor(record) === 'pj';
+  const dailyTotal = (record) => recordIsPj(record) ? calcElapsedDailyTotal(record) : calcDailyTotal(record);
+  const shiftIdFor = (record) => inferShiftForRecord(record, profile?.escala_trabalho?.turno_id);
+  const shiftFor = (record) => recordIsPj(record) ? '—' : getShiftLabel(shiftIdFor(record));
+  const lunchFor = (record) => recordIsPj(record) ? '—' : getLunchLabelForRecord(record, shiftIdFor(record));
   const toast = useToast();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +48,27 @@ export default function HistoryPage() {
   const [customEnd, setCustomEnd] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
-  const pjPeriodMinutes = isPj ? records.reduce((total, record) => total + getElapsedWorkMinutes(record), 0) : 0;
+  const pjRecords = records.filter(recordIsPj);
+  const cltRecords = records.filter((record) => !recordIsPj(record));
+  const hasClt = records.length ? cltRecords.length > 0 : profile?.tipo_contrato !== 'pj';
+  const mixedContracts = hasClt && pjRecords.length > 0;
+  const periodContract = mixedContracts ? 'CLT e PJ' : hasClt ? 'CLT' : 'PJ';
+  const pjPeriodMinutes = pjRecords.reduce((total, record) => total + getElapsedWorkMinutes(record), 0);
+  const showHabitualSchedule = hasClt && profile?.tipo_contrato === 'clt' && profile.escala_trabalho;
+
+  const reportColumns = timesheetColumns(hasClt, mixedContracts);
+  const reportCells = (record, clt = hasClt, mixed = mixedContracts, pjRow) => [
+    formatDate(record.data),
+    ...(mixed ? [contractFor(record).toUpperCase()] : []),
+    ...(clt ? [shiftFor(record)] : []),
+    formatTime(record.entrada),
+    ...(clt ? [lunchFor(record)] : []),
+    pjRow?.hideExit ? '—' : `${formatTime(record.saida)}${record.saida_data && record.saida_data !== record.data ? ` (${formatDate(record.saida_data)})` : ''}`,
+    pjRow?.hours ?? dailyTotal(record),
+    pjRow?.status ?? (record.saida ? 'Completo' : 'Incompleto'),
+  ];
+  const markdownTable = () => [reportColumns, reportColumns.map(() => '---'), ...records.map((record) => reportCells(record))]
+    .map((cells) => `| ${cells.join(' | ')} |`).join('\n');
 
   const getDateRange = useCallback(() => {
     switch (filter) {
@@ -77,15 +105,7 @@ export default function HistoryPage() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('registros_ponto')
-        .select('*')
-        .eq('funcionario_id', profile.id)
-        .gte('data', start)
-        .lte('data', end)
-        .order('data', { ascending: true });
-
-      if (error) throw error;
+      const data = await fetchTimesheetRows(profile.id, start, end);
       if (requestId !== latestRequest.current) return;
       setRecords(data || []);
     } catch (err) {
@@ -103,34 +123,48 @@ export default function HistoryPage() {
   const handleExportPDF = async () => {
     setExporting(true);
     try {
-      const [{ jsPDF }, { autoTable }] = await Promise.all([
+      const { start, end } = getDateRange();
+      const [{ jsPDF }, { autoTable }, { records: pdfRecords, downloadedAt }] = await Promise.all([
         import('jspdf'),
         import('jspdf-autotable'),
+        fetchTimesheetReport(profile.id, start, end),
       ]);
+      if (!pdfRecords.length) throw new Error('Não há registros para baixar neste período.');
+      const pdfCltRecords = pdfRecords.filter((record) => !recordIsPj(record));
+      const pdfPjRecords = pdfRecords.filter(recordIsPj);
+      const hasPdfClt = pdfCltRecords.length > 0;
+      const hasPdfPj = pdfPjRecords.length > 0;
+      const pdfMixed = hasPdfClt && hasPdfPj;
+      const holidays = hasPdfClt
+        ? await supabase.rpc('list_punch_holiday_dates', { p_start: start, p_end: end }) : { data: [] };
+      if (holidays.error) throw holidays.error;
 
       const doc = new jsPDF({ orientation: 'landscape' });
-      const shiftSummary = summarizeWorkedShifts(records);
-      const overtimeMinutes = isPj ? 0 : records.reduce((total, record) => total + getOvertimeMinutes(record, inferShiftForRecord(record, profile?.escala_trabalho?.turno_id)), 0);
-      const overtimeDays = isPj ? 0 : records.filter((record) => getOvertimeMinutes(record, inferShiftForRecord(record, profile?.escala_trabalho?.turno_id)) > 0).length;
+      const pjSnapshot = getPjTimesheetSnapshot(pdfRecords, downloadedAt, profile.tipo_contrato);
+      const shiftSummary = summarizeWorkedShifts(pdfCltRecords);
+      const holidayDates = new Set((holidays.data || []).map(({ data }) => data));
+      const overtime = pdfCltRecords.map((record) => getOvertimeMinutes(record, shiftIdFor(record), holidayDates.has(record.data)));
+      const overtimeMinutes = overtime.reduce((total, minutes) => total + minutes, 0);
+      const overtimeDays = overtime.filter((minutes) => minutes > 0).length;
 
-      const { start, end } = getDateRange();
       const tableStartY = await addKairoPdfHeader(doc, {
         title: `Relatório de Ponto - ${profile.nome}`,
         details: [
-          `Tipo de vínculo: ${isPj ? 'PJ' : 'CLT'}`,
-          ...(!isPj && profile?.escala_trabalho ? [`Horários habituais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}`] : []),
-          ...(!isPj && profile?.escala_trabalho ? ['Sábados: 4h previstas, sem intervalo fixo'] : []),
+          `Vínculo no período: ${pdfMixed ? 'CLT e PJ' : hasPdfClt ? 'CLT' : 'PJ'}`,
+          ...(hasPdfClt && profile.tipo_contrato === 'clt' && profile.escala_trabalho ? [`Horários habituais atuais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}`] : []),
+          ...(hasPdfClt ? ['Sábados: 4h previstas, sem intervalo fixo'] : []),
+          ...(hasPdfPj ? pjPdfHoursDetails(pjSnapshot) : []),
           `Período: ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}`,
-          `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
+          `Gerado em: ${downloadedAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (São Paulo)`,
         ],
       });
 
       let tableStart = tableStartY;
-      if (!isPj) {
+      if (hasPdfClt) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
         doc.setTextColor(60, 60, 60);
-        doc.text(`Horários registrados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
+        doc.text(`Horários CLT registrados no período (${pdfCltRecords.length})`, 14, tableStartY + 2);
         autoTable(doc, {
           startY: tableStartY + 4,
           head: [['06:00–15:00', '08:00–17:00', '14:00–22:52', 'Sem horário identificado']],
@@ -157,21 +191,10 @@ export default function HistoryPage() {
         tableStart = doc.lastAutoTable.finalY + 5;
       }
 
-      // Table
-      const tableData = records.map(r => [
-        formatDate(r.data + 'T00:00:00'),
-        ...(!isPj ? [shiftFor(r)] : []),
-        formatTime(r.entrada),
-        ...(!isPj ? [lunchFor(r)] : []),
-        `${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}`,
-        dailyTotal(r),
-        r.saida ? 'Completo' : 'Incompleto',
-      ]);
-
       autoTable(doc, {
         startY: tableStart,
-        head: [[...(isPj ? ['Data', 'Entrada'] : ['Data', 'Horário', 'Entrada', 'Intervalo de almoço']), 'Saída', 'Horas computadas', 'Status']],
-        body: tableData,
+        head: [timesheetColumns(hasPdfClt, pdfMixed)],
+        body: pdfRecords.map((record) => reportCells(record, hasPdfClt, pdfMixed, pjSnapshot.rows.get(record))),
         theme: 'grid',
         headStyles: {
           fillColor: [27, 94, 32],
@@ -188,7 +211,10 @@ export default function HistoryPage() {
         styles: {
           cellPadding: 3,
         },
+        margin: { bottom: 20 },
       });
+
+      if (hasPdfPj) addPjSignatureFields(doc, doc.lastAutoTable.finalY);
 
       // Footer
       const pageCount = doc.getNumberOfPages();
@@ -222,11 +248,11 @@ export default function HistoryPage() {
         period: `Período: ${formatDate(`${start}T12:00:00`)} a ${formatDate(`${end}T12:00:00`)}`,
         filename: `ponto_${profile.nome.replace(/\s+/g, '_')}_${start}_${end}.xlsx`,
         calcDailyTotal: dailyTotal,
-        lunchLabel: isPj ? null : lunchFor,
-        scheduleColumn: isPj ? null : { key: 'shift', header: 'Horário', width: 20, value: shiftFor },
-        summary: isPj ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(pjPeriodMinutes) } : null,
+        lunchLabel: lunchFor,
+        scheduleColumn: hasClt ? { key: 'shift', header: 'Horário', width: 20, value: shiftFor } : null,
+        summary: pjRecords.length ? { label: 'Total de horas PJ', value: formatMinutesAsHours(pjPeriodMinutes) } : null,
         extraColumns: [
-          { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => isPj ? 'PJ' : 'CLT' },
+          { key: 'contract', header: 'Tipo de vínculo', width: 16, value: (record) => contractFor(record).toUpperCase() },
           { key: 'exitDate', header: 'Data da saída', width: 17, value: formatPunchExitDate },
         ],
       });
@@ -243,14 +269,10 @@ export default function HistoryPage() {
       const { start, end } = getDateRange();
       let md = `# Relatório de Ponto\n\n`;
       md += `**Funcionário:** ${profile.nome}\n`;
-      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horários habituais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}\n`;
+      md += `**Tipo de vínculo:** ${periodContract}${showHabitualSchedule ? ` · Horários habituais atuais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n`;
       md += `**Gerado em:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`;
-      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|------|---------|-------|------------------|--------|\n` : `| Data | Horário | Entrada | Almoço fixo | Saída | Horas computadas | Status |\n|------|--------|---------|-------------|-------|-------|--------|\n`;
-
-      records.forEach(r => {
-        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${shiftFor(r)} | ${formatTime(r.entrada)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n`;
-      });
+      md += markdownTable() + '\n';
 
       const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -269,13 +291,9 @@ export default function HistoryPage() {
     try {
       const { start, end } = getDateRange();
       let md = `## Relatório de Ponto - ${profile.nome}\n`;
-      md += `**Tipo de vínculo:** ${isPj ? 'PJ' : 'CLT'}${!isPj && profile.escala_trabalho ? ` · Horários habituais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}\n`;
+      md += `**Tipo de vínculo:** ${periodContract}${showHabitualSchedule ? ` · Horários habituais atuais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}\n`;
       md += `**Período:** ${formatDate(start + 'T00:00:00')} a ${formatDate(end + 'T00:00:00')}\n\n`;
-      md += isPj ? `| Data | Entrada | Saída | Horas computadas | Status |\n|---|---|---|---|---|\n` : `| Data | Horário | Entrada | Almoço fixo | Saída | Horas computadas | Status |\n|---|---|---|---|---|---|---|\n`;
-
-      records.forEach(r => {
-        md += isPj ? `| ${formatDate(r.data + 'T00:00:00')} | ${formatTime(r.entrada)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n` : `| ${formatDate(r.data + 'T00:00:00')} | ${shiftFor(r)} | ${formatTime(r.entrada)} | ${lunchFor(r)} | ${formatTime(r.saida)}${r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''} | ${dailyTotal(r)} | ${r.saida ? 'Completo' : 'Incompleto'} |\n`;
-      });
+      md += markdownTable() + '\n';
 
       await navigator.clipboard.writeText(md);
       toast.success('Tabela copiada! Agora é só colar (Ctrl+V) na sua página do Notion.');
@@ -296,7 +314,7 @@ export default function HistoryPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h2 className="page-title">Meu Histórico</h2>
-          <p className="page-subtitle">Vínculo: {isPj ? 'PJ' : 'CLT'}{!isPj && profile?.escala_trabalho ? ` · Horários: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}</p>
+          <p className="page-subtitle">Vínculo no período: {periodContract}{showHabitualSchedule ? ` · Horários atuais: ${getRegisteredScheduleLabel(profile.escala_trabalho)}` : ''}</p>
         </div>
         <div className="page-header-actions">
           <button className="btn btn-secondary btn-sm" onClick={handleExportExcel} disabled={records.length === 0 || exportingExcel}>
@@ -366,9 +384,10 @@ export default function HistoryPage() {
               <thead>
                 <tr>
                   <th>Data</th>
-                  {!isPj && <th>Horário</th>}
+                  {mixedContracts && <th>Vínculo</th>}
+                  {hasClt && <th>Horário</th>}
                   <th>Entrada</th>
-                  {!isPj && <th>Intervalo de almoço</th>}
+                  {hasClt && <th>Intervalo de almoço</th>}
                   <th>Saída</th>
                   <th>Horas computadas</th>
                   <th>Status</th>
@@ -378,9 +397,10 @@ export default function HistoryPage() {
                 {records.map(r => (
                   <tr key={r.id}>
                     <td>{formatDate(r.data + 'T00:00:00')}</td>
-                    {!isPj && <td>{shiftFor(r)}</td>}
+                    {mixedContracts && <td>{contractFor(r).toUpperCase()}</td>}
+                    {hasClt && <td>{shiftFor(r)}</td>}
                     <td>{formatTime(r.entrada)}</td>
-                    {!isPj && <td>{lunchFor(r)}</td>}
+                    {hasClt && <td>{lunchFor(r)}</td>}
                     <td>{formatTime(r.saida)}{r.saida_data && r.saida_data !== r.data ? ` (${formatDate(r.saida_data + 'T12:00:00')})` : ''}</td>
                     <td><strong>{dailyTotal(r)}</strong></td>
                     <td>
@@ -400,9 +420,9 @@ export default function HistoryPage() {
               <div key={r.id} className="table-card-item">
                 <div className="table-card-row">
                   <span className="table-card-label">Data</span>
-                  <span className="table-card-value">{formatDate(r.data + 'T00:00:00')}</span>
+                  <span className="table-card-value">{formatDate(r.data)}{mixedContracts ? ` · ${contractFor(r).toUpperCase()}` : ''}</span>
                 </div>
-                {!isPj && <div className="table-card-row">
+                {hasClt && <div className="table-card-row">
                   <span className="table-card-label">Horário</span>
                   <span className="table-card-value">{shiftFor(r)}</span>
                 </div>}
@@ -410,7 +430,7 @@ export default function HistoryPage() {
                   <span className="table-card-label">Entrada</span>
                   <span className="table-card-value">{formatTime(r.entrada)}</span>
                 </div>
-                {!isPj && <div className="table-card-row">
+                {hasClt && <div className="table-card-row">
                   <span className="table-card-label">Intervalo de almoço</span>
                   <span className="table-card-value">{lunchFor(r)}</span>
                 </div>}
@@ -441,7 +461,7 @@ export default function HistoryPage() {
               <span className="table-card-label">Dias registrados</span>
               <span className="table-card-value">{records.length}</span>
             </div>
-            {isPj && <div className="table-card-row"><span className="table-card-label">Total de horas trabalhadas</span><span className="table-card-value"><strong>{formatMinutesAsHours(pjPeriodMinutes)}</strong></span></div>}
+            {pjRecords.length > 0 && <div className="table-card-row"><span className="table-card-label">Total de horas PJ</span><span className="table-card-value"><strong>{formatMinutesAsHours(pjPeriodMinutes)}</strong></span></div>}
             <div className="table-card-row">
               <span className="table-card-label">Dias completos</span>
               <span className="table-card-value">{records.filter(r => r.saida).length}</span>

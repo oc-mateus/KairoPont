@@ -19,6 +19,7 @@ const SupportPage = lazy(() => import('./pages/SupportPage'));
 const AdminSupport = lazy(() => import('./pages/admin/AdminSupport'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminEmployees = lazy(() => import('./pages/admin/AdminEmployees'));
+const AdminPjContracts = lazy(() => import('./pages/admin/AdminPjContracts'));
 const AdminCalendar = lazy(() => import('./pages/admin/AdminCalendar'));
 const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -122,6 +123,7 @@ export default function App() {
         {/* Rotas de Administração */}
         <Route path="/admin" element={<PrivateRoute requireAdmin><AdminDashboard /></PrivateRoute>} />
         <Route path="/admin/funcionarios" element={<PrivateRoute requireAdmin><AdminEmployees /></PrivateRoute>} />
+        <Route path="/admin/contratos-pj" element={<PrivateRoute requireAdmin><AdminPjContracts /></PrivateRoute>} />
         <Route path="/admin/calendario" element={<PrivateRoute requireAdmin><AdminCalendar /></PrivateRoute>} />
         <Route path="/admin/auditoria" element={<PrivateRoute requireAdmin><AdminAudit /></PrivateRoute>} />
         <Route path="/admin/suporte" element={<PrivateRoute requireSupport><AdminSupport /></PrivateRoute>} />

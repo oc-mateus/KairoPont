@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
+import { managedAvatarPath } from '../lib/avatarUrl';
 import { formatCPF } from '../lib/utils';
 import { Spinner, Avatar } from '../components/ui';
 import WorkScheduleCard from '../components/WorkScheduleCard';
+import PjContracts from '../components/PjContracts';
 
 export default function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
@@ -64,38 +66,46 @@ export default function ProfilePage() {
       return;
     }
 
+    const fileExt = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type];
+    const bucket = supabase.storage.from('fotos-funcionarios');
+    const fileName = `${profile.id}/foto-${crypto.randomUUID()}.${fileExt}`;
+    let uploaded = false;
     setUploading(true);
     try {
-      const fileExt = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type];
-      const fileName = `${profile.id}/foto.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('fotos-funcionarios')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
+      const { error: uploadError } = await bucket.upload(fileName, file, { cacheControl: '300' });
       if (uploadError) throw uploadError;
+      uploaded = true;
 
-      const { data: urlData } = supabase.storage
-        .from('fotos-funcionarios')
-        .getPublicUrl(fileName);
-      const finalUrl = urlData.publicUrl + '?t=' + Date.now();
-
-      const { error: profileError } = await supabase
+      const { data: { publicUrl } } = bucket.getPublicUrl(fileName);
+      const update = supabase
         .from('funcionarios')
-        .update({ foto_url: finalUrl })
-        .eq('id', profile.id)
-        .select('id')
-        .single();
+        .update({ foto_url: publicUrl })
+        .eq('id', profile.id);
+      const { data, error: profileError } = await (profile.foto_url == null
+        ? update.is('foto_url', null)
+        : update.eq('foto_url', profile.foto_url)).select('id').maybeSingle();
       if (profileError) throw profileError;
-
-      await refreshProfile();
-      toast.success('Foto atualizada com sucesso!');
+      if (!data) throw new Error('O perfil mudou durante o envio. Atualize a página e tente novamente.');
     } catch (err) {
-      toast.error('Erro ao atualizar foto: ' + err.message);
+      // The delete policy preserves the currently referenced object even if
+      // the profile update succeeded but its response was lost.
+      if (uploaded) await bucket.remove([fileName]).catch(() => {});
+      toast.error('Não foi possível confirmar a atualização da foto: ' + err.message);
+      setUploading(false);
+      return;
+    }
+    try {
+      const previous = managedAvatarPath(profile.foto_url, import.meta.env.VITE_SUPABASE_URL, profile.id);
+      const legacy = ['jpg', 'jpeg', 'png', 'webp'].map((extension) => `${profile.id}/foto.${extension}`);
+      const retired = [...new Set([previous, ...legacy].filter(Boolean))];
+      const { data: removed, error } = await bucket.remove(retired);
+      if (error) throw error;
+      if (previous && !removed?.some(({ name }) => name === previous)) throw new Error('Remoção não confirmada.');
+      toast.success('Foto atualizada com sucesso!');
+    } catch {
+      toast.warning('A foto foi atualizada. A remoção da imagem anterior ficou pendente.');
     } finally {
+      await refreshProfile();
       setUploading(false);
     }
   };
@@ -158,6 +168,7 @@ export default function ProfilePage() {
       </div>
 
       {profile.tipo_contrato !== 'pj' && <WorkScheduleCard schedule={profile.escala_trabalho} admissionDate={profile.data_admissao} preferenceKey={profile.id} />}
+      {profile.tipo_contrato === 'pj' && profile.role !== 'admin' && <PjContracts key={profile.id} employeeId={profile.id} />}
 
       {/* Info Card */}
       <div className="card mb-6">

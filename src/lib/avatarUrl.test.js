@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { safeAvatarUrl } from './avatarUrl.js';
+import { managedAvatarPath, safeAvatarUrl } from './avatarUrl.js';
 
 const project = 'https://leupokvtpdqgggppjras.supabase.co';
 const path = '/storage/v1/object/public/fotos-funcionarios/10000000-0000-0000-0000-000000000001/foto.jpg';
@@ -8,6 +8,12 @@ const path = '/storage/v1/object/public/fotos-funcionarios/10000000-0000-0000-00
 test('managed avatar URLs allow only images in this project public photo bucket', () => {
   assert.equal(safeAvatarUrl(project + path, project), project + path);
   assert.equal(safeAvatarUrl(project + path + '?t=1794320000000', project), project + path + '?t=1794320000000');
+});
+
+test('cleanup derives a path only for the employee’s own managed avatar', () => {
+  const owner = '10000000-0000-0000-0000-000000000001';
+  assert.equal(managedAvatarPath(project + path + '?t=1794320000000', project, owner), `${owner}/foto.jpg`);
+  assert.equal(managedAvatarPath(project + path, project, '10000000-0000-0000-0000-000000000002'), null);
 });
 
 test('stored avatar URLs cannot request trackers, another project, private files or active content', () => {

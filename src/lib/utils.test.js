@@ -7,9 +7,12 @@ import {
   calcNightAdjustedMilliseconds,
   formatDate,
   formatPunchExitDate,
+  getCreditedDailyMinutes,
   formatMinutesAsHours,
   getElapsedWorkMinutes,
   getExpectedShiftMinutes,
+  getOvertimeMinutes,
+  getPunchContract,
   getTodayInSP,
   isValidDateRange,
   getMonthRangeForDateInSP,
@@ -31,6 +34,26 @@ test('formats calendar dates in São Paulo without shifting the day', () => {
 test('uses the São Paulo date on both sides of midnight', () => {
   assert.equal(getTodayInSP(new Date('2026-11-12T02:59:59Z')), '2026-11-11');
   assert.equal(getTodayInSP(new Date('2026-11-12T03:00:00Z')), '2026-11-12');
+});
+
+test('punch reports use the recorded contract after the profile changes', () => {
+  assert.equal(getPunchContract({ tipo_contrato: 'clt' }, 'pj'), 'clt');
+  assert.equal(getPunchContract({ tipo_contrato: 'pj' }, 'clt'), 'pj');
+});
+
+test('a completed fixed night shift earns the published eight hours without crediting early exits', () => {
+  const record = { data: '2026-11-10', entrada: '14:00:00', saida: '22:52:00', turno_trabalhado: 'turno3' };
+  assert.equal(getCreditedDailyMinutes(record), 480);
+  assert.equal(getExpectedShiftMinutes(record), 480);
+  assert.ok(getCreditedDailyMinutes({ ...record, saida: '22:51:59' }) < 480);
+  assert.ok(getCreditedDailyMinutes({ ...record, entrada: '14:00:01' }) < 480);
+});
+
+test('shared overtime calculation credits all completed holiday work', () => {
+  const record = { data: '2026-10-12', entrada: '08:00:00', saida: '17:00:00', turno_trabalhado: 'turno2' };
+  assert.equal(getOvertimeMinutes(record, 'turno2'), 0);
+  assert.equal(getOvertimeMinutes(record, 'turno2', true), 480);
+  assert.equal(getOvertimeMinutes({ ...record, saida: null }, 'turno2', true), 0);
 });
 
 test('advances calendar days across leap days and year boundaries', () => {

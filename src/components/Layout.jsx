@@ -32,6 +32,7 @@ const employeeNav = [
 const adminNav = [
   { id: 'admin-dashboard', label: 'Painel Admin', icon: DashboardIcon, path: '/admin' },
   { id: 'admin-funcionarios', label: 'Funcionários', icon: UsersIcon, path: '/admin/funcionarios' },
+  { id: 'admin-contratos-pj', label: 'Contratos PJ', icon: DocIcon, path: '/admin/contratos-pj' },
   { id: 'admin-calendario', label: 'Calendário de feriados', icon: CalendarIcon, path: '/admin/calendario' },
   { id: 'admin-auditoria', label: 'Auditoria', icon: ChartIcon, path: '/admin/auditoria' },
   { id: 'admin-suporte', label: 'Atendimentos', icon: SupportIcon, path: '/admin/suporte' },

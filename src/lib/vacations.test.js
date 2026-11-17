@@ -27,4 +27,8 @@ test('approval hides both deadline notices only for the matching vacation period
     { status: 'recusada', periodo_id: 'refused' },
   ];
   assert.deepEqual(getActiveVacationNotices(notifications, requests), notifications.slice(2, 4));
+  assert.deepEqual(
+    getActiveVacationNotices(notifications, requests, [{ id: 'another', substituido_em: '2026-11-12' }]),
+    [notifications[2]],
+  );
 });

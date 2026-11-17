@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import LoadError from '../../components/LoadError';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { addIsoDays, formatMinutesAsHours, getCreditedDailyMinutes, getElapsedWorkMinutes, getOvertimeMinutes, getTodayInSP } from '../../lib/utils';
+import { addIsoDays, formatMinutesAsHours, getElapsedWorkMinutes, getOvertimeMinutes, getPunchContract, getTodayInSP } from '../../lib/utils';
 import { Spinner } from '../../components/ui';
 import { getAssignedShiftId, getNearestRegisteredSchedule, inferShiftFromEntry } from '../../lib/workShifts';
 
@@ -82,7 +82,7 @@ function buildAttendanceChartData({ employees, records, vacations, holidays, tod
   const scheduledEmployees = employees.filter((employee) => isCltEmployee(employee) && employee.ativo && getAssignedShiftId(employee.escala_trabalho));
   const recordByEmployeeDay = new Map(records.map((record) => [`${record.funcionario_id}:${record.data}`, record]));
   const holidayDates = new Set(holidays.map((holiday) => holiday.data));
-  const employeeById = new Map(employees.filter(isCltEmployee).map((employee) => [employee.id, employee]));
+  const employeeById = new Map(employees.filter((employee) => employee.role !== 'admin').map((employee) => [employee.id, employee]));
 
   const firstTrackedDate = periodStart < ATTENDANCE_TRACKING_START ? ATTENDANCE_TRACKING_START : periodStart;
   for (let date = firstTrackedDate; date && date <= periodEnd && date < today; date = addIsoDays(date, 1)) {
@@ -102,19 +102,16 @@ function buildAttendanceChartData({ employees, records, vacations, holidays, tod
   records.forEach((record) => {
     if (!record.entrada) return;
     const employee = employeeById.get(record.funcionario_id);
-    if (!employee) return;
+    if (!employee || getPunchContract(record, employee.tipo_contrato) !== 'clt') return;
     const bucket = buckets[chartBucketIndex(record.data, periodStartMonth, monthlyBuckets)];
     if (!bucket) return;
     const nearestSchedule = getNearestRegisteredSchedule(employee.escala_trabalho, record.entrada);
     const expectedEntry = nearestSchedule?.expected ?? null;
-    const expectedTime = expectedEntry == null ? null : `${String(Math.floor(expectedEntry / 60)).padStart(2, '0')}:${String(expectedEntry % 60).padStart(2, '0')}`;
-    const shiftId = (expectedTime && inferShiftFromEntry(expectedTime)) || record.turno_trabalhado || inferShiftFromEntry(record.entrada) || getAssignedShiftId(employee.escala_trabalho);
+    const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada) || getAssignedShiftId(employee.escala_trabalho);
     const actualEntry = clockMinutes(record.entrada);
     if (employee.escala_trabalho?.contabilizar_atrasos !== false
       && !holidayDates.has(record.data) && expectedEntry != null && actualEntry != null && actualEntry > expectedEntry) bucket.delays += 1;
-    bucket.overtimeMinutes += holidayDates.has(record.data)
-      ? getCreditedDailyMinutes(record, shiftId)
-      : getOvertimeMinutes(record, shiftId);
+    bucket.overtimeMinutes += getOvertimeMinutes(record, shiftId, holidayDates.has(record.data));
   });
 
   return buckets;
@@ -160,9 +157,13 @@ function PjHoursChart({ title, records, periodStartMonth, periodMonthCount, mont
 
 function PjAttendance({ employees, records, loading, periodStartMonth, periodMonthCount, monthlyBuckets }) {
   const [selectedPjId, setSelectedPjId] = useState('');
-  const pjEmployees = employees.filter((employee) => employee.tipo_contrato === 'pj' && employee.role !== 'admin');
-  const pjIds = new Set(pjEmployees.map((employee) => employee.id));
-  const completedRecords = records.filter((record) => record.entrada && record.saida && pjIds.has(record.funcionario_id));
+  const employeesById = new Map(employees.filter((employee) => employee.role !== 'admin').map((employee) => [employee.id, employee]));
+  const completedRecords = records.filter((record) => {
+    const employee = employeesById.get(record.funcionario_id);
+    return employee && record.entrada && record.saida && getPunchContract(record, employee.tipo_contrato) === 'pj';
+  });
+  const historicalIds = new Set(completedRecords.map((record) => record.funcionario_id));
+  const pjEmployees = [...employeesById.values()].filter((employee) => employee.tipo_contrato === 'pj' || historicalIds.has(employee.id));
   const selectedPj = pjEmployees.find((employee) => employee.id === selectedPjId);
   const chartPeriod = { periodStartMonth, periodMonthCount, monthlyBuckets };
 
@@ -270,10 +271,10 @@ export default function AdminDashboard() {
       }
       try {
         const [periodRecords, vacationsResult, holidaysResult, todayRows] = await Promise.all([
-          fetchAllRows(() => supabase.from('registros_ponto').select('id,funcionario_id,data,entrada,saida_almoco,retorno_almoco,saida,saida_data,turno_trabalhado').gte('data', periodStart).lte('data', periodEnd).order('data', { ascending: false }).order('funcionario_id')),
+          fetchAllRows(() => supabase.from('registros_ponto').select('id,funcionario_id,data,entrada,saida_almoco,retorno_almoco,saida,saida_data,turno_trabalhado,tipo_contrato').gte('data', periodStart).lte('data', periodEnd).order('data', { ascending: false }).order('funcionario_id')),
           supabase.from('solicitacoes_ferias').select('funcionario_id,data_inicio,data_retorno,data_fim,status').eq('status', 'aprovada').lt('data_inicio', today).gte('data_retorno', periodStart),
           supabase.from('feriados').select('data').gte('data', periodStart).lte('data', periodEnd),
-          fetchAllRows(() => supabase.from('registros_ponto').select('funcionario_id').eq('data', today).order('funcionario_id')),
+          fetchAllRows(() => supabase.from('registros_ponto').select('funcionario_id,tipo_contrato').eq('data', today).not('entrada', 'is', null).order('funcionario_id')),
         ]);
         if (vacationsResult.error) throw vacationsResult.error;
         if (holidaysResult.error) throw holidaysResult.error;
@@ -301,8 +302,12 @@ export default function AdminDashboard() {
 
   const cltEmployees = employees.filter(isCltEmployee);
   const activeCltEmployees = cltEmployees.filter((employee) => employee.ativo);
-  const activeCltEmployeeIds = new Set(activeCltEmployees.map((employee) => employee.id));
-  const todayRecords = todayPunches.filter((record) => activeCltEmployeeIds.has(record.funcionario_id)).length;
+  const activeEmployeesById = new Map(employees.filter((employee) => employee.ativo && employee.role !== 'admin').map((employee) => [employee.id, employee]));
+  const isActiveCltRecord = (record) => {
+    const employee = activeEmployeesById.get(record.funcionario_id);
+    return employee && getPunchContract(record, employee.tipo_contrato) === 'clt';
+  };
+  const todayRecords = todayPunches.filter(isActiveCltRecord).length;
   const chartData = useMemo(() => buildAttendanceChartData({
     employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodEnd, periodMonthCount, monthlyBuckets,
   }), [employees, records, vacations, holidays, today, periodStartMonth, periodStart, periodEnd, periodMonthCount, monthlyBuckets]);
@@ -310,8 +315,10 @@ export default function AdminDashboard() {
   const absenceTotal = chartData.reduce((total, item) => total + item.absences, 0);
   const delayTotal = chartData.reduce((total, item) => total + item.delays, 0);
   const overtimeTotal = chartData.reduce((total, item) => total + item.overtimeMinutes, 0);
-  const hasSpecificCltRecords = records.some((record) => activeCltEmployeeIds.has(record.funcionario_id));
-  const selectedEmployee = activeCltEmployees.find((employee) => employee.id === selectedEmployeeId) || null;
+  const historicalCltIds = new Set(records.filter(isActiveCltRecord).map((record) => record.funcionario_id));
+  const cltChartEmployees = [...activeEmployeesById.values()].filter((employee) => employee.tipo_contrato === 'clt' || historicalCltIds.has(employee.id));
+  const hasSpecificCltRecords = historicalCltIds.size > 0;
+  const selectedEmployee = cltChartEmployees.find((employee) => employee.id === selectedEmployeeId) || null;
   const individualChartData = useMemo(() => selectedEmployee ? buildAttendanceChartData({
     employees: [selectedEmployee], records, vacations, holidays, today, periodStartMonth, periodStart, periodEnd, periodMonthCount, monthlyBuckets,
   }) : [], [selectedEmployee, records, vacations, holidays, today, periodStartMonth, periodStart, periodEnd, periodMonthCount, monthlyBuckets]);
@@ -331,7 +338,7 @@ export default function AdminDashboard() {
 
       <div className="admin-summary-grid">
         <Link className="admin-summary-card" to="/admin/funcionarios"><span className="admin-summary-icon"><UsersIcon /></span><span className="admin-summary-content"><span>Funcionários CLT ativos</span><strong>{activeCltEmployees.length}<small> de {cltEmployees.length}</small></strong></span><ArrowIcon /></Link>
-        <div className="admin-summary-card"><span className="admin-summary-icon"><ClockIcon /></span><span className="admin-summary-content"><span>Registros CLT hoje</span><strong>{todayRecords}<small> marcações</small></strong></span></div>
+        <div className="admin-summary-card"><span className="admin-summary-icon"><ClockIcon /></span><span className="admin-summary-content"><span>CLT com ponto hoje</span><strong>{todayRecords}<small> funcionários</small></strong></span></div>
         <div className="admin-summary-card"><span className="admin-summary-icon"><FileIcon /></span><span className="admin-summary-content"><span>Documentos enviados</span><strong>{documentsCount}<small> arquivos</small></strong></span></div>
       </div>
 
@@ -369,7 +376,7 @@ export default function AdminDashboard() {
             <span>Funcionário CLT</span>
             <select aria-label="Selecionar funcionário CLT" value={selectedEmployeeId} onChange={(event) => setSelectedEmployeeId(event.target.value)}>
               <option value="">Selecione um funcionário</option>
-              {activeCltEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.nome}</option>)}
+              {cltChartEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.nome}</option>)}
             </select>
           </label>
         </div>

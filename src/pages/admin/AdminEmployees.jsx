@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { fetchAllRows, fetchTimesheetReport, fetchTimesheetRows, supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import LoadError from '../../components/LoadError';
-import { addIsoDays, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, getCreditedDailyMinutes, getExpectedShiftMinutes, getOvertimeMinutes, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatPunchExitDate, formatTime, getTodayInSP, isValidDateRange, maskCPF } from '../../lib/utils';
+import { addIsoDays, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, getCreditedDailyMinutes, getExpectedShiftMinutes, getOvertimeMinutes, getPunchContract, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatPunchExitDate, formatTime, getTodayInSP, isValidDateRange, maskCPF } from '../../lib/utils';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
-import { addKairoPdfHeader } from '../../lib/pdfBranding';
+import { addKairoPdfHeader, addPjSignatureFields } from '../../lib/pdfBranding';
+import { getPjTimesheetSnapshot, pjPdfHoursDetails } from '../../lib/pjTimesheet';
 import { downloadTimesheetXlsx } from '../../lib/exportTimesheetXlsx';
 import WorkScheduleCard from '../../components/WorkScheduleCard';
+import PjContracts from '../../components/PjContracts';
 import PunchLocation from '../../components/PunchLocation';
 import { locationExportColumns, locationLabel } from '../../lib/punchLocation';
 import { getAssignedShiftId, getHabitualSchedules, getLunchLabelForRecord, getShiftLabel, getRegisteredScheduleLabel, getNearestRegisteredSchedule, inferShiftFromEntry, makeEmployeeSchedule, makeHabitualSchedule, summarizeWorkedShifts, WORK_SHIFTS } from '../../lib/workShifts';
@@ -60,17 +62,6 @@ function getCurrentWeekRangeForDate(dateValue) {
   return { start: asIsoDate(monday), end: asIsoDate(sunday) };
 }
 
-async function fetchAllRows(buildQuery) {
-  const rows = [];
-  const pageSize = 1000;
-  for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await buildQuery().range(offset, offset + pageSize - 1);
-    if (error) throw error;
-    rows.push(...(data || []));
-    if (!data || data.length < pageSize) return rows;
-  }
-}
-
 function safeFilename(name) {
   return (name || 'funcionario').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9-_]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
 }
@@ -89,12 +80,11 @@ function getScheduleComparison(record, schedule, isHoliday = false) {
     const workedMinutes = record.entrada && record.saida ? getCreditedDailyMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)) : null;
     return { expected: 'Feriado', balance: workedMinutes == null ? '—' : durationLabel(workedMinutes), overtimeMinutes: workedMinutes || 0 };
   }
-  if (!schedule?.dias_semana?.length) return { expected: '—', balance: '—' };
   const weekday = new Date(`${record.data}T12:00:00`).getDay() || 7;
-  if (!schedule.dias_semana.includes(weekday)) return { expected: 'Folga', balance: record.saida ? 'Extra' : '—' };
+  if (schedule?.dias_semana?.length && !schedule.dias_semana.includes(weekday)) return { expected: 'Folga', balance: record.saida ? 'Extra' : '—' };
   const nearest = getNearestRegisteredSchedule(schedule, record.entrada);
   const expectedTime = nearest?.expected == null ? null : `${String(Math.floor(nearest.expected / 60)).padStart(2, '0')}:${String(nearest.expected % 60).padStart(2, '0')}`;
-  const expectedShiftId = expectedTime ? inferShiftFromEntry(expectedTime) : (record.turno_trabalhado || getAssignedShiftId(schedule));
+  const expectedShiftId = record.turno_trabalhado || (expectedTime ? inferShiftFromEntry(expectedTime) : getAssignedShiftId(schedule));
   const actualMinutes = record.entrada && record.saida ? getCreditedDailyMinutes(record, expectedShiftId) : null;
   const expectedMinutes = getExpectedShiftMinutes(record, expectedShiftId);
   const expected = expectedMinutes == null ? '—' : formatMinutesAsHours(expectedMinutes);
@@ -150,8 +140,19 @@ export default function AdminEmployees() {
   const [employeeForm, setEmployeeForm] = useState(makeNewEmployeeForm);
 
   const isHolidayRecord = (record) => holidays.some((holiday) => holiday.data === record.data);
-  const employeeDailyTotal = (record) => selectedEmp?.tipo_contrato === 'pj' ? calcElapsedDailyTotal(record) : calcDailyTotal(record);
-  const employeePeriodMinutes = selectedEmp?.tipo_contrato === 'pj' ? records.reduce((total, record) => total + getElapsedWorkMinutes(record), 0) : 0;
+  const contractFor = (record) => getPunchContract(record, selectedEmp?.tipo_contrato);
+  const recordIsPj = (record) => contractFor(record) === 'pj';
+  const shiftFor = (record) => record.turno_trabalhado || inferShiftFromEntry(record.entrada);
+  const employeeDailyTotal = (record) => recordIsPj(record) ? calcElapsedDailyTotal(record) : calcDailyTotal(record);
+  const comparisonFor = (record) => recordIsPj(record)
+    ? { expected: '—', balance: '—' }
+    : getScheduleComparison(record, selectedEmp?.escala_trabalho, isHolidayRecord(record));
+  const pjRecords = records.filter(recordIsPj);
+  const cltRecords = records.filter((record) => !recordIsPj(record));
+  const hasCltRecords = cltRecords.length > 0;
+  const mixedContracts = hasCltRecords && pjRecords.length > 0;
+  const periodContract = mixedContracts ? 'CLT e PJ' : hasCltRecords ? 'CLT' : 'PJ';
+  const employeePeriodMinutes = pjRecords.reduce((total, record) => total + getElapsedWorkMinutes(record), 0);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -358,9 +359,8 @@ export default function AdminEmployees() {
     setSavingPunch(true);
     try {
       const historical = creatingPunch || !canEditPunch(editingRecord);
-      let savedId = editingPunchId;
       if (historical) {
-        const { data, error } = await supabase.rpc('admin_apply_historical_punch', {
+        const { error } = await supabase.rpc('admin_apply_historical_punch', {
           p_record_id: creatingPunch ? null : editingPunchId,
           p_funcionario_id: selectedEmp.id,
           p_data: creatingPunch ? punchCreateDate : editingRecord.data,
@@ -372,7 +372,6 @@ export default function AdminEmployees() {
           p_motivo: punchEditReason,
         });
         if (error) throw error;
-        savedId = data;
       } else {
         const { error } = await supabase.rpc('admin_edit_punch_record', {
           p_record_id: editingPunchId,
@@ -385,17 +384,11 @@ export default function AdminEmployees() {
         });
         if (error) throw error;
       }
-      const { data, error: fetchError } = await supabase.from('registros_ponto').select('*').eq('id', savedId).single();
-      if (fetchError) throw fetchError;
-      setRecords((current) => {
-        if (!creatingPunch) return current.map((record) => record.id === editingPunchId ? data : record);
-        if (data.data < range.start || data.data > range.end) return current;
-        return [...current, data].sort((a, b) => a.data.localeCompare(b.data));
-      });
       setEditingPunchId(null);
       setCreatingPunch(false);
       setPunchEditReason('');
       toast.success(creatingPunch ? 'Registro histórico criado e auditado.' : historical ? 'Correção histórica salva com auditoria.' : 'Horários do registro atualizados.');
+      setDetailAttempt((value) => value + 1);
     } catch (error) {
       toast.error(error.message?.includes('Prazo expirado')
         ? 'O prazo de 4 dias terminou. Este registro não pode mais ser alterado.'
@@ -447,9 +440,9 @@ export default function AdminEmployees() {
           if (syncError) throw syncError;
         }
         const [employeeRecords, employeeDocuments, employeeCycles, employeeVacations, calendarDays] = await Promise.all([
-          hasValidRange ? fetchAllRows(() => supabase.from('registros_ponto').select('*').eq('funcionario_id', selectedEmp.id).gte('data', range.start).lte('data', range.end).order('data', { ascending: true })) : Promise.resolve([]),
+          hasValidRange ? fetchTimesheetRows(selectedEmp.id, range.start, range.end) : Promise.resolve([]),
           fetchAllRows(() => supabase.from('documentos').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
-          isPj ? Promise.resolve([]) : fetchAllRows(() => supabase.from('periodos_aquisitivos_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('periodo_inicio', { ascending: false })),
+          isPj ? Promise.resolve([]) : fetchAllRows(() => supabase.from('periodos_aquisitivos_ferias').select('*').eq('funcionario_id', selectedEmp.id).is('substituido_em', null).order('periodo_inicio', { ascending: false })),
           isPj ? Promise.resolve([]) : fetchAllRows(() => supabase.from('solicitacoes_ferias').select('*').eq('funcionario_id', selectedEmp.id).order('created_at', { ascending: false })),
           hasValidRange ? supabase.from('feriados').select('data').gte('data', range.start).lte('data', range.end) : Promise.resolve({ data: [], error: null }),
         ]);
@@ -506,17 +499,17 @@ export default function AdminEmployees() {
         period: `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
         filename: `ponto-${safeFilename(selectedEmp.nome)}-${range.start}-a-${range.end}.xlsx`,
         calcDailyTotal: employeeDailyTotal,
-        lunchLabel: selectedEmp.tipo_contrato === 'pj' ? null : (record) => getLunchLabelForRecord(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)),
-        scheduleColumn: selectedEmp.tipo_contrato === 'pj' ? null : { key: 'shift', header: 'Horário', width: 20, value: (record) => getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)) },
-        summary: selectedEmp.tipo_contrato === 'pj' ? { label: 'Total de horas trabalhadas', value: formatMinutesAsHours(employeePeriodMinutes) } : null,
+        lunchLabel: (record) => recordIsPj(record) ? '—' : getLunchLabelForRecord(record, shiftFor(record)),
+        scheduleColumn: hasCltRecords ? { key: 'shift', header: 'Horário', width: 20, value: (record) => recordIsPj(record) ? '—' : getShiftLabel(shiftFor(record)) } : null,
+        summary: pjRecords.length ? { label: 'Total de horas PJ', value: formatMinutesAsHours(employeePeriodMinutes) } : null,
         extraColumns: [
           ...locationExportColumns(includeLocationInReport),
-          { key: 'contract', header: 'Tipo de vínculo', width: 16, value: () => selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT' },
+          { key: 'contract', header: 'Tipo de vínculo', width: 16, value: (record) => contractFor(record).toUpperCase() },
           { key: 'exitDate', header: 'Data da saída', width: 17, value: formatPunchExitDate },
-          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [
-            { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).expected },
-            { key: 'balance', header: 'Saldo diário', width: 17, value: (record) => getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).balance },
-          ]),
+          ...(hasCltRecords ? [
+            { key: 'expected', header: 'Jornada prevista', width: 20, value: (record) => comparisonFor(record).expected },
+            { key: 'balance', header: 'Saldo diário', width: 17, value: (record) => comparisonFor(record).balance },
+          ] : []),
         ],
       });
       toast.success('Planilha Excel baixada.');
@@ -531,32 +524,39 @@ export default function AdminEmployees() {
     if (!records.length) return toast.error('Não há registros para baixar neste período.');
     setExportingPdf(true);
     try {
-      const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+      const [{ jsPDF }, { autoTable }, { records: pdfRecords, downloadedAt }] = await Promise.all([
+        import('jspdf'), import('jspdf-autotable'), fetchTimesheetReport(selectedEmp.id, range.start, range.end),
+      ]);
+      if (!pdfRecords.length) throw new Error('Não há registros para baixar neste período.');
+      const pdfCltRecords = pdfRecords.filter((record) => !recordIsPj(record));
+      const pdfPjRecords = pdfRecords.filter(recordIsPj);
+      const hasPdfClt = pdfCltRecords.length > 0;
+      const hasPdfPj = pdfPjRecords.length > 0;
+      const pdfMixed = hasPdfClt && hasPdfPj;
+      const pjSnapshot = getPjTimesheetSnapshot(pdfRecords, downloadedAt, selectedEmp.tipo_contrato);
       const pdf = new jsPDF({ orientation: 'landscape' });
-      const shiftSummary = summarizeWorkedShifts(records);
-      const recordOvertimeMinutes = (record) => isHolidayRecord(record)
-        ? (record.entrada && record.saida ? getCreditedDailyMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada)) : 0)
-        : getOvertimeMinutes(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada));
-      const overtimeMinutes = selectedEmp.tipo_contrato === 'pj' ? 0 : records.reduce((total, record) => total + recordOvertimeMinutes(record), 0);
-      const overtimeDays = selectedEmp.tipo_contrato === 'pj' ? 0 : records.filter((record) => recordOvertimeMinutes(record) > 0).length;
+      const shiftSummary = summarizeWorkedShifts(pdfCltRecords);
+      const overtime = pdfCltRecords.map((record) => getOvertimeMinutes(record, shiftFor(record), isHolidayRecord(record)));
+      const overtimeMinutes = overtime.reduce((total, minutes) => total + minutes, 0);
+      const overtimeDays = overtime.filter((minutes) => minutes > 0).length;
       const tableStartY = await addKairoPdfHeader(pdf, {
         title: `Relatório de ponto - ${selectedEmp.nome}`,
         details: [
           `CPF: ${formatCPF(selectedEmp.cpf)}`,
-          `Tipo de vínculo: ${selectedEmp.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}`,
-          ...(selectedEmp.tipo_contrato === 'pj' || !selectedEmp.escala_trabalho ? [] : [`Horários habituais: ${getRegisteredScheduleLabel(selectedEmp.escala_trabalho)}`]),
-          ...(selectedEmp.tipo_contrato === 'pj' || !selectedEmp.escala_trabalho ? [] : ['Sábados: 4h previstas, sem intervalo fixo']),
-          ...(selectedEmp.tipo_contrato === 'pj' ? [`Total de horas trabalhadas: ${formatMinutesAsHours(employeePeriodMinutes)}`] : []),
+          `Vínculo no período: ${pdfMixed ? 'CLT e PJ' : hasPdfClt ? 'CLT' : 'PJ'}`,
+          ...(hasPdfClt && selectedEmp.escala_trabalho ? [`Horários habituais atuais: ${getRegisteredScheduleLabel(selectedEmp.escala_trabalho)}`] : []),
+          ...(hasPdfClt ? ['Sábados: 4h previstas, sem intervalo fixo'] : []),
+          ...(hasPdfPj ? pjPdfHoursDetails(pjSnapshot) : []),
           `Período: ${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}`,
-          `Gerado em: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
+          `Gerado em: ${downloadedAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (São Paulo)`,
         ],
       });
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(9);
       pdf.setTextColor(60, 60, 60);
       let reportStart = tableStartY;
-      if (selectedEmp.tipo_contrato !== 'pj') {
-        pdf.text(`Horários registrados no período (${records.length} ${records.length === 1 ? 'registro' : 'registros'})`, 14, tableStartY + 2);
+      if (hasPdfClt) {
+        pdf.text(`Horários CLT registrados no período (${pdfCltRecords.length})`, 14, tableStartY + 2);
         autoTable(pdf, {
           startY: tableStartY + 4,
           head: [['06:00–15:00', '08:00–17:00', '14:00–22:52', 'Sem horário identificado']],
@@ -581,19 +581,29 @@ export default function AdminEmployees() {
       }
       autoTable(pdf, {
         startY: reportStart,
-        head: [[...(selectedEmp.tipo_contrato === 'pj' ? ['Data', 'Entrada'] : ['Data', 'Horário', 'Entrada', 'Intervalo de almoço']), 'Saída', 'Saída em', 'Horas computadas', ...(selectedEmp.tipo_contrato === 'pj' ? [] : ['Previsto', 'Saldo']), 'Status']],
-        body: records.map((record) => [
-          formatDate(`${record.data}T12:00:00`),
-          ...(selectedEmp.tipo_contrato === 'pj' ? [formatTime(record.entrada)] : [getShiftLabel(record.turno_trabalhado || inferShiftFromEntry(record.entrada)), formatTime(record.entrada), getLunchLabelForRecord(record, record.turno_trabalhado || inferShiftFromEntry(record.entrada))]),
-          record.saida ? formatTime(record.saida) : '', formatPunchExitDate(record), employeeDailyTotal(record),
-          ...(selectedEmp.tipo_contrato === 'pj' ? [] : [getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).expected, getScheduleComparison(record, selectedEmp.escala_trabalho, isHolidayRecord(record)).balance]),
-          record.saida ? 'Completo' : 'Incompleto',
-        ]),
+        head: [['Data', ...(pdfMixed ? ['Vínculo'] : []), ...(hasPdfClt ? ['Horário'] : []), 'Entrada',
+          ...(hasPdfClt ? ['Intervalo de almoço'] : []), 'Saída', 'Saída em', 'Horas computadas',
+          ...(hasPdfClt ? ['Previsto', 'Saldo'] : []), 'Status']],
+        body: pdfRecords.map((record) => {
+          const pjRow = pjSnapshot.rows.get(record);
+          const showExit = record.saida && !pjRow?.hideExit;
+          const comparison = comparisonFor(record);
+          return [
+            formatDate(record.data), ...(pdfMixed ? [contractFor(record).toUpperCase()] : []),
+            ...(hasPdfClt ? [pjRow ? '—' : getShiftLabel(shiftFor(record))] : []), formatTime(record.entrada),
+            ...(hasPdfClt ? [pjRow ? '—' : getLunchLabelForRecord(record, shiftFor(record))] : []),
+            showExit ? formatTime(record.saida) : '', showExit ? formatPunchExitDate(record) : '',
+            pjRow?.hours ?? employeeDailyTotal(record),
+            ...(hasPdfClt ? [comparison.expected, comparison.balance] : []),
+            pjRow?.status ?? (record.saida ? 'Completo' : 'Incompleto'),
+          ];
+        }),
         theme: 'grid',
         headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 },
         bodyStyles: { fontSize: 7 },
         alternateRowStyles: { fillColor: [232, 245, 233] },
         styles: { cellPadding: 3 },
+        margin: { bottom: 20 },
       });
       if (includeLocationInReport) {
         pdf.addPage();
@@ -607,12 +617,15 @@ export default function AdminEmployees() {
         autoTable(pdf, {
           startY: locationStart,
           head: [['Data da jornada', 'Entrada', 'Localização da entrada', 'Saída', 'Localização da saída']],
-          body: records.map((record) => [
-            formatDate(`${record.data}T12:00:00`), formatTime(record.entrada),
-            locationLabel(record.entrada_localizacao, Boolean(record.entrada)),
-            `${formatTime(record.saida)}${record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}`,
-            locationLabel(record.saida_localizacao, Boolean(record.saida)),
-          ]),
+          body: pdfRecords.map((record) => {
+            const hideExit = pjSnapshot.rows.get(record)?.hideExit;
+            return [
+              formatDate(`${record.data}T12:00:00`), formatTime(record.entrada),
+              locationLabel(record.entrada_localizacao, Boolean(record.entrada)),
+              hideExit ? '—' : `${formatTime(record.saida)}${record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}`,
+              locationLabel(hideExit ? null : record.saida_localizacao, !hideExit && Boolean(record.saida)),
+            ];
+          }),
           theme: 'grid',
           headStyles: { fillColor: [27, 94, 32], textColor: [255, 255, 255], fontSize: 8 },
           bodyStyles: { fontSize: 8 },
@@ -620,6 +633,7 @@ export default function AdminEmployees() {
           margin: { bottom: 20 },
         });
       }
+      if (hasPdfPj) addPjSignatureFields(pdf, pdf.lastAutoTable.finalY);
       const pageCount = pdf.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         pdf.setPage(page);
@@ -726,6 +740,7 @@ export default function AdminEmployees() {
 
           {editingEmployee && <section className="employee-records-section" id="employee-registration-editor" aria-label="Editar cadastro"><h3>Editar cadastro</h3><p className="page-subtitle">Alterações registradas na auditoria.</p>{employmentForm(saveEmployment, 'Salvar alterações')}</section>}
           {selectedEmp.tipo_contrato !== 'pj' && <WorkScheduleCard schedule={selectedEmp.escala_trabalho} admissionDate={selectedEmp.data_admissao} preferenceKey={selectedEmp.id} />}
+          {selectedEmp.tipo_contrato === 'pj' && <PjContracts key={selectedEmp.id} employeeId={selectedEmp.id} readOnly />}
 
           {selectedEmp.tipo_contrato !== 'pj' && <section className="employee-records-section employee-vacation-section">
             <div className="employee-section-heading"><div><h3>Férias deste funcionário</h3><p>{vacationPeriods.length} período(s) aquisitivo(s) · {vacationRequests.length} solicitação(ões)</p></div><Link className="btn btn-secondary btn-sm" to={`/ferias?funcionario=${selectedEmp.id}`}>Abrir gestão de férias</Link></div>
@@ -748,7 +763,7 @@ export default function AdminEmployees() {
           </section>}
 
           <section className="employee-records-section">
-            <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecordsExcel} disabled={detailLoading || !records.length || exportingExcel}>{exportingExcel ? 'Gerando Excel…' : 'Baixar Excel'}</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>
+            <div className="employee-section-heading"><div><h3>Registros de ponto</h3><p>{range.start && range.end ? `${formatDate(`${range.start}T12:00:00`)} a ${formatDate(`${range.end}T12:00:00`)}` : 'Escolha um período válido.'}{records.length > 0 && ` · Vínculo no período: ${periodContract}`}</p></div><div className="employee-export-actions"><button className="btn btn-secondary btn-sm" onClick={downloadEmployeeRecordsExcel} disabled={detailLoading || !records.length || exportingExcel}>{exportingExcel ? 'Gerando Excel…' : 'Baixar Excel'}</button><button className="btn btn-primary btn-sm" onClick={downloadEmployeeRecordsPdf} disabled={detailLoading || !records.length || exportingPdf}>{exportingPdf ? 'Gerando PDF…' : 'Baixar PDF'}</button></div></div>
             <label className="location-export-option"><input type="checkbox" checked={includeLocationInReport} disabled={exportingPdf || exportingExcel} onChange={(event) => setIncludeLocationInReport(event.target.checked)} /><span><strong>Incluir localizações no relatório</strong><small>PDF e Excel deste período. A coleta permanece ativa.</small></span></label>
             <div className="employee-record-filters">
               <div className="filter-chips">{FILTERS.map((item) => <button key={item.id} className={`filter-chip ${filter === item.id ? 'active' : ''}`} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
@@ -756,7 +771,7 @@ export default function AdminEmployees() {
               {(filter === 'week' || filter === 'month') && <label className="employee-date-filter">Referência<input className="form-input" type="date" value={referenceDate} onChange={(event) => setReferenceDate(event.target.value)} /></label>}
               {filter === 'custom' && <div className="employee-custom-range"><label className="employee-date-filter">De<input className="form-input" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label className="employee-date-filter">Até<input className="form-input" type="date" min={customStart} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
             </div>
-            {selectedEmp.tipo_contrato === 'pj' && <div className="pj-hours-summary"><span>Total de horas trabalhadas no período</span><strong>{formatMinutesAsHours(employeePeriodMinutes)}</strong></div>}
+            {pjRecords.length > 0 && <div className="pj-hours-summary"><span>Total de horas PJ no período</span><strong>{formatMinutesAsHours(employeePeriodMinutes)}</strong></div>}
             {detailLoading ? <div className="flex flex-center" style={{ minHeight: '160px' }}><Spinner /></div> : (
               <>
                 {hasValidRange && <button className="btn btn-secondary btn-sm employee-add-historical" disabled={savingPunch} onClick={startHistoricalPunch}>Adicionar registro histórico</button>}
@@ -779,7 +794,37 @@ export default function AdminEmployees() {
                     </>;
                   })()}
                 </form>}
-                {records.length ? <div className="table-container"><table className="table"><thead><tr><th>Data</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Horário do dia</th>}<th>Entrada</th>{selectedEmp.tipo_contrato !== 'pj' && <th>Intervalo de almoço</th>}<th>Saída</th><th>Horas computadas</th>{selectedEmp.tipo_contrato !== 'pj' && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ações</th></tr></thead><tbody>{records.map((record) => { const isHoliday = holidays.some((holiday) => holiday.data === record.data); const comparison = getScheduleComparison(record, selectedEmp.tipo_contrato === 'pj' ? null : selectedEmp.escala_trabalho, isHoliday); const shiftId = record.turno_trabalhado || inferShiftFromEntry(record.entrada); return <tr key={record.id}><td>{formatDate(`${record.data}T12:00:00`)}{isHoliday && <div className="employee-punch-locked">Feriado</div>}</td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getShiftLabel(shiftId)}</td>}<td>{formatTime(record.entrada)}<PunchLocation location={record.entrada_localizacao} punched={Boolean(record.entrada)} label="entrada" /></td>{selectedEmp.tipo_contrato !== 'pj' && <td>{getLunchLabelForRecord(record, shiftId)}</td>}<td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(`${record.saida_data}T12:00:00`)})` : ''}<PunchLocation location={record.saida_localizacao} punched={Boolean(record.saida)} label="saída" /></td><td><strong>{employeeDailyTotal(record)}</strong></td>{selectedEmp.tipo_contrato !== 'pj' && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}<td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td><td><div className="employee-punch-actions"><button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Corrigir horários</button><button className="btn btn-danger btn-sm" onClick={() => setPunchToDelete(record)}>Excluir</button></div></td></tr>; })}</tbody></table></div> : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
+                {records.length ? (
+                  <div className="table-container">
+                    <table className="table">
+                      <thead><tr>
+                        <th>Data</th>{mixedContracts && <th>Vínculo</th>}{hasCltRecords && <th>Horário do dia</th>}
+                        <th>Entrada</th>{hasCltRecords && <th>Intervalo de almoço</th>}<th>Saída</th><th>Horas computadas</th>
+                        {hasCltRecords && <><th>Previsto</th><th>Saldo</th></>}<th>Status</th><th>Ações</th>
+                      </tr></thead>
+                      <tbody>{records.map((record) => {
+                        const pj = recordIsPj(record);
+                        const shift = shiftFor(record);
+                        const comparison = comparisonFor(record);
+                        return <tr key={record.id}>
+                          <td>{formatDate(record.data)}{isHolidayRecord(record) && <div className="employee-punch-locked">Feriado</div>}</td>
+                          {mixedContracts && <td>{contractFor(record).toUpperCase()}</td>}
+                          {hasCltRecords && <td>{pj ? '—' : getShiftLabel(shift)}</td>}
+                          <td>{formatTime(record.entrada)}<PunchLocation location={record.entrada_localizacao} punched={Boolean(record.entrada)} label="entrada" /></td>
+                          {hasCltRecords && <td>{pj ? '—' : getLunchLabelForRecord(record, shift)}</td>}
+                          <td>{formatTime(record.saida)}{record.saida_data && record.saida_data !== record.data ? ` (${formatDate(record.saida_data)})` : ''}<PunchLocation location={record.saida_localizacao} punched={Boolean(record.saida)} label="saída" /></td>
+                          <td><strong>{employeeDailyTotal(record)}</strong></td>
+                          {hasCltRecords && <><td>{comparison.expected}</td><td>{comparison.balance}</td></>}
+                          <td><Badge variant={record.saida ? 'success' : 'warning'}>{record.saida ? 'Completo' : 'Incompleto'}</Badge></td>
+                          <td><div className="employee-punch-actions">
+                            <button className="btn btn-secondary btn-sm" onClick={() => startPunchEdit(record)} disabled={savingPunch}>Corrigir horários</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => setPunchToDelete(record)}>Excluir</button>
+                          </div></td>
+                        </tr>;
+                      })}</tbody>
+                    </table>
+                  </div>
+                ) : <p className="employee-no-results">Nenhum registro de ponto neste período.</p>}
               </>
             )}
           </section>

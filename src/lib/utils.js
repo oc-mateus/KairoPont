@@ -76,6 +76,10 @@ export function formatPunchExitDate(record) {
   return 'Mesmo dia';
 }
 
+export function getPunchContract(record, currentContract) {
+  return record.tipo_contrato || currentContract || 'clt';
+}
+
 /**
  * Retorna a data atual no fuso de São Paulo (formato YYYY-MM-DD)
  */
@@ -234,7 +238,16 @@ export function calcCreditedDailyMilliseconds(record, shiftId = null) {
   const lunchCredit = calcNightAdjustedMilliseconds(
     overlapStartParts.date, overlapStartParts.time, overlapEndParts.date, overlapEndParts.time,
   );
-  return Math.max(0, total - lunchCredit);
+  const credited = Math.max(0, total - lunchCredit);
+  // The published night shift uses a minute-only end time. Credit the small
+  // rounding gap only when the employee actually covers the whole fixed shift.
+  const schedule = WORK_SHIFTS[shift];
+  if (schedule && start <= toUtcTimestamp(record.data, schedule.start)
+    && end >= toUtcTimestamp(record.data, schedule.end)
+    && credited >= (8 * 60 - 1) * 60000 && credited < 8 * 60 * 60000) {
+    return 8 * 60 * 60000;
+  }
+  return credited;
 }
 
 export function getCreditedDailyMinutes(record, shiftId = null) {
@@ -250,9 +263,10 @@ export function getExpectedShiftMinutes(record, shiftId = null) {
   return WORK_SHIFTS[shift] ? 8 * 60 : null;
 }
 
-export function getOvertimeMinutes(record, shiftId = null) {
+export function getOvertimeMinutes(record, shiftId = null, isHoliday = false) {
   if (!record?.entrada || !record?.saida) return 0;
   const shift = shiftId || inferShiftForRecord(record);
+  if (isHoliday) return getCreditedDailyMinutes(record, shift);
   const expected = getExpectedShiftMinutes(record, shift);
   if (expected == null) return 0;
   return Math.max(0, getCreditedDailyMinutes(record, shift) - expected);

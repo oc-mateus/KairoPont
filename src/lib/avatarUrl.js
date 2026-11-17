@@ -11,3 +11,10 @@ export function safeAvatarUrl(value, supabaseUrl) {
     return url.href;
   } catch { return null; }
 }
+
+export function managedAvatarPath(value, supabaseUrl, employeeId) {
+  const url = safeAvatarUrl(value, supabaseUrl);
+  if (!url) return null;
+  const path = new URL(url).pathname.split('/').slice(-2).join('/');
+  return path.startsWith(`${employeeId}/`) ? path : null;
+}

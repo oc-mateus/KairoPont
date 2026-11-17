@@ -4,7 +4,8 @@ import { fetchAllRows, fetchTimesheetReport, fetchTimesheetRows, supabase } from
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import LoadError from '../../components/LoadError';
-import { addIsoDays, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, getCreditedDailyMinutes, getExpectedShiftMinutes, getOvertimeMinutes, getPunchContract, formatCPF, formatDate, formatDateTime, formatMinutesAsHours, formatPunchExitDate, formatTime, getTodayInSP, isValidDateRange, maskCPF } from '../../lib/utils';
+import { addIsoDays, calcDailyTotal, calcElapsedDailyTotal, getElapsedWorkMinutes, getCreditedDailyMinutes, getExpectedShiftMinutes, getOvertimeMinutes, getPunchContract, formatDate, formatDateTime, formatMinutesAsHours, formatPunchExitDate, formatTime, getTodayInSP, isValidDateRange } from '../../lib/utils';
+import { formatEmployeeDocument, isCnpjDocument, normalizeEmployeeDocument, validateEmployeeDocument } from '../../../supabase/functions/_shared/employee-document.mjs';
 import { Spinner, Badge, Avatar, ConfirmDialog } from '../../components/ui';
 import { addKairoPdfHeader, addPjSignatureFields } from '../../lib/pdfBranding';
 import { getPjTimesheetSnapshot, pjPdfHoursDetails } from '../../lib/pjTimesheet';
@@ -201,6 +202,13 @@ export default function AdminEmployees() {
   };
 
   const setFormField = (field, value) => setEmployeeForm((current) => ({ ...current, [field]: value }));
+  const setEmploymentContract = (contract) => setEmployeeForm((current) => ({
+    ...current,
+    tipo_contrato: contract,
+    cpf: contract === 'clt' && isCnpjDocument(current.cpf) ? '' : current.cpf,
+  }));
+  const isPjForm = employeeForm.tipo_contrato === 'pj';
+  const replacingCnpj = editingEmployee && !isPjForm && selectedEmp?.tipo_contrato === 'pj' && isCnpjDocument(selectedEmp.cpf);
 
   const addHabitualSchedule = (turnoId) => setEmployeeForm((current) => {
     const schedules = getHabitualSchedules(current);
@@ -228,7 +236,7 @@ export default function AdminEmployees() {
     const habitualSchedules = getHabitualSchedules(schedule);
     const shiftId = habitualSchedules[0]?.id || (WORK_SHIFTS[schedule.turno_id || schedule.tipo] ? (schedule.turno_id || schedule.tipo) : inferShiftFromEntry(schedule.entrada) || 'turno1');
     return {
-      nome: employee.nome || '', email: employee.email || '', cpf: formatCPF(employee.cpf) || '', cargo: employee.cargo || '', tipo_contrato: employee.tipo_contrato || 'clt',
+      nome: employee.nome || '', email: employee.email || '', cpf: formatEmployeeDocument(employee.cpf), cargo: employee.cargo || '', tipo_contrato: employee.tipo_contrato || 'clt',
       data_admissao: employee.data_admissao || '', ...makeEmployeeSchedule(shiftId),
       ...schedule,
       turno_id: shiftId,
@@ -242,6 +250,10 @@ export default function AdminEmployees() {
 
   const inviteEmployee = async (event) => {
     event.preventDefault();
+    if (!validateEmployeeDocument(employeeForm.cpf, employeeForm.tipo_contrato)) {
+      toast.error(isPjForm ? 'Informe um CPF ou CNPJ válido.' : 'Informe um CPF válido para o vínculo CLT.');
+      return;
+    }
     setSavingEmployment(true);
     try {
       const { error } = await supabase.functions.invoke('invite-employee', {
@@ -250,7 +262,7 @@ export default function AdminEmployees() {
           email: employeeForm.email,
           cargo: employeeForm.cargo,
           tipo_contrato: employeeForm.tipo_contrato,
-          cpf: employeeForm.cpf.replace(/\D/g, ''),
+          cpf: normalizeEmployeeDocument(employeeForm.cpf),
           data_admissao: employeeForm.data_admissao || null,
           escala_trabalho: employeeForm.tipo_contrato === 'clt' ? scheduleFromForm(employeeForm) : null,
         },
@@ -275,6 +287,10 @@ export default function AdminEmployees() {
   const saveEmployment = async (event) => {
     event.preventDefault();
     if (savingEmployment) return;
+    if (replacingCnpj && !validateEmployeeDocument(employeeForm.cpf, 'clt')) {
+      toast.error('Informe um CPF válido para mudar o vínculo para CLT.');
+      return;
+    }
     setSavingEmployment(true);
     try {
       const { data, error } = await supabase.rpc('admin_update_employee_details', {
@@ -285,6 +301,7 @@ export default function AdminEmployees() {
         p_escala_trabalho: employeeForm.tipo_contrato === 'clt' ? scheduleFromForm(employeeForm) : null,
         p_tipo_contrato: employeeForm.tipo_contrato,
         p_suporte: employeeForm.suporte === true,
+        ...(replacingCnpj ? { p_cpf: normalizeEmployeeDocument(employeeForm.cpf) } : {}),
       });
       if (error) throw error;
       setEmployees((current) => current.map((employee) => employee.id === data.id ? data : employee));
@@ -303,11 +320,25 @@ export default function AdminEmployees() {
     <form className="vacation-form employee-employment-form" onSubmit={onSubmit}>
       <fieldset className="employee-edit-fields" disabled={savingEmployment}>
       <div className="form-row"><label className="form-group">Nome completo<input className="form-input" required minLength={3} maxLength={160} autoFocus={editingEmployee} value={employeeForm.nome} onChange={(event) => setFormField('nome', event.target.value)} /></label><label className="form-group">Cargo<input className="form-input" required maxLength={120} value={employeeForm.cargo} onChange={(event) => setFormField('cargo', event.target.value)} /></label></div>
-      {showInviteForm && <div className="form-row"><label className="form-group">E-mail corporativo<input className="form-input" required type="email" value={employeeForm.email} onChange={(event) => setFormField('email', event.target.value)} /></label><label className="form-group">CPF<input className="form-input" required inputMode="numeric" value={employeeForm.cpf} onChange={(event) => setFormField('cpf', maskCPF(event.target.value))} /></label></div>}
       <div className="form-row">
-      <label className="form-group">Tipo de vínculo<select className="form-input" value={employeeForm.tipo_contrato} onChange={(event) => setFormField('tipo_contrato', event.target.value)}><option value="clt">CLT</option><option value="pj">PJ</option></select></label>
+      <label className="form-group">Tipo de vínculo<select className="form-input" value={employeeForm.tipo_contrato} onChange={(event) => setEmploymentContract(event.target.value)}><option value="clt">CLT</option><option value="pj">PJ</option></select></label>
       <label className="form-group">Data de admissão{employeeForm.tipo_contrato === 'pj' && <small> (opcional para PJ)</small>}<input className="form-input" required={employeeForm.tipo_contrato === 'clt'} type="date" max={getTodayInSP()} value={employeeForm.data_admissao} onChange={(event) => setFormField('data_admissao', event.target.value)} /></label>
       </div>
+      {(showInviteForm || replacingCnpj) && <div className="form-row">
+        {showInviteForm && <label className="form-group">E-mail corporativo<input className="form-input" required type="email" value={employeeForm.email} onChange={(event) => setFormField('email', event.target.value)} /></label>}
+        <label className="form-group">
+          {isPjForm ? 'CPF ou CNPJ' : 'CPF'}
+          <input className="form-input" required inputMode={isPjForm ? 'text' : 'numeric'} maxLength={18}
+            autoCapitalize="characters" spellCheck={false} value={employeeForm.cpf}
+            onChange={(event) => setFormField('cpf', event.target.value)}
+            onBlur={() => {
+              if (validateEmployeeDocument(employeeForm.cpf, employeeForm.tipo_contrato)) {
+                setFormField('cpf', formatEmployeeDocument(employeeForm.cpf));
+              }
+            }} />
+          {replacingCnpj && <small>Informe o CPF que vai substituir o CNPJ neste cadastro CLT.</small>}
+        </label>
+      </div>}
       {editingEmployee && <label className="employee-support-access"><input type="checkbox" checked={employeeForm.suporte === true} onChange={(event) => setFormField('suporte', event.target.checked)} /><span><strong>Acesso ao suporte</strong><small>Permite consultar e responder chamados.</small></span></label>}
       {employeeForm.tipo_contrato === 'pj' && <p className="vacation-form-note">PJ: apenas entrada e saída, sem horários habituais ou férias.</p>}
       {employeeForm.tipo_contrato === 'clt' && <>
@@ -542,7 +573,7 @@ export default function AdminEmployees() {
       const tableStartY = await addKairoPdfHeader(pdf, {
         title: `Relatório de ponto - ${selectedEmp.nome}`,
         details: [
-          `CPF: ${formatCPF(selectedEmp.cpf)}`,
+          `${isCnpjDocument(selectedEmp.cpf) ? 'CNPJ' : 'CPF'}: ${formatEmployeeDocument(selectedEmp.cpf)}`,
           `Vínculo no período: ${pdfMixed ? 'CLT e PJ' : hasPdfClt ? 'CLT' : 'PJ'}`,
           ...(hasPdfClt && selectedEmp.escala_trabalho ? [`Horários habituais atuais: ${getRegisteredScheduleLabel(selectedEmp.escala_trabalho)}`] : []),
           ...(hasPdfClt ? ['Sábados: 4h previstas, sem intervalo fixo'] : []),
@@ -670,6 +701,13 @@ export default function AdminEmployees() {
     }
   };
 
+  const normalizeName = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const employeeQuery = normalizeName(employeeSearch.trim());
+  const documentQuery = normalizeEmployeeDocument(employeeSearch);
+  const matchingEmployees = employees.filter((employee) => !employeeQuery
+    || normalizeName(`${employee.nome} ${employee.cargo}`).includes(employeeQuery)
+    || (documentQuery && normalizeEmployeeDocument(employee.cpf).includes(documentQuery)));
+
   if (loading) return <div className="flex flex-center" style={{ minHeight: '40vh' }}><Spinner size="lg" /></div>;
   if (loadError) return <LoadError message="Não foi possível carregar os funcionários. Confira sua conexão e tente novamente." onRetry={fetchEmployees} />;
   if (selectedEmp && detailError && !detailLoading) return <div><button type="button" className="btn btn-ghost" onClick={closeEmployee}>Voltar à lista</button><LoadError message="Não foi possível carregar os dados deste funcionário. Confira sua conexão e tente novamente." onRetry={() => setDetailAttempt((value) => value + 1)} /></div>;
@@ -684,22 +722,17 @@ export default function AdminEmployees() {
       {!selectedEmp ? (
         <>
           <div className="flex justify-between gap-3 employee-list-toolbar">
-            <label className="employee-search-label">Buscar funcionário<input className="form-input" type="search" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} placeholder="Nome, CPF ou cargo" /></label>
+            <label className="employee-search-label">Buscar funcionário<input className="form-input" type="search" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} placeholder="Nome, cargo, CPF ou CNPJ" /></label>
             <div className="employee-list-actions"><button className="btn btn-secondary" onClick={() => setNameSort((value) => value === 'asc' ? 'desc' : 'asc')} aria-label={`Ordenar nome ${nameSort === 'asc' ? 'decrescente' : 'crescente'}`}>Nome {nameSort === 'asc' ? 'A–Z' : 'Z–A'}</button><button className="btn btn-primary" disabled={savingEmployment} onClick={() => { if (!showInviteForm) setEmployeeForm(makeNewEmployeeForm()); setShowInviteForm((value) => !value); }}>{showInviteForm ? 'Cancelar' : 'Novo funcionário'}</button></div>
           </div>
           {showInviteForm && <section className="employee-records-section"><h3>Convidar funcionário</h3><p className="page-subtitle">O funcionário receberá um convite por e-mail.</p>{employmentForm(inviteEmployee, 'Enviar convite')}</section>}
         <div className="employee-select-list">
-          {employees.filter((emp) => {
-            const normalize = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-            const query = normalize(employeeSearch.trim());
-            const digits = employeeSearch.replace(/\D/g, '');
-            return !query || normalize(`${emp.nome} ${emp.cargo}`).includes(query) || (digits.length > 0 && String(emp.cpf || '').replace(/\D/g, '').includes(digits));
-          }).sort((a, b) => nameSort === 'asc' ? a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) : b.nome.localeCompare(a.nome, 'pt-BR', { sensitivity: 'base' })).map((emp) => (
+          {matchingEmployees.sort((a, b) => nameSort === 'asc' ? a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) : b.nome.localeCompare(a.nome, 'pt-BR', { sensitivity: 'base' })).map((emp) => (
             <article className="employee-select-card" key={emp.id}>
               <button className="employee-select-main" onClick={() => openEmployee(emp)} aria-label={`Abrir informações de ${emp.nome}`}>
                 <Avatar src={emp.foto_url} name={emp.nome} />
                 <span className="employee-select-copy"><strong>{emp.nome}</strong><small>{emp.cargo} · {emp.email}</small></span>
-                <span className="employee-select-cpf">{formatCPF(emp.cpf)}</span>
+                <span className="employee-select-cpf">{formatEmployeeDocument(emp.cpf)}</span>
                 <Badge variant="info">{emp.tipo_contrato === 'pj' ? 'PJ' : 'CLT'}</Badge>
                 <Badge variant={emp.ativo ? 'success' : 'neutral'}>{emp.ativo ? 'Ativo' : 'Inativo'}</Badge>
                 <span className="employee-select-arrow" aria-hidden="true">›</span>
@@ -711,12 +744,7 @@ export default function AdminEmployees() {
             </article>
           ))}
           {!employees.length && <div className="empty-state"><h3 className="empty-state-title">Nenhum funcionário cadastrado</h3></div>}
-          {employees.length > 0 && !employees.some((emp) => {
-            const normalize = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-            const query = normalize(employeeSearch.trim());
-            const digits = employeeSearch.replace(/\D/g, '');
-            return !query || normalize(`${emp.nome} ${emp.cargo}`).includes(query) || (digits.length > 0 && String(emp.cpf || '').replace(/\D/g, '').includes(digits));
-          }) && employeeSearch && <div className="empty-state"><h3 className="empty-state-title">Nenhum resultado para essa busca</h3></div>}
+          {employees.length > 0 && !matchingEmployees.length && employeeSearch && <div className="empty-state"><h3 className="empty-state-title">Nenhum resultado para essa busca</h3></div>}
         </div>
         </>
       ) : (
@@ -728,7 +756,7 @@ export default function AdminEmployees() {
             <Badge variant={selectedEmp.ativo ? 'success' : 'neutral'}>{selectedEmp.ativo ? 'Ativo' : 'Inativo'}</Badge>
             <div className="employee-profile-fields">
               <div><span>Nome completo</span><strong>{selectedEmp.nome}</strong></div>
-              <div><span>CPF</span><strong>{formatCPF(selectedEmp.cpf)}</strong></div>
+              <div><span>{isCnpjDocument(selectedEmp.cpf) ? 'CNPJ' : 'CPF'}</span><strong>{formatEmployeeDocument(selectedEmp.cpf)}</strong></div>
               <div><span>Cargo</span><strong>{selectedEmp.cargo || 'Não informado'}</strong></div>
               <div><span>Perfil de acesso</span><strong>{selectedEmp.role === 'admin' ? 'Administrador' : 'Funcionário'}</strong></div>
               <div><span>Acesso ao suporte</span><strong>{selectedEmp.suporte ? 'Habilitado' : 'Não habilitado'}</strong></div>

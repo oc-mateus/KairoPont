@@ -15,7 +15,7 @@ function PrivacyPolicy() {
       <h2>Dados usados e para quê</h2>
       <ul>
         <li>Dados de conta, como e-mail, senha protegida pelo serviço de autenticação e identificador da conta, para conceder e proteger o acesso.</li>
-        <li>Dados profissionais, como nome, CPF, cargo, tipo de vínculo, data de admissão e escala, para identificar a pessoa e administrar o ponto.</li>
+        <li>Dados cadastrais, como nome, CPF ou CNPJ para vínculos PJ, cargo, tipo de vínculo, data de admissão e escala, para identificar o profissional e administrar o ponto.</li>
         <li>Registros de jornada e alterações administrativas, para consultar, corrigir, auditar e exportar folhas de ponto.</li>
         <li>Localização do dispositivo na entrada e na saída, incluindo latitude, longitude e precisão aproximada, quando o navegador permitir a captura. Uma falha ou recusa de permissão fica indicada no registro. Não há rastreamento contínuo. A administração consulta esses dados e escolhe se serão incluídos nos relatórios PDF e Excel.</li>
         <li>Pedidos de férias e documentos enviados pelo funcionário, quando esses recursos forem aplicáveis ao vínculo.</li>

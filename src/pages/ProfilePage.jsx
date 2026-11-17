@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 import { managedAvatarPath } from '../lib/avatarUrl';
-import { formatCPF } from '../lib/utils';
+import { formatEmployeeDocument, isCnpjDocument } from '../../supabase/functions/_shared/employee-document.mjs';
 import { Spinner, Avatar } from '../components/ui';
 import WorkScheduleCard from '../components/WorkScheduleCard';
 import PjContracts from '../components/PjContracts';
@@ -174,8 +174,8 @@ export default function ProfilePage() {
       <div className="card mb-6">
         <h3 className="card-title mb-4">Informações</h3>
         <div className="table-card-row">
-          <span className="table-card-label">CPF</span>
-          <span className="table-card-value">{formatCPF(profile.cpf)}</span>
+          <span className="table-card-label">{isCnpjDocument(profile.cpf) ? 'CNPJ' : 'CPF'}</span>
+          <span className="table-card-value">{formatEmployeeDocument(profile.cpf)}</span>
         </div>
         <div className="table-card-row">
           <span className="table-card-label">E-mail</span>

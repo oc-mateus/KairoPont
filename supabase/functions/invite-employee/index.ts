@@ -1,17 +1,7 @@
 import "jsr:@supabase/functions-js@2.119.0/edge-runtime.d.ts";
 import { createSupabaseContext } from "npm:@supabase/server@1.9.2";
 import { enforceRateLimit, HttpError, readJsonObject, requestSecurity, stringField } from "../_shared/security.mjs";
-
-function validCPF(value: string) {
-  const cpf = value.replace(/\D/g, "");
-  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
-  const digit = (length: number) => {
-    const sum = [...cpf.slice(0, length)].reduce((total, char, index) => total + Number(char) * (length + 1 - index), 0);
-    const remainder = (sum * 10) % 11;
-    return remainder === 10 ? 0 : remainder;
-  };
-  return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
-}
+import { normalizeEmployeeDocument, validateEmployeeDocument } from "../_shared/employee-document.mjs";
 
 function validIsoDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -83,7 +73,7 @@ Deno.serve(async (req) => {
     ]);
     const email = stringField(input, "email", 254).toLowerCase();
     const nome = stringField(input, "nome", 150);
-    const cpf = stringField(input, "cpf", 18).replace(/\D/g, "");
+    const cpf = normalizeEmployeeDocument(stringField(input, "cpf", 18));
     const cargo = stringField(input, "cargo", 100);
     const tipoContrato = stringField(input, "tipo_contrato", 3, true) || "clt";
     const dataAdmissao = stringField(input, "data_admissao", 10, true);
@@ -94,8 +84,11 @@ Deno.serve(async (req) => {
     const todayValues = Object.fromEntries(todayParts.map((part) => [part.type, part.value]));
     const today = todayValues.year + "-" + todayValues.month + "-" + todayValues.day;
 
-    if (!/^\S+@\S+\.\S+$/.test(email) || nome.length < 3 || cargo.length < 2 || !validCPF(cpf) || !["clt", "pj"].includes(tipoContrato)) {
-      return response({ error: "Confira o nome, e-mail, CPF e cargo informados." }, 400);
+    if (!/^\S+@\S+\.\S+$/.test(email) || nome.length < 3 || cargo.length < 2 || !["clt", "pj"].includes(tipoContrato)) {
+      return response({ error: "Confira o nome, e-mail, cargo e tipo de vínculo informados." }, 400);
+    }
+    if (!validateEmployeeDocument(cpf, tipoContrato)) {
+      return response({ error: tipoContrato === "pj" ? "Informe um CPF ou CNPJ válido." : "Informe um CPF válido para o vínculo CLT." }, 400);
     }
     if (dataAdmissao && (!validIsoDate(dataAdmissao) || dataAdmissao > today)) {
       return response({ error: "Informe uma data de admissão válida, igual ou anterior a hoje." }, 400);

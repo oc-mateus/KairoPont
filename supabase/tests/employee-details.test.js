@@ -16,6 +16,7 @@ test('administrative registration edits preserve identity and audit atomic chang
       GRANT USAGE ON SCHEMA public,auth TO anon,authenticated;
       CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
       CREATE TABLE public.funcionarios(id uuid PRIMARY KEY,auth_id uuid UNIQUE,nome text,cargo text,role text,ativo boolean,tipo_contrato text,data_admissao date,escala_trabalho jsonb,cpf text,email text);
+      CREATE TABLE public.funcionario_convites(cpf text NOT NULL,tipo_contrato text NOT NULL);
       CREATE TABLE public.auditoria(admin_id uuid,acao text,alvo_id uuid,detalhes jsonb,created_at timestamptz);
       CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$SELECT EXISTS(SELECT 1 FROM public.funcionarios WHERE auth_id=auth.uid() AND role='admin' AND ativo=true)$$;
       CREATE FUNCTION public.kairopont_today_sp() RETURNS date LANGUAGE sql STABLE AS $$SELECT (now() AT TIME ZONE 'America/Sao_Paulo')::date$$;
@@ -31,6 +32,7 @@ test('administrative registration edits preserve identity and audit atomic chang
     }
     await db.exec(await readFile(new URL('../migrations/20261110125841_admin_employee_details.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../migrations/20261110140710_support_account_access.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../migrations/20261117233112_allow_cnpj_for_pj_employees.sql', import.meta.url), 'utf8'));
     for (const [id, role, active] of [[admin, 'admin', true], [employee, 'employee', true], [inactiveAdmin, 'admin', false]]) {
       await db.query('insert into funcionarios values($1,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [id, 'Pessoa original', 'Assistente', role, active, 'clt', '2026-01-02', schedule, `cpf-${id}`, `${id}@example.invalid`]);
     }
@@ -106,6 +108,30 @@ test('administrative registration edits preserve identity and audit atomic chang
         assert.equal(result.role,'employee');
         const audit=(await db.query("select * from auditoria where acao='alterar_acesso_suporte'")).rows[0];
         assert.deepEqual(audit.detalhes,{antes:false,depois:true});
+      });
+    });
+    await t.test('CNPJ stays exclusive to PJ and a CLT conversion replaces it atomically', async () => {
+      const cnpj = '12ABC34501DE35';
+      const cpf = '529.982.247-25';
+      const convert = (document, admission = '2026-01-02') => db.query(
+        'select admin_update_employee_details($1,$2,$3,$4,$5,$6,$7,$8) as employee',
+        [employee, 'Pessoa atualizada', 'Analista', admission, schedule, 'clt', false, document],
+      );
+      await assert.rejects(db.query('insert into funcionario_convites values ($1, $2)', [cnpj, 'clt']), /cnpj_apenas_pj/);
+      await db.query('insert into funcionario_convites values ($1, $2)', [cnpj, 'pj']);
+      await db.query('update funcionarios set tipo_contrato = $1, cpf = $2 where id = $3', ['pj', cnpj, employee]);
+      await as('authenticated', employee, () => assert.rejects(convert(cpf), /restrita a administradores/));
+      await as('authenticated', admin, () => assert.rejects(save(), /cnpj_apenas_pj/));
+      await as('authenticated', admin, () => assert.rejects(convert('52998224726'), /CPF válido/));
+      await as('authenticated', admin, () => assert.rejects(convert(cpf, null)));
+      const original = (await db.query('select cpf, tipo_contrato from funcionarios where id = $1', [employee])).rows[0];
+      assert.deepEqual(original, { cpf: cnpj, tipo_contrato: 'pj' });
+      await as('authenticated', admin, async () => {
+        const result = (await convert(cpf)).rows[0].employee;
+        assert.equal(result.cpf, '52998224725');
+        assert.equal(result.tipo_contrato, 'clt');
+        const audit = (await db.query("select detalhes from auditoria where acao = 'alterar_documento_funcionario'")).rows[0];
+        assert.deepEqual(audit.detalhes, { antes: 'CNPJ', depois: 'CPF' });
       });
     });
   } finally { await db.close(); }

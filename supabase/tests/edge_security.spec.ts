@@ -21,6 +21,7 @@ Deno.test("Edge authorization, quotas and side effects", async (t) => {
 
   const actorId = "12345678-1234-1234-1234-123456789012";
   let effects = 0;
+  let savedDocument: string | undefined;
   let quotaCalls = 0;
   let quota: unknown = { allowed: true, retry_after: 0 };
   let quotaError: unknown = null;
@@ -39,7 +40,7 @@ Deno.test("Edge authorization, quotas and side effects", async (t) => {
         maybeSingle() {
           return Promise.resolve({ data: table === "funcionarios" ? (administrator ? { id: actorId } : null) : decision, error: null });
         },
-        insert() { effects++; return Promise.resolve({ error: null }); },
+        insert(values: { cpf: string }) { savedDocument = values.cpf; effects++; return Promise.resolve({ error: null }); },
       };
     },
     auth: { admin: { inviteUserByEmail() { effects++; return Promise.resolve({ error: null }); } } },
@@ -92,5 +93,19 @@ Deno.test("Edge authorization, quotas and side effects", async (t) => {
     const response = await handlers[0](req({ nome: "Test Employee", email: "test@example.invalid", cpf: "52998224725", cargo: "Test", tipo_contrato: "pj", data_admissao: null }));
     assert(response.status === 201, `Valid invitation failed: ${await response.text()}`);
     assert(effects === 2, "Expected exactly one invitation record and one provider call (both mocked)");
+  });
+  await t.step("numeric and alphanumeric CNPJs are canonicalized and accepted only for PJ", async () => {
+    const employee = { nome: "Test Employee", email: "test@example.invalid", cargo: "Test" };
+    for (const [submitted, canonical] of [["04.252.011/0001-10", "04252011000110"], ["12.abc.345/01de-35", "12ABC34501DE35"]]) {
+      const before = effects;
+      const clt = await handlers[0](req({ ...employee, cpf: submitted, tipo_contrato: "clt" }));
+      assert(clt.status === 400 && effects === before, "A CLT invitation must reject a CNPJ before writing or sending");
+      assert((await clt.json()).error.includes("CPF válido"), "CLT received the wrong validation message");
+      const pj = await handlers[0](req({ ...employee, cpf: submitted, tipo_contrato: "pj" }));
+      assert(pj.status === 201 && savedDocument === canonical && effects === before + 2, "Expected an accepted PJ invitation with the canonical identifier");
+    }
+    const before = effects;
+    const invalid = await handlers[0](req({ ...employee, cpf: "12.ABC.345/01DE-36", tipo_contrato: "pj" }));
+    assert(invalid.status === 400 && effects === before, "An invalid CNPJ must not create or send an invitation");
   });
 });

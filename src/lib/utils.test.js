@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { formatEmployeeDocument, normalizeEmployeeDocument, validateEmployeeDocument } from '../../supabase/functions/_shared/employee-document.mjs';
 import {
   addIsoDays,
   calcDailyTotal,
@@ -24,6 +25,16 @@ test('validates CPF check digits and rejects repeated digits', () => {
   assert.equal(validateCPF('529.982.247-25'), true);
   assert.equal(validateCPF('111.111.111-11'), false);
   assert.equal(validateCPF('123'), false);
+});
+
+test('formats CPF and CNPJ without dropping letters or leading zeros', () => {
+  assert.equal(formatEmployeeDocument('52998224725'), '529.982.247-25');
+  assert.equal(formatEmployeeDocument('04252011000110'), '04.252.011/0001-10');
+  assert.equal(formatEmployeeDocument('12abc34501de35'), '12.ABC.345/01DE-35');
+  assert.equal(normalizeEmployeeDocument('12.abc.345/01de-35'), '12ABC34501DE35');
+  assert.equal(validateEmployeeDocument('529.982.247-25', 'pj'), true);
+  assert.equal(validateEmployeeDocument('00.000.000/0000-00', 'pj'), false);
+  assert.equal(validateEmployeeDocument('12.ABC.345/01DE-35', 'clt'), false);
 });
 
 test('formats calendar dates in São Paulo without shifting the day', () => {

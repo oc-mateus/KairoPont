@@ -1,0 +1,117 @@
+.audit-records {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.audit-record {
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  overflow-wrap: anywhere;
+}
+
+.audit-record-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+}
+
+.audit-record-heading h3 {
+  color: var(--text-primary);
+  font-size: var(--font-lg);
+  line-height: 1.35;
+}
+
+.audit-record-heading time {
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-record-people,
+.audit-fields-main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-3) var(--space-5);
+}
+
+.audit-record-people {
+  max-width: 44rem;
+  margin-block: var(--space-3) 0;
+}
+
+.audit-record dt {
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  font-weight: 700;
+}
+
+.audit-record dd {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.audit-record-details {
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border-default);
+}
+
+.audit-record-details summary {
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-2) 0;
+  color: var(--text-success-strong);
+  font-size: var(--font-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.audit-record-details summary:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.audit-details-content {
+  margin-top: var(--space-1);
+  padding: var(--space-4);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.audit-fields {
+  margin: 0;
+  min-width: 0;
+}
+
+.audit-fields-main {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+}
+
+.audit-field-wide {
+  grid-column: 1 / -1;
+}
+
+.audit-fields .audit-fields {
+  margin-top: var(--space-1);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--border-default);
+}
+
+.audit-fields .audit-fields > div + div {
+  margin-top: var(--space-2);
+}
+
+.audit-value-list {
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
